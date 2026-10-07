@@ -39,10 +39,11 @@ const none = await call({ since: old.body.rev, changes: [] });
 assert.equal(none.body.changes.length, 0, "nichts Neues seit letztem Stand");
 
 const list = { type: "list", id: "smoke-list", updated: t, deleted: 0, data: { name: "Smoke-Liste", created: t } };
-const item = { type: "listItem", id: `smoke-list:${card.id}`, updated: t, deleted: 0, data: { list: "smoke-list", card, added: t } };
+const item = { type: "listItem", id: `smoke-list:${card.id}`, updated: t, deleted: 0, data: { list: "smoke-list", card, added: t, position: 1.5 } };
 const b = await call({ since: none.body.rev, changes: [list, item] });
 assert.equal(find(b, "list", "smoke-list").data.name, "Smoke-Liste", "Liste kommt an");
 assert.deepEqual(find(b, "listItem", item.id).data.card, card, "Listeneintrag mit Karte kommt an");
+assert.equal(find(b, "listItem", item.id).data.position, 1.5, "eigene Reihenfolge (Position) kommt an");
 
 if (otherKey) {
   const other = await call({ since: 0, changes: [] }, otherKey);

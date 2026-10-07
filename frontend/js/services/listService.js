@@ -1,4 +1,5 @@
 import { isObj } from "../core/format.js";
+import { orderOf } from "../domain/sorting.js";
 
 const itemId = (listId, cardId) => `${listId}:${cardId}`;
 const cleanName = (name) => String(name ?? "").trim().slice(0, 80);
@@ -13,7 +14,27 @@ export class ListService {
     return this.store
       .all("list")
       .map(({ id, data }) => ({ id, ...data }))
-      .sort((a, b) => a.created - b.created);
+      .sort((a, b) => orderOf(a) - orderOf(b));
+  }
+
+  // Eigene Reihenfolge (Drag & Drop): Position einer Liste bzw. einer Karte in einer Liste setzen
+  moveList(id, position) {
+    const list = this.store.get("list", id);
+    if (list) this.store.put("list", id, { ...list, position });
+  }
+
+  moveItem(listId, cardId, position) {
+    const item = this.store.get("listItem", itemId(listId, cardId));
+    if (item) this.store.put("listItem", itemId(listId, cardId), { ...item, position });
+  }
+
+  // Alle Positionen neu vergeben (wenn zwischen zwei Nachbarn kein Platz mehr ist)
+  renumberLists(orderedIds) {
+    this.store.batch(() => orderedIds.forEach((id, i) => this.moveList(id, (i + 1) * 1000)));
+  }
+
+  renumberItems(listId, orderedCardIds) {
+    this.store.batch(() => orderedCardIds.forEach((cardId, i) => this.moveItem(listId, cardId, (i + 1) * 1000)));
   }
 
   get(id) {

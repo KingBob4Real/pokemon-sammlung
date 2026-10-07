@@ -9,7 +9,6 @@ export const CARDMARKET_FILTER = "language=3&minCondition=3"; // nur deutsche Ka
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const PRICE_TTL_MS = DAY_MS;
 export const SETS_TTL_MS = 7 * DAY_MS;
-export const RELOAD_AFTER_HIDDEN_MS = 60 * 60 * 1000; // iPhone-App hat keinen Neu-laden-Knopf
 export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden

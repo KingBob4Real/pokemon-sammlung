@@ -6,17 +6,17 @@ import { CURRENT_REV_SQL } from "./revisionRepository.js";
 
 const ID = "value ->> 'id'";
 const UPSERT = `
-  INSERT INTO list_items (user_id, id, list_id, card_id, added, updated, deleted, rev)
+  INSERT INTO list_items (user_id, id, list_id, card_id, added, position, updated, deleted, rev)
   SELECT ?2, ${ID}, substr(${ID}, 1, instr(${ID}, ':') - 1), substr(${ID}, instr(${ID}, ':') + 1),
-         value ->> '$.data.added', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
+         value ->> '$.data.added', value ->> '$.data.position', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
   FROM json_each(?1)
   WHERE value ->> 'type' = 'listItem'
   ON CONFLICT (user_id, id) DO UPDATE SET
-    added = excluded.added, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
+    added = excluded.added, position = excluded.position, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > list_items.updated`;
 
 const CHANGED = `
-  SELECT i.id, i.list_id, i.added, i.updated, i.deleted, ${CARD_COLUMNS}
+  SELECT i.id, i.list_id, i.added, i.position, i.updated, i.deleted, ${CARD_COLUMNS}
   FROM list_items i LEFT JOIN cards k ON k.id = i.card_id
   WHERE i.user_id = ?3
     AND (i.rev > ?1 OR i.id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'listItem'))`;
@@ -42,7 +42,7 @@ export class ListItemRepository {
       id: row.id,
       updated: row.updated,
       deleted: row.deleted,
-      data: row.deleted ? null : { list: row.list_id, card: cardFromRow(row), added: row.added },
+      data: row.deleted ? null : { list: row.list_id, card: cardFromRow(row), added: row.added, position: row.position },
     };
   }
 }

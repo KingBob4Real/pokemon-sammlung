@@ -3,16 +3,18 @@ import { CURRENT_REV_SQL } from "./revisionRepository.js";
 // Listen pro Person (Tabelle lists). Änderungsart „list“, id = Listen-ID.
 
 const UPSERT = `
-  INSERT INTO lists (user_id, id, name, created, updated, deleted, rev)
-  SELECT ?2, value ->> 'id', value ->> '$.data.name', value ->> '$.data.created', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
+  INSERT INTO lists (user_id, id, name, created, position, updated, deleted, rev)
+  SELECT ?2, value ->> 'id', value ->> '$.data.name', value ->> '$.data.created', value ->> '$.data.position',
+         value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
   FROM json_each(?1)
   WHERE value ->> 'type' = 'list'
   ON CONFLICT (user_id, id) DO UPDATE SET
-    name = excluded.name, created = excluded.created, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
+    name = excluded.name, created = excluded.created, position = excluded.position,
+    updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > lists.updated`;
 
 const CHANGED = `
-  SELECT id, name, created, updated, deleted
+  SELECT id, name, created, position, updated, deleted
   FROM lists
   WHERE user_id = ?3
     AND (rev > ?1 OR id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'list'))`;
@@ -38,7 +40,7 @@ export class ListRepository {
       id: row.id,
       updated: row.updated,
       deleted: row.deleted,
-      data: row.deleted ? null : { name: row.name, created: row.created },
+      data: row.deleted ? null : { name: row.name, created: row.created, position: row.position },
     };
   }
 }

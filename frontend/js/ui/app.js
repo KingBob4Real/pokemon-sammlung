@@ -10,7 +10,7 @@ import * as moreView from "./views/moreView.js";
 import * as searchView from "./views/searchView.js";
 import * as setView from "./views/setView.js";
 
-// Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick? }. Neue Ansicht = hier eintragen.
+// Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
 const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", busy: "Sync …", error: "Sync-Fehler", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
@@ -22,6 +22,7 @@ const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
 export class App {
   #viewRefresh = null;
   #viewPick = null; // Ansichten mit Auswahl-Kacheln bekommen das Antippen hierüber
+  #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
   #rerenderTimer = null;
 
@@ -71,11 +72,13 @@ export class App {
   render() {
     clearTimeout(this.#rerenderTimer);
     const route = currentRoute();
+    this.#viewDispose?.();
     this.main.textContent = "";
     this.main.classList.remove("has-action-bar");
     const view = VIEWS[route.view].render(this.main, this.ctx, route.arg) || {};
     this.#viewRefresh = view.refresh || null;
     this.#viewPick = view.onPick || null;
+    this.#viewDispose = view.dispose || null;
     for (const a of document.querySelectorAll(".tabs a")) {
       if (a.dataset.tab === route.tab) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");

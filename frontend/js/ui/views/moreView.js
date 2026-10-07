@@ -5,7 +5,7 @@ import { panel } from "../components/widgets.js";
 
 // Ansicht „Mehr“: Sync einrichten, Sicherung, alte Checkliste übernehmen, Hinweise zu Preisen
 export function render(main, ctx) {
-  const { sync, backup, legacyImport } = ctx;
+  const { sync, backup, legacyImport, updates } = ctx;
   ctx.setTitle("Mehr");
 
   // --- Sync ---
@@ -62,6 +62,21 @@ export function render(main, ctx) {
       legacy
         ? h("button", { type: "button", class: "btn", onclick: importLegacy }, `Aus diesem Browser übernehmen (${legacy.owned.length} abgehakt)`)
         : h("p", { class: "muted" }, "In diesem Browser ist keine alte Checkliste gespeichert. Exportiere sie dort und wähle die Datei oben bei „Import“."),
+    ]),
+    panel("App", [
+      h("p", {}, "Neue Versionen lädt die App automatisch, sobald du sie öffnest oder zu ihr zurückkehrst."),
+      h("div", { class: "buttons" }, [
+        h("button", {
+          type: "button",
+          class: "btn btn-ghost",
+          onclick: async (e) => {
+            const latest = await updates.latestVersion();
+            if (latest) location.reload();
+            else e.target.textContent = "Du hast die neueste Version ✓";
+          },
+        }, "Nach Update suchen"),
+      ]),
+      h("p", { class: "muted small" }, `Version ${updates.currentVersion || "?"}`),
     ]),
     panel("Zu den Preisen", [
       h("p", {}, "Der Marktwert ist der Cardmarket-Trend aus der TCGdex-API. Er mischt alle Sprachen und Zustände. Echte Preise für deutsche Karten ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),

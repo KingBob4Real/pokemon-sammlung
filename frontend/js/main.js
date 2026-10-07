@@ -4,7 +4,7 @@
 //   domain/    reine Fachlogik (Karte, Preis, Sortierung)
 //   services/  Anwendungslogik (Sammlung, Listen, Preise, Sync …)
 //   ui/        Ansichten und Komponenten
-import { DEFAULT_BACKEND_URL, OLD_APP_URL, POCKET_SERIES, PRICE_TTL_MS, RELOAD_AFTER_HIDDEN_MS, SETS_TTL_MS, STORAGE_KEYS, SYNC_BATCH, TCGDEX_API } from "./config.js";
+import { DEFAULT_BACKEND_URL, OLD_APP_URL, POCKET_SERIES, PRICE_TTL_MS, SETS_TTL_MS, STORAGE_KEYS, SYNC_BATCH, TCGDEX_API } from "./config.js";
 import { fetchJson } from "./core/http.js";
 import { storage } from "./core/storage.js";
 import { SyncApi } from "./data/syncApi.js";
@@ -19,6 +19,7 @@ import { ListService } from "./services/listService.js";
 import { PriceService } from "./services/priceService.js";
 import { SetService } from "./services/setService.js";
 import { SyncService } from "./services/syncService.js";
+import { UpdateService } from "./services/updateService.js";
 import { App } from "./ui/app.js";
 import { createPrefs } from "./ui/prefs.js";
 
@@ -33,18 +34,19 @@ const sync = new SyncService(store, new SyncApi(fetchJson), storage, STORAGE_KEY
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id) });
-const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listSort: "order", listFilter: "all" });
+const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
+const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all" });
 
-new App({ store, sets, prices, collection, lists, catalog, sync, legacyImport, backup, sorters }, prefs).start();
+new App({ store, sets, prices, collection, lists, catalog, sync, legacyImport, backup, sorters, updates }, prefs).start();
 
 // Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
-// Nach langer Pause neu laden – so kommen Updates auch in der iPhone-App ohne Neu-laden-Knopf an.
+// Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates
+// auch in der iPhone-App vom Home-Bildschirm sofort an.
 sync.run();
-let hiddenAt = 0;
-document.addEventListener("visibilitychange", () => {
-  if (document.hidden) hiddenAt = Date.now();
-  else if (hiddenAt && Date.now() - hiddenAt > RELOAD_AFTER_HIDDEN_MS) location.reload();
-  else sync.run();
+updates.reloadIfUpdated();
+document.addEventListener("visibilitychange", async () => {
+  if (document.hidden) return;
+  if (!(await updates.reloadIfUpdated())) sync.run();
 });
 window.addEventListener("online", () => {
   sync.run();

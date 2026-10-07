@@ -23,7 +23,7 @@ export function cardTile(card, { mode = "default" } = {}) {
         "aria-label": pick ? `${card.name} ${cardNumber(card)} auswählen` : `${card.name} ${cardNumber(card)} anzeigen`,
       },
       [
-        img ? h("img", { src: img, alt: "", loading: "lazy", decoding: "async", crossorigin: "anonymous" }) : null,
+        img ? h("img", { src: img, alt: "", loading: "lazy", decoding: "async", crossorigin: "anonymous", draggable: "false" }) : null,
         h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
       ]
     ),

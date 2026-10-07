@@ -1,7 +1,9 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, plural } from "../../core/format.js";
+import { orderOf, positionBetween } from "../../domain/sorting.js";
 import { links } from "../router.js";
-import { cardTile, setPicked } from "../components/cardTile.js";
+import { cardTile, setPicked, tileCard } from "../components/cardTile.js";
+import { enableReorder } from "../components/reorder.js";
 import { backLink, emptyState, segmented, sortSelect, stat } from "../components/widgets.js";
 
 const SORT_KEYS = ["order", "set", "name", "value"];
@@ -30,7 +32,10 @@ export function render(main, ctx, listId) {
   const selecting = selection.listId === listId;
   if (!selecting) selection.ids.clear();
   const filter = prefs.get("listFilter");
-  const items = lists.items(listId).sort((sorters[prefs.get("listSort")] || sorters.order).compare);
+  const sortKey = sorters[prefs.get("listSort")] ? prefs.get("listSort") : "order";
+  const items = lists.items(listId).sort(sorters[sortKey].compare);
+  // Verschieben nur, wenn man die eigene Reihenfolge vollständig sieht
+  const canReorder = sortKey === "order" && filter === "all" && !selecting && items.length > 1;
   const shown = items.filter((i) => filter === "all" || (filter === "owned") === collection.has(i.card.id));
 
   const rename = () => {
@@ -55,6 +60,15 @@ export function render(main, ctx, listId) {
   };
 
   const stats = h("div", { class: "stats" });
+  const grid = h(
+    "div",
+    { class: "grid checklist" },
+    shown.map((i) => {
+      const el = cardTile(i.card, { mode: selecting ? "pick" : "default" });
+      if (selecting) setPicked(el, selection.ids.has(i.card.id));
+      return el;
+    })
+  );
   const refresh = () => {
     const p = lists.progress(listId, (id) => collection.has(id), (id) => prices.value(id));
     stats.replaceChildren(
@@ -80,18 +94,13 @@ export function render(main, ctx, listId) {
       h("a", { class: "btn", href: links.addTo(listId) }, "+ Hinzufügen"),
       items.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(!selecting) }, selecting ? "Auswahl beenden" : "Auswählen") : null,
     ]),
-    h("div", { class: "toolbar" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, prefs.get("listSort"), setPref("listSort"))]),
-    h(
-      "div",
-      { class: "grid checklist" },
-      shown.map((i) => {
-        const el = cardTile(i.card, { mode: selecting ? "pick" : "default" });
-        if (selecting) setPicked(el, selection.ids.has(i.card.id));
-        return el;
-      })
-    )
+    h("div", { class: "toolbar" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, sortKey, setPref("listSort"))]),
+    items.length > 1 && !selecting
+      ? h("p", { class: "muted pad" }, canReorder ? "Karte gedrückt halten und ziehen zum Verschieben." : "Zum Verschieben „Eigene Reihenfolge“ und „Alle“ wählen.")
+      : null,
+    grid
   );
-  if (!items.length) main.append(emptyState("Noch keine Karten in dieser Liste.", "Tippe auf „+ Karten hinzufügen“ und dann einfach auf die Karten, die rein sollen."));
+  if (!items.length) main.append(emptyState("Noch keine Karten in dieser Liste.", "Tippe auf „+ Hinzufügen“ und dann einfach auf die Karten, die rein sollen."));
   else if (!shown.length) main.append(emptyState(filter === "missing" ? "Alles gesammelt! 🎉" : "Noch keine Karte aus dieser Liste in der Sammlung."));
 
   // Auswahl: Leiste unten mit Aktionen für die markierten Karten
@@ -125,6 +134,17 @@ export function render(main, ctx, listId) {
       updateBar();
     };
   }
+  const dispose = canReorder
+    ? enableReorder(grid, {
+        itemSelector: ".tile",
+        onDrop: (el, prev, next) => {
+          const item = (tile) => tile && lists.items(listId).find((i) => i.card.id === tileCard(tile).id);
+          const position = positionBetween(prev ? orderOf(item(prev)) : null, next ? orderOf(item(next)) : null);
+          if (position == null) lists.renumberItems(listId, [...grid.querySelectorAll(".tile")].map((t) => tileCard(t).id));
+          else lists.moveItem(listId, tileCard(el).id, position);
+        },
+      })
+    : null;
   prices.request(items.map((i) => i.card.id));
-  return { refresh, onPick };
+  return { refresh, onPick, dispose };
 }

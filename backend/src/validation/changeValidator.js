@@ -7,6 +7,7 @@ const str = (v, max) => typeof v === "string" && v.length > 0 && v.length <= max
 const optStr = (v, max) => v == null || str(v, max);
 const int = (v) => Number.isSafeInteger(v);
 const optAmount = (v) => v == null || (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1e7);
+const optPosition = (v) => v == null || (typeof v === "number" && Number.isFinite(v));
 
 const isCard = (c) =>
   c != null &&
@@ -21,8 +22,8 @@ const isCard = (c) =>
 const DATA_RULES = {
   collection: (d, id) =>
     int(d.qty) && d.qty >= 0 && d.qty <= 9999 && optStr(d.cond, 40) && optStr(d.lang, 40) && optAmount(d.paid) && int(d.added) && isCard(d.card) && d.card.id === id,
-  list: (d) => str(d.name, 80) && d.name.trim() !== "" && int(d.created),
-  listItem: (d, id) => str(d.list, 100) && isCard(d.card) && int(d.added) && id === `${d.list}:${d.card.id}`,
+  list: (d) => str(d.name, 80) && d.name.trim() !== "" && int(d.created) && optPosition(d.position),
+  listItem: (d, id) => str(d.list, 100) && isCard(d.card) && int(d.added) && optPosition(d.position) && id === `${d.list}:${d.card.id}`,
 };
 
 export const CHANGE_TYPES = Object.keys(DATA_RULES);
