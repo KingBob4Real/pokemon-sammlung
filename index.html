@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Pokémon-Sammlung</title>
+  <meta name="description" content="Meine Pokémon-Kartensammlung: alle deutschen Karten suchen, Sammlung und Listen pflegen, Marktwerte sehen.">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#e8443a">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="icon" href="icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Sammlung">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://api.tcgdex.net" crossorigin>
+  <link rel="preconnect" href="https://assets.tcgdex.net" crossorigin>
+  <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" crossorigin>
+  <link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+  <header class="top">
+    <h1 id="title">Sammlung</h1>
+    <a class="sync-dot" id="syncDot" href="#mehr" aria-label="Sync-Status"><i></i><span id="syncLabel">Sync aus</span></a>
+  </header>
+
+  <main id="view" aria-live="polite"></main>
+
+  <nav class="tabs" aria-label="Bereiche">
+    <a href="#sammlung" data-tab="sammlung">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="4" y="3" width="11" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M18 6.5l1.6.4a1.5 1.5 0 0 1 1.1 1.8l-2.8 11.2a1.5 1.5 0 0 1-1.8 1.1L9 19.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span>Sammlung</span>
+    </a>
+    <a href="#listen" data-tab="listen">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="4.5" cy="6" r="1.5" fill="currentColor"/><circle cx="4.5" cy="12" r="1.5" fill="currentColor"/><circle cx="4.5" cy="18" r="1.5" fill="currentColor"/></svg>
+      <span>Listen</span>
+    </a>
+    <a href="#suche" data-tab="suche">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.2" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M15.2 15.2L20 20" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+      <span>Suche</span>
+    </a>
+    <a href="#mehr" data-tab="mehr">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
+      <span>Mehr</span>
+    </a>
+  </nav>
+
+  <dialog class="sheet" id="sheet" aria-label="Karte">
+    <div class="sheet-inner" id="sheetBody"></div>
+  </dialog>
+
+  <script src="app.js?v=1"></script>
+</body>
+</html>

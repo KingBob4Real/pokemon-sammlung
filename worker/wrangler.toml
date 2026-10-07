@@ -1,0 +1,8 @@
+name = "pokemon-sammlung"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "pokemon-sammlung"
+database_id = "local" # beim Einrichten durch die echte ID aus `npx wrangler d1 create pokemon-sammlung` ersetzen
