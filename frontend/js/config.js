@@ -18,7 +18,7 @@ export const STORAGE_KEYS = {
   dirty: "ps.dirty.v1",
   rev: "ps.rev.v1",
   sync: "ps.sync.v1",
-  prices: "ps.prices.v1",
+  prices: "ps.prices.v2", // v2: mit Pokédex-Nummer
   sets: "ps.sets.v2", // v2: mit Serie für englische Ersatzbilder
   prefs: "ps.prefs.v1",
   // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)

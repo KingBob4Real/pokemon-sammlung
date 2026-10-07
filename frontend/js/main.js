@@ -33,7 +33,7 @@ const catalog = new CatalogService(tcgdex, sets);
 const sync = new SyncService(store, new SyncApi(fetchJson), storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH);
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
-const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id) });
+const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
 const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all" });
 

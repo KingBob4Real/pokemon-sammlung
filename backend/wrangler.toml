@@ -1,5 +1,6 @@
 name = "pokemon-sammlung"
 main = "src/index.js"
+account_id = "3eff4ed7c54a174af6d042c750ebee99" # nicht geheim; nötig fürs automatische Veröffentlichen per GitHub Action
 compatibility_date = "2026-09-01"
 
 [[d1_databases]]

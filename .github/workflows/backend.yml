@@ -1,0 +1,53 @@
+# Veröffentlicht das Backend bei Cloudflare (Datenbank-Migrationen + Worker), sobald sich backend/ ändert.
+# Braucht das Repository-Secret CLOUDFLARE_API_TOKEN – ohne Token wird nur gewarnt, nichts veröffentlicht.
+name: Backend zu Cloudflare
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/backend.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: backend
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.token.outputs.ready }}
+    steps:
+      - id: token
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Secret CLOUDFLARE_API_TOKEN fehlt – Backend wird nicht veröffentlicht (Anleitung in der README)."
+          fi
+
+  deploy:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Datenbank-Migrationen
+        run: npx wrangler d1 migrations apply pokemon-sammlung --remote
+      - name: Worker veröffentlichen
+        run: npx wrangler deploy
+      - name: Kurztest
+        run: sleep 15 && curl -fsS https://pokemon-sammlung.pokemon-sammlung-backend.workers.dev/

@@ -6,7 +6,7 @@ import { cardTile, setPicked, tileCard } from "../components/cardTile.js";
 import { enableReorder } from "../components/reorder.js";
 import { backLink, emptyState, segmented, sortSelect, stat } from "../components/widgets.js";
 
-const SORT_KEYS = ["order", "set", "name", "value"];
+const SORT_KEYS = ["order", "pokedex", "set", "name", "value"];
 const FILTERS = [
   ["all", "Alle"],
   ["missing", "Fehlend"],
@@ -69,7 +69,13 @@ export function render(main, ctx, listId) {
       return el;
     })
   );
+  // Pokédex-Sortierung braucht die Kartendetails – sind sie nachgeladen, einmal neu sortieren
+  let waitingForDex = sortKey === "pokedex" && items.some((i) => !prices.get(i.card.id));
   const refresh = () => {
+    if (waitingForDex && items.every((i) => prices.get(i.card.id))) {
+      waitingForDex = false;
+      return ctx.render();
+    }
     const p = lists.progress(listId, (id) => collection.has(id), (id) => prices.value(id));
     stats.replaceChildren(
       stat("Fortschritt", `${p.have}/${p.total}`, p.total ? `${Math.round((p.have / p.total) * 100)} %` : "leer"),

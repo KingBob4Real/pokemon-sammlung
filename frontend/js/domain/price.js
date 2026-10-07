@@ -1,7 +1,8 @@
 import { CARDMARKET_FILTER } from "../config.js";
 import { positive } from "../core/format.js";
 
-// Cardmarket-Richtwerte aus einer TCGdex-Karte. Sie mischen alle Sprachen und Zustände.
+// Cardmarket-Richtwerte aus einer TCGdex-Karte (mischen alle Sprachen und Zustände),
+// dazu Kartendetails, die nur die volle Karte hat: Seltenheit und Pokédex-Nummer (Trainer/Energie: null).
 export function toPrice(card) {
   const cm = card?.pricing?.cardmarket;
   const first = (...values) => values.map(positive).find((x) => x != null) ?? null;
@@ -13,6 +14,7 @@ export function toPrice(card) {
     cardmarketId: cm?.idProduct || null,
     updated: cm?.updated || null,
     rarity: card?.rarity || null,
+    dexId: Array.isArray(card?.dexId) && Number.isInteger(card.dexId[0]) ? card.dexId[0] : null,
   };
 }
 

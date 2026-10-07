@@ -4,7 +4,7 @@ import { COLLECTION_TARGET, links } from "../router.js";
 import { cardTile } from "../components/cardTile.js";
 import { emptyState, sortSelect, stat } from "../components/widgets.js";
 
-const SORT_KEYS = ["newest", "value", "name", "set"];
+const SORT_KEYS = ["newest", "pokedex", "value", "name", "set"];
 const GROUPS = [
   ["none", "Ohne Gruppen"],
   ["set", "Nach Set"],
@@ -20,7 +20,13 @@ export function render(main, ctx) {
   const stats = h("div", { class: "stats" });
   main.append(stats, h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen")]));
 
+  // Pokédex-Sortierung braucht die Kartendetails – sind sie nachgeladen, einmal neu sortieren
+  let waitingForDex = prefs.get("collectionSort") === "pokedex" && entries.some((e) => !prices.get(e.card.id));
   const refresh = () => {
+    if (waitingForDex && entries.every((e) => prices.get(e.card.id))) {
+      waitingForDex = false;
+      return ctx.render();
+    }
     const s = collection.summary((id) => prices.value(id));
     stats.replaceChildren(
       stat("Karten", String(s.count), `${s.distinct} verschiedene`),
