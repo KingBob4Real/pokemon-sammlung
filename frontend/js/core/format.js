@@ -15,7 +15,7 @@ export const fmtDate = (ms) => new Date(ms).toLocaleDateString("de-DE");
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // klein, ohne Akzente: „Pokémon“ findet man auch mit „pokemon“
-export const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+export const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
 // Kartennummern: „023“ < „199“ < „TG01“
 export const numCmp = (a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || String(a).localeCompare(String(b));

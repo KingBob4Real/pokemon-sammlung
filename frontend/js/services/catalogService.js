@@ -31,7 +31,7 @@ export class CatalogService {
 
   async setCards(setId) {
     const data = await this.tcgdex.set(setId);
-    const set = { id: setId, name: data.name, cardCount: data.cardCount };
+    const set = { id: setId, name: data.name, cardCount: data.cardCount, serie: data.serie };
     return {
       name: data.name,
       cards: (data.cards || []).map((c) => toCard({ ...c, set }, () => null)).sort((a, b) => numCmp(a.num, b.num)),

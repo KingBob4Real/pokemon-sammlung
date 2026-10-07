@@ -1,20 +1,21 @@
 import { CURRENT_REV_SQL } from "./revisionRepository.js";
 
-// Eigene Listen (Tabelle lists). Änderungsart „list“, id = Listen-ID.
+// Listen pro Person (Tabelle lists). Änderungsart „list“, id = Listen-ID.
 
 const UPSERT = `
-  INSERT INTO lists (id, name, created, updated, deleted, rev)
-  SELECT value ->> 'id', value ->> '$.data.name', value ->> '$.data.created', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
+  INSERT INTO lists (user_id, id, name, created, updated, deleted, rev)
+  SELECT ?2, value ->> 'id', value ->> '$.data.name', value ->> '$.data.created', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
   FROM json_each(?1)
   WHERE value ->> 'type' = 'list'
-  ON CONFLICT (id) DO UPDATE SET
+  ON CONFLICT (user_id, id) DO UPDATE SET
     name = excluded.name, created = excluded.created, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > lists.updated`;
 
 const CHANGED = `
   SELECT id, name, created, updated, deleted
   FROM lists
-  WHERE rev > ?1 OR id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'list')`;
+  WHERE user_id = ?3
+    AND (rev > ?1 OR id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'list'))`;
 
 export class ListRepository {
   type = "list";
@@ -23,12 +24,12 @@ export class ListRepository {
     this.db = db;
   }
 
-  upsert(changesJson) {
-    return this.db.prepare(UPSERT).bind(changesJson);
+  upsert(changesJson, userId) {
+    return this.db.prepare(UPSERT).bind(changesJson, userId);
   }
 
-  changed(since, changesJson) {
-    return this.db.prepare(CHANGED).bind(since, changesJson);
+  changed(since, changesJson, userId) {
+    return this.db.prepare(CHANGED).bind(since, changesJson, userId);
   }
 
   toEntity(row) {

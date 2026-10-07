@@ -1,12 +1,15 @@
-// Kurzer Test des Backends: node test/smoke.mjs [URL] [SCHLÜSSEL]
-// Ohne Angaben: lokales `npx wrangler dev` (Port 8787) mit dem Schlüssel aus .dev.vars.
+// Kurzer Test des Backends: node test/smoke.mjs <URL> <SCHLÜSSEL> [SCHLÜSSEL EINER ZWEITEN PERSON]
 // Nutzt eine feste Test-Karte und Test-Liste; am Ende ist die Karte auf Anzahl 0 und die Liste gelöscht,
-// in der App ist also nichts davon zu sehen.
+// in der App ist also nichts davon zu sehen. Mit zweitem Schlüssel wird geprüft, dass die andere Person
+// diese Daten nicht sieht (dabei wird für sie nichts geschrieben).
 import assert from "node:assert/strict";
-import fs from "node:fs";
 
-const base = (process.argv[2] || "http://127.0.0.1:8787").replace(/\/$/, "");
-const key = process.argv[3] || fs.readFileSync(new URL("../.dev.vars", import.meta.url), "utf8").match(/SYNC_KEY\s*=\s*"?([^"\n]+)/)[1];
+const [baseArg, key, otherKey] = process.argv.slice(2);
+if (!baseArg || !key) {
+  console.error("Aufruf: node test/smoke.mjs <URL> <SCHLÜSSEL> [ZWEITER SCHLÜSSEL]");
+  process.exit(1);
+}
+const base = baseArg.replace(/\/$/, "");
 
 const call = async (body, k = key) => {
   const r = await fetch(`${base}/sync`, { method: "POST", headers: { Authorization: `Bearer ${k}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -19,10 +22,11 @@ const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, del
 const find = (res, type, id) => res.body.changes.find((c) => c.type === type && c.id === id);
 
 assert.equal((await fetch(base)).status, 200, "Backend antwortet");
-assert.equal((await call({ since: 0, changes: [] }, "falsch")).status, 401, "falscher Schlüssel wird abgewiesen");
+assert.equal((await call({ since: 0, changes: [] }, "FALSCH-FALSCH")).status, 401, "falscher Schlüssel wird abgewiesen");
 
 const start = await call({ since: 0, changes: [] });
 assert.equal(start.status, 200);
+assert.equal(typeof start.body.user, "string", "Name der Person kommt zurück");
 
 const a = await call({ since: start.body.rev, changes: [entry(t, 2)] });
 assert.ok(a.body.rev > start.body.rev, "Server-Stand steigt bei Änderungen");
@@ -40,10 +44,17 @@ const b = await call({ since: none.body.rev, changes: [list, item] });
 assert.equal(find(b, "list", "smoke-list").data.name, "Smoke-Liste", "Liste kommt an");
 assert.deepEqual(find(b, "listItem", item.id).data.card, card, "Listeneintrag mit Karte kommt an");
 
+if (otherKey) {
+  const other = await call({ since: 0, changes: [] }, otherKey);
+  assert.equal(other.status, 200, "zweite Person kommt rein");
+  assert.notEqual(other.body.user, start.body.user, "zweite Person ist eine andere");
+  assert.ok(!other.body.changes.some((c) => c.id === card.id || c.id === "smoke-list" || c.id === item.id), "zweite Person sieht diese Daten nicht");
+}
+
 const gone = { type: "listItem", id: item.id, updated: t + 1, deleted: 1, data: null };
 const c = await call({ since: b.body.rev, changes: [gone, { ...list, updated: t + 1, deleted: 1, data: null }, entry(t + 1, 0)] });
 assert.equal(find(c, "listItem", item.id).deleted, 1, "Löschen kommt an");
 
 assert.equal((await call({ since: 0, changes: [{ type: "böse", id: "x", updated: 1, deleted: 0, data: {} }] })).status, 400, "unbekannte Art wird abgewiesen");
 assert.equal((await call({ since: 0, changes: [{ ...item, id: "falsch:id" }] })).status, 400, "unstimmige ID wird abgewiesen");
-console.log("Backend ok:", base);
+console.log(`Backend ok: ${base} (Person: ${start.body.user}${otherKey ? ", Trennung zu zweiter Person geprüft" : ""})`);

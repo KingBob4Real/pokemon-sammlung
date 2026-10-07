@@ -3,7 +3,10 @@
 // TCGdex-IDs sind „<set>-<nummer>“, z. B. sv03.5-199
 export const setIdOf = (c) => c.id.slice(0, c.id.length - String(c.localId).length - 1);
 
-// TCGdex-Karte (kurz oder voll) → gespeicherte Karte. setInfo(id) liefert { name, official } oder null.
+// Ältere Sets (Base, Neo, EX, DP, Platin) hat TCGdex auf Deutsch ohne Bilder, auf Englisch aber vollständig
+const englishImage = (serie, setId, localId) => (serie ? `https://assets.tcgdex.net/en/${serie}/${setId}/${localId}` : null);
+
+// TCGdex-Karte (kurz oder voll) → gespeicherte Karte. setInfo(id) liefert { name, official, serie } oder null.
 export function toCard(c, setInfo) {
   const setId = c.set?.id || setIdOf(c);
   const s = setInfo(setId);
@@ -14,7 +17,7 @@ export function toCard(c, setInfo) {
     set: setId,
     setName: c.set?.name || s?.name || setId,
     total: c.set?.cardCount?.official || s?.official || null,
-    img: c.image || null,
+    img: c.image || englishImage(c.set?.serie?.id || s?.serie, setId, c.localId),
   };
 }
 

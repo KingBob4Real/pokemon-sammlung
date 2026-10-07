@@ -7,7 +7,7 @@ export class SyncController {
     this.syncService = syncService;
   }
 
-  async sync(request) {
+  async sync(request, user) {
     let body;
     try {
       body = await request.json();
@@ -16,6 +16,6 @@ export class SyncController {
     }
     const parsed = parseSyncRequest(body);
     if (!parsed.ok) return error(parsed.status, parsed.error);
-    return json(await this.syncService.sync(parsed.since, parsed.changes));
+    return json(await this.syncService.sync(user, parsed.since, parsed.changes));
   }
 }

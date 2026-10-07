@@ -20,7 +20,7 @@ export const STORAGE_KEYS = {
   rev: "ps.rev.v1",
   sync: "ps.sync.v1",
   prices: "ps.prices.v1",
-  sets: "ps.sets.v1",
+  sets: "ps.sets.v2", // v2: mit Serie für englische Ersatzbilder
   prefs: "ps.prefs.v1",
   // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
   legacyOwned: "pkc.owned.v1",

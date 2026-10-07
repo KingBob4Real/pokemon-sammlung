@@ -5,7 +5,7 @@
 //   repositories/  SQL pro Tabelle
 //   validation/    Prüfung eingehender Daten
 import { SyncController } from "./controllers/syncController.js";
-import { requireKey } from "./http/auth.js";
+import { requireUser } from "./http/auth.js";
 import { json } from "./http/responses.js";
 import { Router } from "./http/router.js";
 import { CardRepository } from "./repositories/cardRepository.js";
@@ -13,10 +13,12 @@ import { CollectionRepository } from "./repositories/collectionRepository.js";
 import { ListItemRepository } from "./repositories/listItemRepository.js";
 import { ListRepository } from "./repositories/listRepository.js";
 import { RevisionRepository } from "./repositories/revisionRepository.js";
+import { UserRepository } from "./repositories/userRepository.js";
 import { SyncService } from "./services/syncService.js";
 
 export function createApp(env) {
   const db = env.DB;
+  const users = new UserRepository(db);
   const syncService = new SyncService(db, new RevisionRepository(db), new CardRepository(db), [
     new CollectionRepository(db),
     new ListRepository(db),
@@ -26,7 +28,7 @@ export function createApp(env) {
 
   return new Router()
     .get("/", () => json({ ok: true, app: "pokemon-sammlung" }))
-    .post("/sync", requireKey(env.SYNC_KEY, (request) => syncController.sync(request)));
+    .post("/sync", requireUser(users, (request, user) => syncController.sync(request, user)));
 }
 
 export default {

@@ -1,12 +1,10 @@
 import { objOr } from "../core/format.js";
 
-const KEY_CHARS = "ABCDEFGHJKMNPQRSTVWXYZ0123456789"; // 32 Zeichen ohne I, L, O, U – gut abtippbar
-
 // Schlüssel in Form „XXXX-XXXX-…“ bringen (Groß/klein und Leerzeichen egal)
 export const normalizeKey = (key) => (String(key).toUpperCase().replace(/[^A-Z0-9]/g, "").match(/.{1,4}/g) || []).join("-");
 
 /**
- * Gleicht den lokalen Speicher mit dem Backend ab.
+ * Gleicht den lokalen Speicher mit dem Backend ab – mit dem Schlüssel einer Person.
  * Zustand: off (nicht eingerichtet), busy, error, pending (Änderungen warten), ok. Meldet "status".
  */
 export class SyncService extends EventTarget {
@@ -20,13 +18,8 @@ export class SyncService extends EventTarget {
     this.storage = storage;
     this.storageKey = storageKey;
     this.batchSize = batchSize;
-    this.config = { url: "", key: "", at: 0, error: "", ...objOr(storage.get(storageKey, {})) };
+    this.config = { url: "", key: "", user: "", at: 0, error: "", ...objOr(storage.get(storageKey, {})) };
     if (!this.config.url) this.config.url = defaultUrl;
-  }
-
-  // 20 Zeichen × 5 Bit = 100 Bit Zufall
-  generateKey() {
-    return normalizeKey([...crypto.getRandomValues(new Uint8Array(20))].map((b) => KEY_CHARS[b & 31]).join(""));
   }
 
   get enabled() {
@@ -44,7 +37,17 @@ export class SyncService extends EventTarget {
     return this.store.pendingCount ? "pending" : "ok";
   }
 
+  // Wechsel zum Schlüssel einer (womöglich) anderen Person? Dann gehören die Daten auf dem Gerät nicht dazu.
+  isOtherKey(key) {
+    return Boolean(this.config.key) && normalizeKey(key) !== this.config.key;
+  }
+
   configure(url, key) {
+    if (this.isOtherKey(key)) {
+      this.store.reset(); // im Backend bleibt alles, das Gerät holt die Daten der neuen Person
+      this.config.user = "";
+      this.config.at = 0;
+    }
     this.config = { ...this.config, url: url.trim(), key: normalizeKey(key), error: "" };
     this.#save();
     return this.run();
@@ -63,7 +66,9 @@ export class SyncService extends EventTarget {
       // in Päckchen hochladen, bis nichts mehr wartet
       for (let round = 0; round < 50; round++) {
         const sent = this.store.pendingChanges(this.batchSize);
-        this.store.applySyncResult(sent, await this.api.sync(this.config, this.store.rev, sent));
+        const result = await this.api.sync(this.config, this.store.rev, sent);
+        this.store.applySyncResult(sent, result);
+        this.config.user = result.user || "";
         if (!this.store.pendingCount || !sent.length) break;
       }
       this.config.at = Date.now();

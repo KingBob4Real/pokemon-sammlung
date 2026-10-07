@@ -1,5 +1,8 @@
 import { isObj } from "../core/format.js";
 
+// Die Serie steht in der Adresse von Symbol/Logo: …/univ/<serie>/<set>/symbol oder …/de/<serie>/<set>/logo
+const serieOf = (set) => (set.symbol || set.logo || "").match(/\/(?:univ|[a-z]{2})\/([^/]+)\/[^/]+\/(?:symbol|logo)$/)?.[1] || null;
+
 /**
  * Alle deutschen Sets (eine Woche zwischengespeichert), ohne TCG Pocket.
  * Reihenfolge = Erscheinen (TCGdex liefert die ältesten zuerst).
@@ -44,7 +47,7 @@ export class SetService {
       const [all, pocket] = await Promise.all([this.tcgdex.sets(), this.tcgdex.serieSetIds(this.pocketSerie)]);
       const list = all
         .filter((s) => !pocket.includes(s.id))
-        .map((s) => ({ id: s.id, name: s.name, total: s.cardCount?.total ?? null, official: s.cardCount?.official ?? null }));
+        .map((s) => ({ id: s.id, name: s.name, serie: serieOf(s), total: s.cardCount?.total ?? null, official: s.cardCount?.official ?? null }));
       const data = { at: Date.now(), list, pocket };
       this.storage.set(this.storageKey, data);
       this.#use(data);

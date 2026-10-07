@@ -1,7 +1,7 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, plural } from "../../core/format.js";
 import { links } from "../router.js";
-import { cardTile } from "../components/cardTile.js";
+import { cardTile, setPicked } from "../components/cardTile.js";
 import { backLink, emptyState, segmented, sortSelect, stat } from "../components/widgets.js";
 
 const SORT_KEYS = ["order", "set", "name", "value"];
@@ -11,9 +11,13 @@ const FILTERS = [
   ["owned", "Vorhanden"],
 ];
 
-// Ansicht einer Liste: umbenennen, löschen, Fortschritt, filtern, sortieren, Karten abhaken
+/**
+ * Ansicht einer Liste: Fortschritt, filtern, sortieren, Karten abhaken (= in die Sammlung).
+ * „Karten hinzufügen“ öffnet Suche/Sets zum Antippen, „Auswählen“ markiert mehrere Karten
+ * für „Hab ich“ oder „Aus Liste entfernen“.
+ */
 export function render(main, ctx, listId) {
-  const { lists, collection, prices, sorters, prefs } = ctx;
+  const { lists, collection, prices, sorters, prefs, session } = ctx;
   const list = lists.get(listId);
   if (!list) {
     ctx.setTitle("Liste");
@@ -22,6 +26,9 @@ export function render(main, ctx, listId) {
   }
   ctx.setTitle(list.name);
 
+  const selection = session.selection;
+  const selecting = selection.listId === listId;
+  if (!selecting) selection.ids.clear();
   const filter = prefs.get("listFilter");
   const items = lists.items(listId).sort((sorters[prefs.get("listSort")] || sorters.order).compare);
   const shown = items.filter((i) => filter === "all" || (filter === "owned") === collection.has(i.card.id));
@@ -39,6 +46,11 @@ export function render(main, ctx, listId) {
   };
   const setPref = (name) => (value) => {
     prefs.set(name, value);
+    ctx.render();
+  };
+  const setSelecting = (on) => {
+    selection.listId = on ? listId : null;
+    selection.ids.clear();
     ctx.render();
   };
 
@@ -64,11 +76,55 @@ export function render(main, ctx, listId) {
       ]),
     ]),
     stats,
+    h("div", { class: "buttons" }, [
+      h("a", { class: "btn", href: links.addTo(listId) }, "+ Hinzufügen"),
+      items.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(!selecting) }, selecting ? "Auswahl beenden" : "Auswählen") : null,
+    ]),
     h("div", { class: "toolbar" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, prefs.get("listSort"), setPref("listSort"))]),
-    h("div", { class: "grid" }, shown.map((i) => cardTile(i.card)))
+    h(
+      "div",
+      { class: "grid checklist" },
+      shown.map((i) => {
+        const el = cardTile(i.card, { mode: selecting ? "pick" : "default" });
+        if (selecting) setPicked(el, selection.ids.has(i.card.id));
+        return el;
+      })
+    )
   );
-  if (!items.length) main.append(emptyState("Noch keine Karten in dieser Liste.", "Über „Suche“ eine Karte antippen und unten bei „Listen“ diese Liste anhaken."));
+  if (!items.length) main.append(emptyState("Noch keine Karten in dieser Liste.", "Tippe auf „+ Karten hinzufügen“ und dann einfach auf die Karten, die rein sollen."));
   else if (!shown.length) main.append(emptyState(filter === "missing" ? "Alles gesammelt! 🎉" : "Noch keine Karte aus dieser Liste in der Sammlung."));
+
+  // Auswahl: Leiste unten mit Aktionen für die markierten Karten
+  let onPick;
+  if (selecting) {
+    const label = h("span");
+    const chosen = () => items.filter((i) => selection.ids.has(i.card.id)).map((i) => i.card);
+    const updateBar = () => (label.textContent = selection.ids.size ? `${selection.ids.size} ausgewählt` : "Karten antippen zum Auswählen");
+    const own = () => {
+      collection.markOwned(chosen());
+      setSelecting(false);
+    };
+    const drop = () => {
+      lists.removeCards(listId, chosen());
+      setSelecting(false);
+    };
+    main.append(
+      h("div", { class: "action-bar" }, [
+        label,
+        h("button", { type: "button", class: "btn", onclick: own }, "Hab ich"),
+        h("button", { type: "button", class: "btn danger", onclick: drop }, "Entfernen"),
+        h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(false) }, "Fertig"),
+      ])
+    );
+    main.classList.add("has-action-bar");
+    updateBar();
+    onPick = (card, el) => {
+      if (selection.ids.has(card.id)) selection.ids.delete(card.id);
+      else selection.ids.add(card.id);
+      setPicked(el, selection.ids.has(card.id));
+      updateBar();
+    };
+  }
   prices.request(items.map((i) => i.card.id));
-  return { refresh };
+  return { refresh, onPick };
 }

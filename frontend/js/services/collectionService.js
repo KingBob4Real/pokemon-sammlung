@@ -46,6 +46,13 @@ export class CollectionService {
     this.setQuantity(card, this.has(card.id) ? 0 : 1);
   }
 
+  // Mehrere Karten als vorhanden markieren (Anzahl mindestens 1)
+  markOwned(cards) {
+    this.store.batch(() => {
+      for (const card of cards) if (!this.has(card.id)) this.setQuantity(card, 1);
+    });
+  }
+
   update(cardId, patch) {
     const e = this.entry(cardId);
     if (e) this.store.put("collection", cardId, { ...e, ...patch });

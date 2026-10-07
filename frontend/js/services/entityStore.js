@@ -111,6 +111,19 @@ export class EntityStore extends EventTarget {
     return [...this.#items.values()];
   }
 
+  // Gerät leeren (z. B. beim Wechsel zu einer anderen Person); der nächste Sync holt alles neu
+  reset() {
+    this.#items.clear();
+    this.#dirty.clear();
+    this.#rev = 0;
+    this.#persist();
+    this.dispatchEvent(new Event("remote"));
+  }
+
+  get isEmpty() {
+    return this.#items.size === 0;
+  }
+
   #commit() {
     this.#persist();
     this.dispatchEvent(new Event("change"));

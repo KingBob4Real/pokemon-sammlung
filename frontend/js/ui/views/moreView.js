@@ -13,13 +13,12 @@ export function render(main, ctx) {
   const key = h("input", { type: "password", class: "field", value: sync.config.key, placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
   const status = h("p", { class: "muted" });
   const showKey = () => (key.type = key.type === "password" ? "text" : "password");
-  const newKey = () => {
-    if (key.value && !confirm("Den bisherigen Schlüssel ersetzen? Er muss dann auch im Backend und auf allen Geräten geändert werden.")) return;
-    key.value = sync.generateKey();
-    key.type = "text";
-  };
   const copyKey = () => navigator.clipboard?.writeText(key.value).then(() => (status.textContent = "Schlüssel kopiert."), () => {});
-  const save = () => sync.configure(url.value, key.value).then(() => (key.value = sync.config.key));
+  const save = () => {
+    // anderer Schlüssel = andere Person → Daten dieses Geräts gehören nicht dazu
+    if (sync.isOtherKey(key.value) && !ctx.store.isEmpty && !confirm("Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden entfernt und durch die der neuen Person ersetzt (im Backend bleibt alles erhalten). Weiter?")) return;
+    sync.configure(url.value, key.value).then(() => (key.value = sync.config.key));
+  };
 
   // --- Sicherung ---
   const file = h("input", { type: "file", accept: ".json,application/json", hidden: true });
@@ -45,12 +44,11 @@ export function render(main, ctx) {
 
   main.append(
     panel("Sync zwischen Geräten", [
-      h("p", {}, "Mit Backend-Adresse und deinem persönlichen Schlüssel sind Sammlung und Listen auf allen Geräten gleich. Den Schlüssel auf jedem Gerät einmal eintragen."),
+      h("p", {}, "Jede Person hat einen eigenen Schlüssel und damit eine eigene Sammlung. Trag deinen Schlüssel auf jedem deiner Geräte einmal ein, dann sind Sammlung und Listen überall gleich."),
       h("label", { class: "label" }, ["Backend-Adresse", url]),
       h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
       h("div", { class: "buttons" }, [
         h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
-        h("button", { type: "button", class: "btn btn-ghost", onclick: newKey }, "Neuen Schlüssel erzeugen"),
         h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
       ]),
       status,
@@ -84,7 +82,9 @@ function syncStatusText(sync) {
       return "Synchronisiere …";
     case "error":
       return `Fehler: ${sync.config.error}`;
-    default:
-      return sync.config.at ? `Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
+    default: {
+      const who = sync.config.user ? `Verbunden als ${sync.config.user} · ` : "";
+      return sync.config.at ? `${who}Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
+    }
   }
 }

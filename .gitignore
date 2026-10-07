@@ -2,4 +2,6 @@ node_modules/
 .wrangler/
 .dev.vars
 .idea/
+# Sync-Schlüssel der Personen – nie committen
+.keys/
 .sync-key.txt

@@ -33,7 +33,7 @@ const sync = new SyncService(store, new SyncApi(fetchJson), storage, STORAGE_KEY
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id) });
-const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", listSort: "order", listFilter: "all" });
+const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listSort: "order", listFilter: "all" });
 
 new App({ store, sets, prices, collection, lists, catalog, sync, legacyImport, backup, sorters }, prefs).start();
 

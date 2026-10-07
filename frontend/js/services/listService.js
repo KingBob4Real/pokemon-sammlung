@@ -54,6 +54,12 @@ export class ListService {
     return this.store.all("listItem").map((e) => e.data).filter((i) => isObj(i.card));
   }
 
+  removeCards(listId, cards) {
+    this.store.batch(() => {
+      for (const card of cards) this.store.put("listItem", itemId(listId, card.id), null);
+    });
+  }
+
   contains(listId, cardId) {
     return this.store.get("listItem", itemId(listId, cardId)) != null;
   }

@@ -2,17 +2,33 @@ import { h, ICONS } from "../../core/dom.js";
 import { fmtEur } from "../../core/format.js";
 import { cardImage, cardNumber } from "../../domain/card.js";
 
-// Kartenkachel: Bild (antippen = Kartenansicht), Haken (antippen = in Sammlung ja/nein), Name, Nummer, Wert.
+/**
+ * Kartenkachel in drei Arten:
+ *   "default" – Bild antippen = Kartenansicht, Haken = in Sammlung ja/nein
+ *   "view"    – nur Kartenansicht (z. B. in der Sammlung)
+ *   "pick"    – ganze Kachel antippen = auswählen (Listen bearbeiten); Zustand über setPicked()
+ */
 const tileCards = new WeakMap();
 
-export function cardTile(card, { checkable = true } = {}) {
+export function cardTile(card, { mode = "default" } = {}) {
   const img = cardImage(card, "low");
-  const el = h("article", { class: "tile" }, [
-    h("button", { type: "button", class: img ? "tile-art" : "tile-art no-img", "data-open": "", "aria-label": `${card.name} ${cardNumber(card)} anzeigen` }, [
-      img ? h("img", { src: img, alt: "", loading: "lazy", decoding: "async", crossorigin: "anonymous" }) : null,
-      h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
-    ]),
-    checkable ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.check }) : null,
+  const pick = mode === "pick";
+  const el = h("article", { class: "tile", "data-pick": pick }, [
+    h(
+      "button",
+      {
+        type: "button",
+        class: img ? "tile-art" : "tile-art no-img",
+        "data-open": !pick,
+        "aria-label": pick ? `${card.name} ${cardNumber(card)} auswählen` : `${card.name} ${cardNumber(card)} anzeigen`,
+      },
+      [
+        img ? h("img", { src: img, alt: "", loading: "lazy", decoding: "async", crossorigin: "anonymous" }) : null,
+        h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
+      ]
+    ),
+    mode === "default" ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.check }) : null,
+    pick ? h("span", { class: "tile-pick", "aria-hidden": "true" }) : null,
     h("div", { class: "tile-info" }, [h("b", {}, card.name), h("span", {}, `${cardNumber(card)} · ${card.setName}`), h("span", { class: "tile-value" })]),
   ]);
   tileCards.set(el, card);
@@ -20,6 +36,11 @@ export function cardTile(card, { checkable = true } = {}) {
 }
 
 export const tileCard = (el) => (el ? tileCards.get(el) : undefined);
+
+export function setPicked(el, picked) {
+  el.classList.toggle("is-picked", picked);
+  el.querySelector(".tile-art").setAttribute("aria-pressed", String(picked));
+}
 
 export function updateTile(el, { qty, value }) {
   const card = tileCards.get(el);

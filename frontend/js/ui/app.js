@@ -2,6 +2,7 @@ import { $ } from "../core/dom.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { tileCard, updateTile } from "./components/cardTile.js";
 import { currentRoute } from "./router.js";
+import * as addView from "./views/addView.js";
 import * as collectionView from "./views/collectionView.js";
 import * as listView from "./views/listView.js";
 import * as listsView from "./views/listsView.js";
@@ -9,8 +10,8 @@ import * as moreView from "./views/moreView.js";
 import * as searchView from "./views/searchView.js";
 import * as setView from "./views/setView.js";
 
-// Jede Ansicht: render(main, ctx, arg) → { refresh? }. Neue Ansicht = hier eintragen.
-const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, suche: searchView, set: setView, mehr: moreView };
+// Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick? }. Neue Ansicht = hier eintragen.
+const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", busy: "Sync …", error: "Sync-Fehler", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
 
@@ -20,6 +21,7 @@ const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
  */
 export class App {
   #viewRefresh = null;
+  #viewPick = null; // Ansichten mit Auswahl-Kacheln bekommen das Antippen hierüber
   #sheetRefresh = null;
   #rerenderTimer = null;
 
@@ -30,7 +32,13 @@ export class App {
     this.ctx = {
       ...services,
       prefs,
-      session: { query: "", results: null, collectionFilter: "" }, // bleibt beim Wechseln der Ansicht erhalten
+      // bleibt beim Wechseln der Ansicht erhalten
+      session: {
+        search: { query: "", results: null },
+        add: { query: "", results: null },
+        collectionFilter: "",
+        selection: { listId: null, ids: new Set() },
+      },
       setTitle: (text) => this.setTitle(text),
       render: () => this.render(),
       refresh: () => this.refresh(),
@@ -64,7 +72,10 @@ export class App {
     clearTimeout(this.#rerenderTimer);
     const route = currentRoute();
     this.main.textContent = "";
-    this.#viewRefresh = VIEWS[route.view].render(this.main, this.ctx, route.arg)?.refresh || null;
+    this.main.classList.remove("has-action-bar");
+    const view = VIEWS[route.view].render(this.main, this.ctx, route.arg) || {};
+    this.#viewRefresh = view.refresh || null;
+    this.#viewPick = view.onPick || null;
     for (const a of document.querySelectorAll(".tabs a")) {
       if (a.dataset.tab === route.tab) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
@@ -108,9 +119,12 @@ export class App {
   }
 
   #onTileClick(e) {
-    const button = e.target.closest("[data-open], [data-toggle]");
-    const card = button && tileCard(button.closest(".tile"));
+    const tile = e.target.closest(".tile");
+    const card = tileCard(tile);
     if (!card) return;
+    if (tile.hasAttribute("data-pick")) return this.#viewPick?.(card, tile);
+    const button = e.target.closest("[data-open], [data-toggle]");
+    if (!button) return;
     if (button.hasAttribute("data-open")) return this.openCard(card);
     this.services.collection.toggle(card);
     navigator.vibrate?.(12);
@@ -128,7 +142,7 @@ export class App {
 
   // Sync hat Neues gebracht. Suche/Set/Mehr nicht neu aufbauen (Eingaben gingen verloren), nur aktualisieren.
   #onRemoteChange() {
-    if (["suche", "set", "mehr"].includes(currentRoute().view)) this.refresh();
+    if (["suche", "set", "mehr", "hinzufuegen"].includes(currentRoute().view)) this.refresh();
     else this.render();
   }
 
