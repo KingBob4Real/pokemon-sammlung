@@ -4,10 +4,12 @@ import { marketValue, toPrice } from "../domain/price.js";
 /**
  * Cardmarket-Richtwerte über TCGdex, pro Karte zwischengespeichert.
  * request(ids) lädt fehlende/alte Preise im Hintergrund (6 parallel) und meldet "update".
+ * Klappt in einem Durchlauf gar nichts (TCGdex weg), meldet sie "error"; gespeicherte Werte bleiben.
  */
 export class PriceService extends EventTarget {
   #queue = new Set();
   #running = false;
+  #failed = new Set(); // Karten, deren Preis zuletzt nicht geladen werden konnte
 
   constructor(tcgdex, storage, storageKey, ttlMs) {
     super();
@@ -26,8 +28,13 @@ export class PriceService extends EventTarget {
     return marketValue(this.get(cardId));
   }
 
+  hasFailed(cardId) {
+    return this.#failed.has(cardId);
+  }
+
   request(cardIds) {
     for (const id of cardIds) {
+      this.#failed.delete(id); // neuer Versuch
       const p = this.prices[id];
       if (!p || Date.now() - p.at > this.ttlMs) this.#queue.add(id);
     }
@@ -39,14 +46,18 @@ export class PriceService extends EventTarget {
     if (this.#running || !this.#queue.size || !navigator.onLine) return;
     this.#running = true;
     let done = 0;
+    let ok = 0;
+    let lastError = null;
     const worker = async () => {
       while (this.#queue.size) {
         const id = this.#queue.values().next().value;
         this.#queue.delete(id);
         try {
           this.prices[id] = toPrice(await this.tcgdex.card(id));
-        } catch {
-          /* alter Wert bleibt */
+          ok++;
+        } catch (e) {
+          this.#failed.add(id); // alter Wert bleibt
+          lastError = e;
         }
         if (++done % 15 === 0) this.#notify();
       }
@@ -55,6 +66,7 @@ export class PriceService extends EventTarget {
     this.storage.set(this.storageKey, this.prices);
     this.#running = false;
     this.#notify();
+    if (!ok && lastError) this.dispatchEvent(new CustomEvent("error", { detail: lastError }));
   }
 
   #notify() {

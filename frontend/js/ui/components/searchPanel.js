@@ -1,5 +1,6 @@
 import { SEARCH_LIMIT } from "../../config.js";
 import { h } from "../../core/dom.js";
+import { describeError } from "../../core/errors.js";
 import { progressBar, trackFirstImages } from "./progressBar.js";
 import { emptyState, note } from "./widgets.js";
 
@@ -56,8 +57,9 @@ export function searchPanel(ctx, { session, tile, setHref }) {
     try {
       const cards = await catalog.search(query);
       if (mine === seq) session.results = { query, cards };
-    } catch {
-      if (mine === seq) session.results = { query, error: navigator.onLine ? "Die Kartensuche ist gerade nicht erreichbar." : "Offline: Die Suche braucht Internet." };
+    } catch (e) {
+      const { kind, message } = describeError(e);
+      if (mine === seq) session.results = { query, error: kind === "offline" ? "Du bist offline – die Suche braucht Internet. Deine Sammlung und Listen gehen trotzdem." : `Die Kartensuche klappt gerade nicht. ${message}` };
     }
     if (mine === seq && box.isConnected) showResults();
     else if (mine === seq) bar.done();
@@ -85,7 +87,12 @@ export function searchPanel(ctx, { session, tile, setHref }) {
   function showResults() {
     const r = session.results;
     if (r.error || !r.cards.length) bar.done();
-    if (r.error) return box.replaceChildren(emptyState(r.error));
+    if (r.error) {
+      return box.replaceChildren(
+        emptyState(r.error),
+        h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn", onclick: () => ((session.results = null), run()) }, "Nochmal versuchen")])
+      );
+    }
     if (!r.cards.length) return box.replaceChildren(emptyState(`Keine Karte gefunden für „${r.query}“.`, "Tipp: deutschen Namen verwenden, z. B. „Glurak“ statt „Charizard“."));
     box.replaceChildren(
       note(r.cards.length > SEARCH_LIMIT ? `${r.cards.length} Treffer, die ersten ${SEARCH_LIMIT} werden angezeigt. Genauer suchen, z. B. mit Nummer.` : `${r.cards.length} Treffer`),

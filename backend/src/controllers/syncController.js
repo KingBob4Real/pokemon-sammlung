@@ -15,7 +15,8 @@ export class SyncController {
       return error(400, "Kein gültiges JSON");
     }
     const parsed = parseSyncRequest(body);
-    if (!parsed.ok) return error(parsed.status, parsed.error);
+    // index: welche Änderung abgelehnt wurde – das Gerät hält genau diese zurück und synchronisiert den Rest
+    if (!parsed.ok) return error(parsed.status, parsed.error, parsed.index != null ? { index: parsed.index } : {});
     return json(await this.syncService.sync(user, parsed.since, parsed.changes));
   }
 }

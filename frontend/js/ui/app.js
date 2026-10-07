@@ -1,7 +1,11 @@
-import { $ } from "../core/dom.js";
+import { $, h } from "../core/dom.js";
+import { describeError } from "../core/errors.js";
+import { deliverFile } from "../core/files.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { tileCard, updateTile } from "./components/cardTile.js";
 import { isDragging } from "./components/reorder.js";
+import { Toaster } from "./components/toast.js";
+import { emptyState } from "./components/widgets.js";
 import { currentRoute } from "./router.js";
 import * as addView from "./views/addView.js";
 import * as collectionView from "./views/collectionView.js";
@@ -13,7 +17,7 @@ import * as setView from "./views/setView.js";
 
 // Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
 const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
-const SYNC_LABELS = { off: "Sync aus", busy: "Sync …", error: "Sync-Fehler", pending: "Nicht synchron", ok: "Synchron" };
+const SYNC_LABELS = { off: "Sync aus", offline: "Offline", busy: "Sync …", error: "Sync-Problem", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
 const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -35,11 +39,13 @@ export class App {
   #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
   #rerenderTimer = null;
+  #shownOnce = new Set(); // Hinweise, die pro Sitzung nur einmal kommen sollen
 
   constructor(services, prefs) {
     this.services = services;
     this.main = $("#view");
     this.dialog = $("#sheet");
+    this.toast = new Toaster();
     this.ctx = {
       ...services,
       prefs,
@@ -53,6 +59,11 @@ export class App {
       setTitle: (text) => this.setTitle(text),
       render: () => this.render(),
       bounce: (el) => replay(el, "just-changed"),
+      // Hinweis unten: notify("Text", { type: "error" | "success" | "info", action: { label, run } })
+      notify: (message, options) => this.toast.show(message, options),
+      // Fehler → verständlicher Hinweis, optional mit „Nochmal“
+      notifyError: (error, { prefix = "", retry } = {}) =>
+        this.toast.show(`${prefix}${describeError(error).message}`, { type: "error", action: retry ? { label: "Nochmal", run: retry } : null }),
       refresh: () => this.refresh(),
       openCard: (card) => this.openCard(card),
       afterChange: (structural) => this.afterChange(structural),
@@ -61,6 +72,7 @@ export class App {
 
   start() {
     const { store, prices, sync } = this.services;
+    this.#catchUnexpectedErrors();
     window.addEventListener("hashchange", () => {
       this.render();
       window.scrollTo(0, 0);
@@ -81,8 +93,22 @@ export class App {
     });
     store.addEventListener("change", () => sync.schedule());
     store.addEventListener("remote", () => this.#onRemoteChange());
+    store.addEventListener("storage-error", () => this.#onStorageError());
     prices.addEventListener("update", () => this.refresh());
+    // Preise: einmal pro Sitzung Bescheid geben, gespeicherte Werte bleiben sichtbar (offline meldet schon der Offline-Hinweis)
+    prices.addEventListener("error", (e) => {
+      if (describeError(e.detail).kind !== "offline") this.#once("prices", () => this.toast.show("Preise sind gerade nicht abrufbar – es werden die gespeicherten gezeigt.", { type: "info" }));
+    });
     sync.addEventListener("status", () => this.#showSyncState());
+    sync.addEventListener("problem", (e) => this.#onSyncProblem(e.detail));
+    window.addEventListener("offline", () => {
+      this.#showSyncState();
+      this.toast.show("Du bist offline. Abhaken und Listen gehen weiter – alles wird später synchronisiert.", { type: "info", duration: 5000 });
+    });
+    window.addEventListener("online", () => {
+      this.#showSyncState();
+      if (sync.pendingCount) this.toast.show("Wieder online – deine Änderungen werden hochgeladen.", { type: "success" });
+    });
     this.#showSyncState();
     this.render();
   }
@@ -98,7 +124,21 @@ export class App {
     this.#viewDispose?.();
     this.main.textContent = "";
     this.main.classList.remove("has-action-bar");
-    const view = VIEWS[route.view].render(this.main, this.ctx, route.arg) || {};
+    let view;
+    try {
+      view = VIEWS[route.view].render(this.main, this.ctx, route.arg) || {};
+    } catch (error) {
+      // Ansicht kaputt? Statt leerer Seite eine Erklärung und Auswege zeigen
+      console.error(error);
+      view = {};
+      this.main.replaceChildren(
+        emptyState("Diese Ansicht konnte nicht angezeigt werden.", "Deine Daten sind sicher gespeichert. Versuch es nochmal oder lade die App neu."),
+        h("div", { class: "buttons" }, [
+          h("button", { type: "button", class: "btn", onclick: () => location.reload() }, "Neu laden"),
+          h("a", { class: "btn btn-ghost", href: "#sammlung" }, "Zur Sammlung"),
+        ])
+      );
+    }
     this.#viewRefresh = view.refresh || null;
     this.#viewPick = view.onPick || null;
     this.#viewDispose = view.dispose || null;
@@ -116,8 +156,12 @@ export class App {
       const card = tileCard(el);
       if (card) updateTile(el, { qty: collection.quantity(card.id), value: prices.value(card.id) });
     }
-    this.#viewRefresh?.();
-    this.#sheetRefresh?.();
+    try {
+      this.#viewRefresh?.();
+      this.#sheetRefresh?.();
+    } catch (error) {
+      this.#reportUnexpected(error);
+    }
   }
 
   openCard(card) {
@@ -185,6 +229,44 @@ export class App {
   #onRemoteChange() {
     if (["suche", "set", "mehr", "hinzufuegen"].includes(currentRoute().view)) this.refresh();
     else this.render();
+  }
+
+  // Unerwartete Fehler: kurzer Hinweis mit „Neu laden“ statt stillem Kaputtgehen
+  #catchUnexpectedErrors() {
+    window.addEventListener("error", (e) => this.#reportUnexpected(e.error || e.message));
+    window.addEventListener("unhandledrejection", (e) => this.#reportUnexpected(e.reason));
+  }
+
+  #reportUnexpected(error) {
+    console.error(error);
+    this.toast.show("Da ist etwas schiefgelaufen. Deine Daten sind gespeichert – falls etwas hängt, neu laden.", {
+      type: "error",
+      action: { label: "Neu laden", run: () => location.reload() },
+    });
+  }
+
+  #onSyncProblem(problem) {
+    if (problem.kind === "offline") return; // dafür gibt es den Offline-Hinweis
+    const toSettings = ["auth", "notFound"].includes(problem.kind) ? { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } : null;
+    const retry = problem.kind === "rejected" ? null : { label: "Nochmal", run: () => this.services.sync.run() };
+    this.toast.show(`Sync: ${problem.message}`, { type: problem.kind === "rejected" ? "info" : "error", action: toSettings || retry });
+  }
+
+  // Gerät kann nicht speichern (Speicher voll / privater Modus) – sofort Sicherung anbieten
+  #onStorageError() {
+    this.#once("storage", () =>
+      this.toast.show("Auf diesem Gerät kann gerade nicht gespeichert werden (Speicher voll oder privater Modus). Bitte eine Sicherung exportieren.", {
+        type: "error",
+        duration: 0,
+        action: { label: "Exportieren", run: () => deliverFile(this.services.backup.createFile()) },
+      })
+    );
+  }
+
+  #once(key, show) {
+    if (this.#shownOnce.has(key)) return;
+    this.#shownOnce.add(key);
+    show();
   }
 
   #showSyncState() {

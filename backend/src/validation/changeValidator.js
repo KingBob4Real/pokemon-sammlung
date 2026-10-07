@@ -41,7 +41,7 @@ export function parseSyncRequest(body) {
   const changes = Array.isArray(body?.changes) ? body.changes : [];
   if (changes.length > MAX_CHANGES_PER_REQUEST) return { ok: false, status: 413, error: `Höchstens ${MAX_CHANGES_PER_REQUEST} Änderungen pro Anfrage` };
   const bad = changes.findIndex((c) => !isValidChange(c));
-  if (bad >= 0) return { ok: false, status: 400, error: `Ungültige Änderung an Position ${bad}` };
+  if (bad >= 0) return { ok: false, status: 400, error: `Ungültige Änderung an Position ${bad}`, index: bad };
   // nur die bekannten Felder weiterreichen
   return { ok: true, since, changes: changes.map(({ type, id, data, updated, deleted }) => ({ type, id, data: data ?? null, updated, deleted })) };
 }

@@ -12,20 +12,20 @@ export class BackupService {
     return new File([JSON.stringify(payload)], `pokemon-sammlung-${new Date().toISOString().slice(0, 10)}.json`, { type: "application/json" });
   }
 
-  // → Meldung für den Nutzer
+  // → { ok, message } für den Nutzer (Netzwerkfehler beim Import der alten Checkliste werden geworfen)
   async importFile(file) {
     let payload;
     try {
       payload = JSON.parse(await file.text());
     } catch {
-      return "Die Datei ist kein gültiges JSON.";
+      return { ok: false, message: "Diese Datei kann nicht gelesen werden. Ist es eine JSON-Sicherung?" };
     }
     if (isObj(payload) && Array.isArray(payload.owned)) {
       const r = await this.legacyImport.import(payload);
-      return `Übernommen: ${plural(r.cards, "Karte", "Karten")} in die Sammlung, ${plural(r.lists, "neue Liste", "neue Listen")}.`;
+      return { ok: true, message: `Übernommen: ${plural(r.cards, "Karte", "Karten")} in die Sammlung, ${plural(r.lists, "neue Liste", "neue Listen")}.` };
     }
-    if (!isObj(payload) || !Array.isArray(payload.entities)) return "Die Datei sieht nicht nach einer Sicherung dieser App aus.";
+    if (!isObj(payload) || !Array.isArray(payload.entities)) return { ok: false, message: "Die Datei sieht nicht nach einer Sicherung dieser App aus." };
     const n = this.store.importEntities(payload.entities);
-    return n ? `${plural(n, "Eintrag", "Einträge")} übernommen.` : "Nichts Neues in der Datei, dein Stand ist aktueller.";
+    return { ok: true, message: n ? `${plural(n, "Eintrag", "Einträge")} übernommen.` : "Nichts Neues in der Datei, dein Stand ist aktueller." };
   }
 }

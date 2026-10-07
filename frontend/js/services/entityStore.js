@@ -7,7 +7,8 @@ const isValid = (e) => isObj(e) && ENTITY_TYPES.includes(e.type) && typeof e.id 
 /**
  * Lokaler Speicher aller synchronisierten Daten – das Repository auf dem Gerät.
  * Eintrag: { type, id, data, updated, deleted }; data = null heißt gelöscht.
- * Events: "change" nach eigenen Änderungen, "remote" wenn der Sync Neues gebracht hat.
+ * Events: "change" nach eigenen Änderungen, "remote" wenn der Sync Neues gebracht hat,
+ *         "storage-error" wenn das Gerät nicht speichern kann (Speicher voll / privater Modus).
  */
 export class EntityStore extends EventTarget {
   #items = new Map();
@@ -111,6 +112,12 @@ export class EntityStore extends EventTarget {
     return [...this.#items.values()];
   }
 
+  // Vom Server abgelehnter Eintrag: nicht mehr hochladen (bleibt auf dem Gerät), damit der Rest weiter synchronisiert
+  markRejected(entity) {
+    this.#dirty.delete(keyOf(entity.type, entity.id));
+    this.#persist();
+  }
+
   // Gerät leeren (z. B. beim Wechsel zu einer anderen Person); der nächste Sync holt alles neu
   reset() {
     this.#items.clear();
@@ -130,8 +137,10 @@ export class EntityStore extends EventTarget {
   }
 
   #persist() {
-    this.storage.set(this.keys.entities, Object.fromEntries(this.#items));
-    this.storage.set(this.keys.dirty, [...this.#dirty]);
-    this.storage.set(this.keys.rev, this.#rev);
+    const ok =
+      this.storage.set(this.keys.entities, Object.fromEntries(this.#items)) &&
+      this.storage.set(this.keys.dirty, [...this.#dirty]) &&
+      this.storage.set(this.keys.rev, this.#rev);
+    if (!ok) this.dispatchEvent(new Event("storage-error"));
   }
 }

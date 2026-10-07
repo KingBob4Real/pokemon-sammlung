@@ -77,7 +77,13 @@ export function renderCardSheet(body, card, ctx) {
     priceBox.replaceChildren(
       p && (p.trend || p.low || p.avg30)
         ? h("div", { class: "price-grid" }, [cell("Trend", p.trend), cell("ab", p.low), cell("Ø 30 Tage", p.avg30)])
-        : h("p", { class: "muted" }, p ? "Kein Cardmarket-Richtwert verfügbar." : navigator.onLine ? "Preis wird geladen …" : "Offline: noch kein Preis gespeichert."),
+        : p
+          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
+          : !navigator.onLine
+            ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
+            : prices.hasFailed(card.id)
+              ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
+              : h("p", { class: "muted" }, "Preis wird geladen …"),
       h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
       h("a", { class: "btn cm", href: cardmarketUrl(card, p), target: "_blank", rel: "noopener" }, "Auf Cardmarket ansehen (Deutsch, ab Excellent)")
     );

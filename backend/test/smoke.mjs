@@ -57,5 +57,7 @@ const c = await call({ since: b.body.rev, changes: [gone, { ...list, updated: t 
 assert.equal(find(c, "listItem", item.id).deleted, 1, "Löschen kommt an");
 
 assert.equal((await call({ since: 0, changes: [{ type: "böse", id: "x", updated: 1, deleted: 0, data: {} }] })).status, 400, "unbekannte Art wird abgewiesen");
-assert.equal((await call({ since: 0, changes: [{ ...item, id: "falsch:id" }] })).status, 400, "unstimmige ID wird abgewiesen");
+const rejected = await call({ since: 0, changes: [list, { ...item, id: "falsch:id" }] });
+assert.equal(rejected.status, 400, "unstimmige ID wird abgewiesen");
+assert.equal(rejected.body.index, 1, "Server nennt die abgelehnte Änderung");
 console.log(`Backend ok: ${base} (Person: ${start.body.user}${otherKey ? ", Trennung zu zweiter Person geprüft" : ""})`);

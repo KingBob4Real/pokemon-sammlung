@@ -1,4 +1,5 @@
 // localStorage-Zugriff, robust gegen Privatmodus und vollen Speicher.
+// set() meldet, ob das Speichern geklappt hat – wer Daten speichert, muss das wissen.
 export const storage = {
   get(key, fallback) {
     try {
@@ -11,8 +12,9 @@ export const storage = {
   set(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
+      return true;
     } catch {
-      /* Speicher voll oder gesperrt – App läuft trotzdem weiter */
+      return false; // Speicher voll oder gesperrt
     }
   },
 };

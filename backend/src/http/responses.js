@@ -8,6 +8,7 @@ export const CORS_HEADERS = {
 
 export const json = (body, status = 200) => Response.json(body, { status, headers: CORS_HEADERS });
 
-export const error = (status, message) => json({ error: message }, status);
+// extra: zusätzliche Felder, z. B. { index } für die abgelehnte Änderung
+export const error = (status, message, extra = {}) => json({ error: message, ...extra }, status);
 
 export const preflight = () => new Response(null, { status: 204, headers: CORS_HEADERS });

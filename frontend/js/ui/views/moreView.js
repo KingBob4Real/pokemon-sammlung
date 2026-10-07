@@ -1,5 +1,6 @@
 import { h } from "../../core/dom.js";
 import { deliverFile } from "../../core/files.js";
+import { describeError } from "../../core/errors.js";
 import { fmtDateTime, plural } from "../../core/format.js";
 import { panel } from "../components/widgets.js";
 
@@ -38,7 +39,12 @@ Weiter?`)) return;
     const chosen = file.files && file.files[0];
     file.value = "";
     if (!chosen) return;
-    alert(await backup.importFile(chosen).catch(() => "Import fehlgeschlagen. Bitte mit Internet nochmal versuchen."));
+    try {
+      const result = await backup.importFile(chosen);
+      ctx.notify(result.message, { type: result.ok ? "success" : "error" });
+    } catch (e) {
+      ctx.notifyError(e, { prefix: "Import fehlgeschlagen: " });
+    }
     ctx.render();
   });
 
@@ -47,9 +53,9 @@ Weiter?`)) return;
   const importLegacy = async () => {
     try {
       const r = await legacyImport.import(legacy);
-      alert(`Übernommen: ${plural(r.cards, "Karte", "Karten")} in die Sammlung, ${plural(r.lists, "neue Liste", "neue Listen")}.`);
-    } catch {
-      alert("Die alte Checkliste ist gerade nicht erreichbar. Bitte mit Internet nochmal versuchen.");
+      ctx.notify(`Übernommen: ${plural(r.cards, "Karte", "Karten")} in die Sammlung, ${plural(r.lists, "neue Liste", "neue Listen")}.`, { type: "success" });
+    } catch (e) {
+      ctx.notifyError(e, { prefix: "Die alte Checkliste ist gerade nicht erreichbar. ", retry: importLegacy });
     }
     ctx.render();
   };
@@ -68,7 +74,7 @@ Weiter?`)) return;
     ]),
     panel("Sicherung", [
       h("p", {}, "Alle Daten als Datei sichern oder eine Sicherung zurückholen. Import nimmt auch die Export-Datei der alten Checkliste."),
-      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()) }, "Export (JSON)"), h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file])]),
+      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"), h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file])]),
     ]),
     panel("Alte Checkliste übernehmen", [
       h("p", {}, "Legt für jede Gruppe der alten Checkliste eine Liste an und übernimmt abgehakte Karten samt „Mein Preis“ als Kaufpreis in die Sammlung. Mehrfach ausführen ist ok, es entsteht nichts doppelt."),
@@ -83,6 +89,7 @@ Weiter?`)) return;
           type: "button",
           class: "btn btn-ghost",
           onclick: async (e) => {
+            if (!navigator.onLine) return ctx.notify(describeError(null).message, { type: "info" });
             const latest = await updates.latestVersion();
             if (latest) location.reload();
             else e.target.textContent = "Du hast die neueste Version ✓";
@@ -106,10 +113,12 @@ function syncStatusText(sync) {
   switch (sync.state) {
     case "off":
       return "Sync ist aus. Deine Daten liegen nur auf diesem Gerät.";
+    case "offline":
+      return `Offline – Änderungen werden hochgeladen, sobald du wieder Internet hast.${pending}`;
     case "busy":
       return "Synchronisiere …";
     case "error":
-      return `Fehler: ${sync.config.error}`;
+      return `Problem: ${sync.config.error}`;
     default: {
       const who = sync.config.user ? `Verbunden als ${sync.config.user} · ` : "";
       return sync.config.at ? `${who}Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
