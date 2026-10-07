@@ -1,0 +1,63 @@
+import { isObj } from "../core/format.js";
+
+/**
+ * Alle deutschen Sets (eine Woche zwischengespeichert), ohne TCG Pocket.
+ * Reihenfolge = Erscheinen (TCGdex liefert die ältesten zuerst).
+ */
+export class SetService {
+  #data = null;
+
+  constructor(tcgdex, storage, storageKey, ttlMs, pocketSerie) {
+    this.tcgdex = tcgdex;
+    this.storage = storage;
+    this.storageKey = storageKey;
+    this.ttlMs = ttlMs;
+    this.pocketSerie = pocketSerie;
+    this.ready = this.#load();
+  }
+
+  get loaded() {
+    return this.#data != null;
+  }
+
+  all() {
+    return this.#data?.list || [];
+  }
+
+  info(setId) {
+    return this.#data?.index.get(setId) || null;
+  }
+
+  order(setId) {
+    return this.info(setId)?.order ?? -1;
+  }
+
+  isPocket(setId) {
+    return this.#data?.pocket.has(setId) || false;
+  }
+
+  async #load() {
+    const cached = this.storage.get(this.storageKey, null);
+    if (isObj(cached) && Array.isArray(cached.list)) this.#use(cached);
+    if (this.loaded && Date.now() - cached.at < this.ttlMs) return;
+    try {
+      const [all, pocket] = await Promise.all([this.tcgdex.sets(), this.tcgdex.serieSetIds(this.pocketSerie)]);
+      const list = all
+        .filter((s) => !pocket.includes(s.id))
+        .map((s) => ({ id: s.id, name: s.name, total: s.cardCount?.total ?? null, official: s.cardCount?.official ?? null }));
+      const data = { at: Date.now(), list, pocket };
+      this.storage.set(this.storageKey, data);
+      this.#use(data);
+    } catch {
+      /* offline: alter Stand bleibt */
+    }
+  }
+
+  #use(data) {
+    this.#data = {
+      list: data.list,
+      pocket: new Set(data.pocket || []),
+      index: new Map(data.list.map((s, i) => [s.id, { ...s, order: i }])),
+    };
+  }
+}

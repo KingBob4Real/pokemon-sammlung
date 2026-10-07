@@ -1,0 +1,87 @@
+import { objOr } from "../core/format.js";
+
+const KEY_CHARS = "ABCDEFGHJKMNPQRSTVWXYZ0123456789"; // 32 Zeichen ohne I, L, O, U – gut abtippbar
+
+// Schlüssel in Form „XXXX-XXXX-…“ bringen (Groß/klein und Leerzeichen egal)
+export const normalizeKey = (key) => (String(key).toUpperCase().replace(/[^A-Z0-9]/g, "").match(/.{1,4}/g) || []).join("-");
+
+/**
+ * Gleicht den lokalen Speicher mit dem Backend ab.
+ * Zustand: off (nicht eingerichtet), busy, error, pending (Änderungen warten), ok. Meldet "status".
+ */
+export class SyncService extends EventTarget {
+  #timer = null;
+  #busy = false;
+
+  constructor(store, api, storage, storageKey, defaultUrl, batchSize) {
+    super();
+    this.store = store;
+    this.api = api;
+    this.storage = storage;
+    this.storageKey = storageKey;
+    this.batchSize = batchSize;
+    this.config = { url: "", key: "", at: 0, error: "", ...objOr(storage.get(storageKey, {})) };
+    if (!this.config.url) this.config.url = defaultUrl;
+  }
+
+  // 20 Zeichen × 5 Bit = 100 Bit Zufall
+  generateKey() {
+    return normalizeKey([...crypto.getRandomValues(new Uint8Array(20))].map((b) => KEY_CHARS[b & 31]).join(""));
+  }
+
+  get enabled() {
+    return Boolean(this.config.url && this.config.key);
+  }
+
+  get pendingCount() {
+    return this.store.pendingCount;
+  }
+
+  get state() {
+    if (!this.enabled) return "off";
+    if (this.#busy) return "busy";
+    if (this.config.error) return "error";
+    return this.store.pendingCount ? "pending" : "ok";
+  }
+
+  configure(url, key) {
+    this.config = { ...this.config, url: url.trim(), key: normalizeKey(key), error: "" };
+    this.#save();
+    return this.run();
+  }
+
+  schedule(ms = 1500) {
+    clearTimeout(this.#timer);
+    this.#timer = setTimeout(() => this.run(), ms);
+  }
+
+  async run() {
+    if (!this.enabled || this.#busy || !navigator.onLine) return this.#notify();
+    this.#busy = true;
+    this.#notify();
+    try {
+      // in Päckchen hochladen, bis nichts mehr wartet
+      for (let round = 0; round < 50; round++) {
+        const sent = this.store.pendingChanges(this.batchSize);
+        this.store.applySyncResult(sent, await this.api.sync(this.config, this.store.rev, sent));
+        if (!this.store.pendingCount || !sent.length) break;
+      }
+      this.config.at = Date.now();
+      this.config.error = "";
+    } catch (e) {
+      this.config.error = e.status === 401 ? "Falscher Sync-Schlüssel" : e.status ? `Backend meldet Fehler ${e.status}` : "Backend nicht erreichbar";
+    }
+    this.#busy = false;
+    this.#save();
+    this.#notify();
+    if (this.store.pendingCount && !this.config.error) this.schedule(); // unterwegs Geändertes nachschieben
+  }
+
+  #save() {
+    this.storage.set(this.storageKey, this.config);
+  }
+
+  #notify() {
+    this.dispatchEvent(new Event("status"));
+  }
+}
