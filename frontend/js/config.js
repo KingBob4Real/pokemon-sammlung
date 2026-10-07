@@ -3,7 +3,7 @@
 export const TCGDEX_API = "https://api.tcgdex.net/v2";
 export const OLD_APP_URL = "https://kingbob4real.github.io/pokemon-karten-checkliste/";
 // Adresse des Cloudflare-Backends (unter „Mehr“ änderbar)
-export const DEFAULT_BACKEND_URL = "";
+export const DEFAULT_BACKEND_URL = "https://pokemon-sammlung.pokemon-sammlung-backend.workers.dev";
 export const CARDMARKET_FILTER = "language=3&minCondition=3"; // nur deutsche Karten ab Excellent
 
 const DAY_MS = 24 * 60 * 60 * 1000;
