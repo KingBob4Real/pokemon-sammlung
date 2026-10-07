@@ -1,4 +1,5 @@
 import { h } from "../../core/dom.js";
+import { progressBar, trackFirstImages } from "./progressBar.js";
 import { note } from "./widgets.js";
 
 /**
@@ -12,6 +13,8 @@ export function setCardsPanel(ctx, setId, { tile, onLoad }) {
   const { catalog, collection } = ctx;
   const info = note("Karten werden geladen …");
   const grid = h("div", { class: "grid" });
+  const bar = progressBar();
+  bar.busy();
   let cards = [];
 
   catalog
@@ -22,13 +25,15 @@ export function setCardsPanel(ctx, setId, { tile, onLoad }) {
       onLoad?.(set.name);
       grid.append(...cards.map(tile));
       ctx.refresh();
+      trackFirstImages(grid, bar);
     })
     .catch(() => {
+      bar.done();
       if (info.isConnected) info.textContent = navigator.onLine ? "Das Set konnte nicht geladen werden." : "Offline: Sets brauchen Internet.";
     });
 
   const refresh = () => {
     if (cards.length) info.textContent = `${cards.filter((c) => collection.has(c.id)).length} von ${cards.length} Karten in deiner Sammlung`;
   };
-  return { element: h("div", {}, [info, grid]), refresh };
+  return { element: h("div", {}, [bar.el, info, grid]), refresh };
 }

@@ -11,16 +11,26 @@ export function parseQuery(query) {
 
 // Kartenkatalog: alle deutschen Karten durchsuchen oder ein Set anzeigen.
 export class CatalogService {
+  #recent = new Map(); // Suche → Ergebnis, damit Zurück-Tippen sofort geht
   constructor(tcgdex, sets) {
     this.tcgdex = tcgdex;
     this.sets = sets;
   }
 
   async search(query) {
+    const key = query.trim().toLowerCase();
+    if (!this.#recent.has(key)) {
+      this.#recent.set(key, this.#search(query).catch((e) => (this.#recent.delete(key), Promise.reject(e))));
+      if (this.#recent.size > 30) this.#recent.delete(this.#recent.keys().next().value);
+    }
+    return this.#recent.get(key);
+  }
+
+  async #search(query) {
     const { words, number, total } = parseQuery(query);
     if (!words && number == null) return [];
-    await this.sets.ready;
-    const found = words ? await this.tcgdex.searchByName(words) : await this.tcgdex.searchByNumber(number);
+    // Set-Liste und Suche gleichzeitig laden statt nacheinander
+    const [found] = await Promise.all([words ? this.tcgdex.searchByName(words) : this.tcgdex.searchByNumber(number), this.sets.ready]);
     return found
       .filter((c) => c && c.id && c.localId != null && !this.sets.isPocket(setIdOf(c)))
       .filter((c) => number == null || parseInt(c.localId, 10) === number)
