@@ -100,7 +100,7 @@ export function render(main, ctx, listId) {
       h("a", { class: "btn", href: links.addTo(listId) }, "+ Hinzufügen"),
       items.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(!selecting) }, selecting ? "Auswahl beenden" : "Auswählen") : null,
     ]),
-    h("div", { class: "toolbar" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, sortKey, setPref("listSort"))]),
+    h("div", { class: "toolbar split" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, sortKey, setPref("listSort"))]),
     items.length > 1 && !selecting
       ? h("p", { class: "muted pad" }, canReorder ? "Karte gedrückt halten und ziehen zum Verschieben." : "Zum Verschieben „Eigene Reihenfolge“ und „Alle“ wählen.")
       : null,
@@ -137,6 +137,7 @@ export function render(main, ctx, listId) {
       if (selection.ids.has(card.id)) selection.ids.delete(card.id);
       else selection.ids.add(card.id);
       setPicked(el, selection.ids.has(card.id));
+      ctx.bounce(el);
       updateBar();
     };
   }

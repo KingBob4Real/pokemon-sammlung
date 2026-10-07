@@ -1,6 +1,7 @@
 import { $ } from "../core/dom.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { tileCard, updateTile } from "./components/cardTile.js";
+import { isDragging } from "./components/reorder.js";
 import { currentRoute } from "./router.js";
 import * as addView from "./views/addView.js";
 import * as collectionView from "./views/collectionView.js";
@@ -14,6 +15,15 @@ import * as setView from "./views/setView.js";
 const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", busy: "Sync …", error: "Sync-Fehler", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
+const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// CSS-Animation neu starten (Klasse kurz entfernen und wieder setzen)
+function replay(el, className) {
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
 
 /**
  * App-Hülle: Ansicht passend zur Adresse zeigen, Kacheln aktuell halten, Kartenansicht öffnen.
@@ -42,6 +52,7 @@ export class App {
       },
       setTitle: (text) => this.setTitle(text),
       render: () => this.render(),
+      bounce: (el) => replay(el, "just-changed"),
       refresh: () => this.refresh(),
       openCard: (card) => this.openCard(card),
       afterChange: (structural) => this.afterChange(structural),
@@ -53,10 +64,17 @@ export class App {
     window.addEventListener("hashchange", () => {
       this.render();
       window.scrollTo(0, 0);
+      replay(this.main, "view-enter"); // neue Ansicht blendet sanft ein
     });
     this.main.addEventListener("click", (e) => this.#onTileClick(e));
     document.addEventListener("error", (e) => this.#onImageError(e), true);
-    this.dialog.addEventListener("click", (e) => e.target === this.dialog && this.dialog.close());
+    // Kartenbilder weich einblenden, sobald sie da sind
+    document.addEventListener("load", (e) => e.target instanceof HTMLImageElement && e.target.closest(".tile-art, .sheet-art") && e.target.classList.add("loaded"), true);
+    this.dialog.addEventListener("click", (e) => e.target === this.dialog && this.closeSheet());
+    this.dialog.addEventListener("cancel", (e) => {
+      e.preventDefault(); // Escape: auch mit Animation schließen
+      this.closeSheet();
+    });
     this.dialog.addEventListener("close", () => {
       this.#sheetRefresh = null;
       this.refresh();
@@ -71,6 +89,11 @@ export class App {
 
   render() {
     clearTimeout(this.#rerenderTimer);
+    // nicht mitten im Ziehen neu aufbauen – kurz danach nachholen
+    if (isDragging()) {
+      this.#rerenderTimer = setTimeout(() => this.render(), 400);
+      return;
+    }
     const route = currentRoute();
     this.#viewDispose?.();
     this.main.textContent = "";
@@ -99,9 +122,21 @@ export class App {
 
   openCard(card) {
     const body = $("#sheetBody");
-    this.#sheetRefresh = renderCardSheet(body, card, { ...this.ctx, close: () => this.dialog.close() });
+    this.#sheetRefresh = renderCardSheet(body, card, { ...this.ctx, close: () => this.closeSheet() });
+    this.dialog.classList.remove("closing");
     if (!this.dialog.open) this.dialog.showModal();
     body.scrollTop = 0;
+  }
+
+  // Kartenansicht mit kurzer Animation schließen
+  closeSheet() {
+    if (!this.dialog.open || this.dialog.classList.contains("closing")) return;
+    if (reducedMotion()) return this.dialog.close();
+    this.dialog.classList.add("closing");
+    setTimeout(() => {
+      this.dialog.classList.remove("closing");
+      this.dialog.close();
+    }, SHEET_CLOSE_MS);
   }
 
   // Nach einer Änderung: Ansicht neu aufbauen, wenn dadurch Karten dazukommen oder wegfallen.
@@ -129,8 +164,11 @@ export class App {
     const button = e.target.closest("[data-open], [data-toggle]");
     if (!button) return;
     if (button.hasAttribute("data-open")) return this.openCard(card);
+    // Mehrere Exemplare? Dann nicht per Haken auf 0 setzen, sondern die Anzahl in der Kartenansicht ändern
+    if (this.services.collection.quantity(card.id) > 1) return this.openCard(card);
     this.services.collection.toggle(card);
     navigator.vibrate?.(12);
+    replay(tile, "just-changed");
     this.afterChange(false);
   }
 

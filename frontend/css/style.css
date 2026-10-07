@@ -184,6 +184,11 @@ select.field { padding-right: 8px; }
 .toolbar > .field:first-child { flex: 1; }
 .toolbar select.field { flex: 0 1 auto; width: auto; max-width: 48%; }
 .toolbar > select.field:only-child { flex: 1; max-width: none; }
+/* Filter + Sortierung: auf schmalen Handys untereinander, damit nichts abgeschnitten wird */
+@media (max-width: 479px) {
+  .toolbar.split { flex-wrap: wrap; }
+  .toolbar.split > * { flex: 1 1 100%; max-width: none; }
+}
 .toolbar .btn { flex: none; }
 .toolbar.tight { margin: 0; }
 .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
@@ -358,6 +363,8 @@ select.field { padding-right: 8px; }
 .panel h2 { font-size: 19px; font-weight: 600; margin-bottom: 6px; }
 .panel p { margin: 6px 0; font-size: 14px; }
 .label { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.field-note { margin: 6px 2px 0; font-size: 13px; font-weight: 800; color: #d6336c; }
+.field-note:empty { display: none; }
 
 /* ===== Kartenansicht ===== */
 .sheet {
@@ -396,7 +403,8 @@ select.field { padding-right: 8px; }
   border: 0;
   border-radius: 50%;
   color: #fff;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.35); /* auf jedem Kartenbild sichtbar */
   cursor: pointer;
 }
 .sheet-close svg { width: 22px; height: 22px; }
@@ -526,6 +534,41 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
 .progress-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--red); transition: width 0.25s ease; }
 .progress-bar.indeterminate i { width: 35%; animation: progress-slide 1s ease-in-out infinite; }
 @keyframes progress-slide { from { left: -35%; } to { left: 100%; } }
+
+/* ===== Animationen (kurz und dezent; aus bei „Bewegung reduzieren“) ===== */
+:root { --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes view-enter { from { opacity: 0; transform: translateY(8px); } }
+@keyframes img-in { from { opacity: 0; } }
+@keyframes pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes sheet-in { from { opacity: 0; transform: translateY(32px) scale(0.98); } }
+@keyframes sheet-out { to { opacity: 0; transform: translateY(32px) scale(0.98); } }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(18px); } }
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+/* Ansichtswechsel */
+main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out); }
+/* Kartenbilder blenden ein, sobald sie geladen sind */
+.tile-art img.loaded, .sheet-art img.loaded { animation: img-in 0.3s ease; }
+/* Haken / Auswahl springen kurz */
+.tile.just-changed .tile-check svg, .tile.just-changed .tile-pick { animation: pop 0.35s var(--ease-out); }
+/* Kartenansicht fährt von unten herein und wieder hinaus */
+.sheet[open] { animation: sheet-in 0.28s var(--ease-out); }
+.sheet[open]::backdrop { animation: fade-in 0.25s ease; }
+.sheet.closing { animation: sheet-out 0.18s ease-in forwards; }
+.sheet.closing::backdrop { animation: fade-out 0.18s ease-in forwards; }
+/* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */
+.action-bar { animation: rise 0.25s var(--ease-out); }
+.reorder-placeholder { animation: fade-in 0.15s ease; }
+.sync-dot[data-state="busy"] i { animation: pulse 1s ease-in-out infinite; }
+/* Antippen fühlt sich an wie ein Knopf */
+.row { transition: transform 0.12s ease, box-shadow 0.2s ease; }
+.row:active { transform: scale(0.985); }
+.tabs a { transition: color 0.2s ease, transform 0.12s ease; }
+.tabs a:active { transform: scale(0.92); }
+.tabs a svg { transition: transform 0.2s var(--ease-out); }
+.tabs a[aria-current="page"] svg { transform: translateY(-1px) scale(1.08); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }

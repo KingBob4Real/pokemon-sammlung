@@ -42,15 +42,24 @@ export class SyncService extends EventTarget {
     return Boolean(this.config.key) && normalizeKey(key) !== this.config.key;
   }
 
-  configure(url, key) {
+  // → null wenn übernommen, sonst der Grund (dann bleibt alles wie es war)
+  async configure(url, key) {
+    const next = { ...this.config, url: url.trim(), key: normalizeKey(key), error: "" };
     if (this.isOtherKey(key)) {
+      // Erst prüfen, ob der neue Schlüssel gilt – ein Tippfehler darf das Gerät nicht leeren
+      try {
+        await this.api.sync(next, 0, []);
+      } catch (e) {
+        return e.status === 401 ? "Dieser Schlüssel stimmt nicht – nichts geändert." : "Backend nicht erreichbar – nichts geändert.";
+      }
       this.store.reset(); // im Backend bleibt alles, das Gerät holt die Daten der neuen Person
-      this.config.user = "";
-      this.config.at = 0;
+      next.user = "";
+      next.at = 0;
     }
-    this.config = { ...this.config, url: url.trim(), key: normalizeKey(key), error: "" };
+    this.config = next;
     this.#save();
-    return this.run();
+    await this.run();
+    return null;
   }
 
   schedule(ms = 1500) {

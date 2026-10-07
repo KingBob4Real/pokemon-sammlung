@@ -4,10 +4,16 @@ const HOLD_MS = 350; // so lange gedrückt halten, bis das Element „abhebt“
 const MOVE_TOLERANCE_PX = 8; // vorher mehr bewegt = Scrollen, kein Ziehen
 const EDGE_PX = 80; // so nah am Rand scrollt die Seite beim Ziehen mit
 const SCROLL_STEP_PX = 12;
+const EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Ist gerade irgendwo ein Element abgehoben? (Die App baut dann nicht neu auf.)
+export const isDragging = () => document.querySelector(".is-dragging") != null;
 
 /**
  * Umsortieren per Gedrückt-halten-und-ziehen – fürs Handy gebaut (wie auf dem iPhone-Home-Bildschirm),
  * klappt auch mit der Maus. Normales Wischen scrollt weiter; erst nach kurzem Halten hebt das Element ab.
+ * Die anderen Elemente rücken animiert nach, beim Loslassen gleitet das Element an seinen Platz.
  * Beim Loslassen: onDrop(element, vorheriges Element | null, nächstes Element | null).
  * → Funktion zum Abschalten
  */
@@ -38,6 +44,21 @@ export function enableReorder(container, { itemSelector, onDrop }) {
     drag.frame = requestAnimationFrame(autoScroll);
   }
 
+  // DOM ändern und die übrigen Elemente von ihrer alten Stelle aus hinübergleiten lassen (FLIP)
+  function animateShift(change) {
+    if (reducedMotion()) return change();
+    const items = [...container.querySelectorAll(itemSelector)].filter((i) => i !== drag.el);
+    const before = new Map(items.map((i) => [i, i.getBoundingClientRect()]));
+    change();
+    for (const i of items) {
+      const a = before.get(i);
+      const b = i.getBoundingClientRect();
+      const dx = a.left - b.left;
+      const dy = a.top - b.top;
+      if (dx || dy) i.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], { duration: 180, easing: EASE });
+    }
+  }
+
   function move(x, y) {
     drag.x = x;
     drag.y = y;
@@ -52,8 +73,7 @@ export function enableReorder(container, { itemSelector, onDrop }) {
     drag.lastTarget = target;
     // Platzhalter auf die andere Seite des Ziels setzen – die anderen rücken nach
     const targetIsAfter = drag.placeholder.compareDocumentPosition(target) & Node.DOCUMENT_POSITION_FOLLOWING;
-    if (targetIsAfter) target.after(drag.placeholder);
-    else target.before(drag.placeholder);
+    animateShift(() => (targetIsAfter ? target.after(drag.placeholder) : target.before(drag.placeholder)));
   }
 
   function autoScroll() {
@@ -70,10 +90,16 @@ export function enableReorder(container, { itemSelector, onDrop }) {
   function finish() {
     cancelAnimationFrame(drag.frame);
     const { el, placeholder } = drag;
+    const from = el.getBoundingClientRect();
     placeholder.replaceWith(el);
     el.classList.remove("is-dragging");
     for (const prop of ["position", "left", "top", "width", "height", "zIndex", "pointerEvents"]) el.style[prop] = "";
     drag = null;
+    // vom Finger an den neuen Platz gleiten
+    if (!reducedMotion()) {
+      const to = el.getBoundingClientRect();
+      el.animate([{ transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(1.04)` }, { transform: "none" }], { duration: 200, easing: EASE });
+    }
     swallowClick = true; // der Klick nach dem Loslassen soll nichts öffnen
     setTimeout(() => (swallowClick = false), 400);
     const sibling = (dir) => {
@@ -118,6 +144,9 @@ export function enableReorder(container, { itemSelector, onDrop }) {
   container.classList.add("reorderable");
 
   return () => {
+    cancelPending();
+    if (drag) cancelAnimationFrame(drag.frame);
+    drag = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerEnd);
     window.removeEventListener("pointercancel", onPointerEnd);

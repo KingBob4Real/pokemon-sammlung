@@ -15,6 +15,8 @@ function resolveTarget(ctx, targetId) {
       backHref: "#sammlung",
       has: (card) => collection.has(card.id),
       toggle: (card) => collection.toggle(card),
+      // mehrere Exemplare nicht per Antippen auf 0 setzen – Anzahl in der Kartenansicht ändern
+      needsSheet: (card) => collection.quantity(card.id) > 1,
       count: () => `${plural(collection.entries().length, "Karte", "Karten")} in der Sammlung`,
     };
   }
@@ -66,8 +68,10 @@ export function render(main, ctx, arg) {
   main.classList.add("has-action-bar");
 
   const onPick = (card, el) => {
+    if (target.needsSheet?.(card)) return ctx.openCard(card);
     target.toggle(card);
     setPicked(el, target.has(card));
+    ctx.bounce(el);
     updateCount();
     navigator.vibrate?.(10);
   };

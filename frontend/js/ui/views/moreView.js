@@ -12,12 +12,24 @@ export function render(main, ctx) {
   const url = h("input", { type: "url", class: "field", value: sync.config.url, placeholder: "https://pokemon-sammlung.….workers.dev", autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
   const key = h("input", { type: "password", class: "field", value: sync.config.key, placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
   const status = h("p", { class: "muted" });
+  const keyNote = h("p", { class: "field-note", role: "alert" });
   const showKey = () => (key.type = key.type === "password" ? "text" : "password");
   const copyKey = () => navigator.clipboard?.writeText(key.value).then(() => (status.textContent = "Schlüssel kopiert."), () => {});
   const save = () => {
     // anderer Schlüssel = andere Person → Daten dieses Geräts gehören nicht dazu
-    if (sync.isOtherKey(key.value) && !ctx.store.isEmpty && !confirm("Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden entfernt und durch die der neuen Person ersetzt (im Backend bleibt alles erhalten). Weiter?")) return;
-    sync.configure(url.value, key.value).then(() => (key.value = sync.config.key));
+    if (sync.isOtherKey(key.value) && !ctx.store.isEmpty) {
+      const unsaved = sync.pendingCount ? `
+
+Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen und gehen dabei verloren.` : "";
+      if (!confirm(`Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden durch die der neuen Person ersetzt (im Backend bleibt alles erhalten).${unsaved}
+
+Weiter?`)) return;
+    }
+    keyNote.textContent = "";
+    sync.configure(url.value, key.value).then((problem) => {
+      if (problem) keyNote.textContent = problem;
+      else key.value = sync.config.key;
+    });
   };
 
   // --- Sicherung ---
@@ -47,6 +59,7 @@ export function render(main, ctx) {
       h("p", {}, "Jede Person hat einen eigenen Schlüssel und damit eine eigene Sammlung. Trag deinen Schlüssel auf jedem deiner Geräte einmal ein, dann sind Sammlung und Listen überall gleich."),
       h("label", { class: "label" }, ["Backend-Adresse", url]),
       h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
+      keyNote,
       h("div", { class: "buttons" }, [
         h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
         h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
