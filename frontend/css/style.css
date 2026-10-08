@@ -54,6 +54,7 @@ body {
 h1, h2, h3 { font-family: var(--font-head); line-height: 1.15; margin: 0; }
 a { color: inherit; }
 button, input, select { font: inherit; color: inherit; }
+button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +, Auslöser) zoomt am iPhone nicht */
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 [hidden] { display: none !important; }
 .muted { color: var(--muted); }
@@ -561,10 +562,11 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
 }
 /* Live-Kamera: Bild füllt den Bildschirm, Rahmen in Kartenform (63 × 88) bzw. Ordnerseite, außen abgedunkelt.
    Oben Art des Scans, in der Mitte der Rahmen (passt sich dem freien Platz an), unten Liste der Serie und Auslöser. */
-.camera { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; overflow: hidden; background: #000; color: #fff; }
+.camera { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; overflow: hidden; background: #000; color: #fff; -webkit-user-select: none; user-select: none; }
 .camera video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .camera-top, .camera-bottom { position: relative; z-index: 1; }
-.camera-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 8px; }
+.camera-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px)); }
+.camera-bottom { padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); } /* quer: nicht unter die Notch */
 .camera-row { display: flex; align-items: center; gap: 8px; }
 /* Rahmen füllt den freien Platz in der Mitte (höchstens 84 % der Breite); Liste und Meldungen ändern ihn nie –
    sonst sähe das Vorschaubild fürs automatische Auslösen bei jeder neuen Zeile anders aus */
@@ -585,7 +587,7 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
 }
 .camera-hint { margin: 0; text-align: center; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; }
 .camera-modes { display: flex; gap: 4px; padding: 4px; border-radius: 99px; background: rgba(0, 0, 0, 0.6); }
-.camera-mode { min-width: 64px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 99px; background: none; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.camera-mode { min-width: 64px; min-height: 44px; padding: 0 10px; border: 0; border-radius: 99px; background: none; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
 .camera-mode[aria-pressed="true"] { background: #fff; color: #111; }
 .camera-mode:disabled { opacity: 0.4; cursor: default; }
 .camera-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 99px; background: rgba(0, 0, 0, 0.6); color: #fff; font: inherit; font-size: 16px; font-weight: 800; }
@@ -640,7 +642,7 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
 .batch-qty output { min-width: 18px; text-align: center; font-weight: 800; }
 .batch-remove { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
 .batch-remove svg { width: 18px; height: 18px; }
-.btn.batch-action { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+.btn.batch-action { min-height: 44px; padding: 6px 12px; font-size: 14px; }
 .btn.batch-done { min-height: 48px; }
 .batch-photo { display: block; width: min(50%, 200px); margin: 8px auto 12px; border-radius: 10px; }
 .batch-hint { margin: 10px 2px 0; font-size: 13px; }

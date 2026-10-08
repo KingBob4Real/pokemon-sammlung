@@ -134,7 +134,8 @@ const cardsIn = (b) => b.items.filter((it) => it.card).reduce((n, it) => n + it.
 function itemRow(ctx, item, onResolve = null) {
   const b = batchOf(ctx);
   const { card } = item;
-  const src = (card && cardImage(card, "low")) || item.preview;
+  // gefundenes Bild pro Karte merken – sonst ginge die Suche nach der Bildquelle bei jedem Neuzeichnen von vorn los (Flackern)
+  const src = (card && ((item.srcOf === card.id && item.src) || cardImage(card, "low"))) || item.preview;
   const title = card?.name || item.rec?.name || "Karte";
   const value = card ? ctx.prices.value(card.id) : null;
   const step = (d) => {
@@ -143,7 +144,7 @@ function itemRow(ctx, item, onResolve = null) {
   };
   const action = onResolve && ACTIONS[item.status];
   return h("li", { class: `batch-row is-${item.status}` }, [
-    h("span", { class: "batch-art" }, [h("img", { src, alt: "", decoding: "async", ...(src === item.preview ? {} : { crossorigin: "anonymous" }) })]),
+    h("span", { class: "batch-art" }, [h("img", { src, alt: "", decoding: "async", onload: (e) => card && Object.assign(item, { src: e.target.src, srcOf: card.id }), ...(src === item.preview ? {} : { crossorigin: "anonymous" }) })]),
     h("div", { class: "batch-info" }, [
       h("b", {}, title),
       h("span", {}, card ? `${cardNumber(card)} · ${card.setName}` : STATUS[item.status]),
@@ -157,7 +158,7 @@ function itemRow(ctx, item, onResolve = null) {
         ])
       : action
         ? h("button", { type: "button", class: "btn batch-action", onclick: () => onResolve(item) }, action)
-        : null,
+        : h("span"), // Spalte freihalten, damit das × rechts bleibt
     h("button", { type: "button", class: "batch-remove", "aria-label": `${title} aus der Liste nehmen`, html: ICONS.close, onclick: () => (drop(b, item), b.changed()) }),
   ]);
 }

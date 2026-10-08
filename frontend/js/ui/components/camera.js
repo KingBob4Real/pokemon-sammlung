@@ -5,6 +5,7 @@ const FRAME_MARGIN = 0.06; // etwas Rand mitnehmen, falls die Karte nicht genau 
 const CELL_MARGIN = 0.03; // Seite: wenig Rand, sonst liest die KI die Nummer der Nachbarkarte (gemessen)
 const MAX_SIDE = 1024; // so groß geht es ohnehin ans Backend
 const TICK_MS = 300; // Serie: so oft ein Vorschaubild vergleichen
+const SHOT_GAP_MS = 800; // so lange nach einem Foto kein zweites (versehentlicher Doppeltipp)
 const THUMB = [24, 32];
 export const LAYOUTS = ["3x3", "2x2", "3x4", "4x3"]; // Spalten × Zeilen einer Ordnerseite
 export const layoutOf = (value) => value.split("x").map(Number); // „3x4“ → [3, 4]
@@ -69,6 +70,7 @@ export function cameraView({ mode = "single", layout = "3x3", tray = null, onPho
   let timer = null;
   let blocked = false; // Tageslimit erreicht
   let seenSince = 0; // Serie: was nach dem Öffnen/Wechseln schon im Rahmen liegt (z. B. die eben gespeicherte Karte), gilt als gesehen
+  let lastShot = 0;
 
   function setMode(next, notify = true) {
     mode = next;
@@ -100,8 +102,11 @@ export function cameraView({ mode = "single", layout = "3x3", tray = null, onPho
   }
 
   async function capture(isAuto = false) {
-    if (!video.videoWidth || shutter.disabled) return;
+    const now = performance.now();
+    if (!video.videoWidth || shutter.disabled || now - lastShot < SHOT_GAP_MS) return; // Doppeltipp = ein Foto
+    lastShot = now;
     const m = mode;
+    if (m === "single") shutter.disabled = true;
     navigator.vibrate?.(10);
     flash.classList.remove("on");
     void flash.offsetWidth;
