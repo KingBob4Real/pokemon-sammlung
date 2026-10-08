@@ -74,6 +74,8 @@ button, input, select { font: inherit; color: inherit; }
   background: linear-gradient(160deg, #f0574b 0%, var(--red) 50%, var(--red-dark) 100%);
   border-bottom: 4px solid var(--ink);
 }
+[data-stage="dev"] .top { background: repeating-linear-gradient(135deg, #4a4f5c 0 14px, #3b3f4a 14px 28px); }
+[data-stage="dev"] .top h1::after { content: " · DEV"; }
 .top h1 {
   font-size: 24px;
   font-weight: 700;

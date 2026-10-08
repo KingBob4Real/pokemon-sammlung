@@ -1,9 +1,11 @@
 // Feste Einstellungen der App an einer Stelle.
 
 export const TCGDEX_API = "https://api.tcgdex.net/v2";
+// Dev-Stufe: der develop-Branch liegt unter …/dev/ (siehe .github/workflows/pages.yml) – eigenes Backend, eigener Speicher.
+export const IS_DEV = location.pathname.includes("/dev/");
 export const OLD_APP_URL = "https://kingbob4real.github.io/pokemon-karten-checkliste/";
 // Adresse des Cloudflare-Backends (unter „Mehr“ änderbar)
-export const DEFAULT_BACKEND_URL = "https://pokemon-sammlung.pokemon-sammlung-backend.workers.dev";
+export const DEFAULT_BACKEND_URL = `https://pokemon-sammlung${IS_DEV ? "-dev" : ""}.pokemon-sammlung-backend.workers.dev`;
 export const CARDMARKET_FILTER = "language=3&minCondition=3"; // nur deutsche Karten ab Excellent
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -13,14 +15,15 @@ export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
+const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
 export const STORAGE_KEYS = {
-  entities: "ps.entities.v1",
-  dirty: "ps.dirty.v1",
-  rev: "ps.rev.v1",
-  sync: "ps.sync.v1",
-  prices: "ps.prices.v2", // v2: mit Pokédex-Nummer
-  sets: "ps.sets.v2", // v2: mit Serie für englische Ersatzbilder
-  prefs: "ps.prefs.v1",
+  entities: `${P}entities.v1`,
+  dirty: `${P}dirty.v1`,
+  rev: `${P}rev.v1`,
+  sync: `${P}sync.v1`,
+  prices: `${P}prices.v2`, // v2: mit Pokédex-Nummer
+  sets: `${P}sets.v2`, // v2: mit Serie für englische Ersatzbilder
+  prefs: `${P}prefs.v1`,
   // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
   legacyOwned: "pkc.owned.v1",
   legacyPrices: "pkc.ownPrices.v1",

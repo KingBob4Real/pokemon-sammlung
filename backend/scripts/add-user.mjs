@@ -1,8 +1,8 @@
 // Person anlegen oder ihren Schlüssel neu setzen (gleiche ID = neuer Schlüssel, Daten bleiben):
-//   npm run user:add -- "<Name>" [--id <id>] [--key-file <datei>] [--local]
+//   npm run user:add -- "<Name>" [--id <id>] [--key-file <datei>] [--local] [--env dev]
 // Erzeugt einen kurzen Schlüssel (oder übernimmt einen aus --key-file), legt ihn in .keys/<id>.txt
 // im Projektordner ab (nicht in Git) und trägt nur seinen SHA-256-Hash in die Datenbank ein.
-// Ohne --local: die echte Datenbank bei Cloudflare.
+// Ohne --local: die echte Datenbank bei Cloudflare. --env dev: die Datenbank der Dev-Stufe.
 import { execSync } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -21,6 +21,7 @@ const take = (flag, withValue = true) => {
 };
 const local = take("--local", false);
 const keyFile = take("--key-file");
+const stage = take("--env");
 const idArg = take("--id");
 const displayName = args.join(" ").trim();
 const id =
@@ -32,8 +33,8 @@ const id =
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-if (!displayName || !/^[a-z0-9-]{1,40}$/.test(id)) {
-  console.error('Aufruf: npm run user:add -- "<Name>" [--id <id>] [--key-file <datei>] [--local]');
+if (!displayName || !/^[a-z0-9-]{1,40}$/.test(id) || (stage && !/^[a-z]+$/.test(stage))) {
+  console.error('Aufruf: npm run user:add -- "<Name>" [--id <id>] [--key-file <datei>] [--local] [--env dev]');
   process.exit(1);
 }
 
@@ -46,7 +47,7 @@ const sql = `INSERT INTO users (id, name, key_hash, created) VALUES ('${id}', '$
 const sqlFile = path.join(os.tmpdir(), `pokemon-sammlung-user-${id}.sql`);
 fs.writeFileSync(sqlFile, sql);
 try {
-  execSync(`npx wrangler d1 execute pokemon-sammlung ${local ? "--local" : "--remote"} --file "${sqlFile}"`, {
+  execSync(`npx wrangler d1 execute DB ${local ? "--local" : "--remote"}${stage ? ` --env ${stage}` : ""} --file "${sqlFile}"`, {
     stdio: "inherit",
     env: { ...process.env, CI: "true" },
   });
@@ -56,6 +57,6 @@ try {
 
 const keysDir = new URL("../../.keys/", import.meta.url);
 fs.mkdirSync(keysDir, { recursive: true });
-const file = `${id}${local ? ".local" : ""}.txt`;
+const file = `${id}${stage ? `.${stage}` : ""}${local ? ".local" : ""}.txt`;
 fs.writeFileSync(new URL(file, keysDir), `${key}\n`);
 console.log(`\nPerson „${displayName}“ (ID ${id}) gespeichert. Schlüssel: .keys/${file}`);

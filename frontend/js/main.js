@@ -4,7 +4,7 @@
 //   domain/    reine Fachlogik (Karte, Preis, Sortierung)
 //   services/  Anwendungslogik (Sammlung, Listen, Preise, Sync …)
 //   ui/        Ansichten und Komponenten
-import { DEFAULT_BACKEND_URL, OLD_APP_URL, POCKET_SERIES, PRICE_TTL_MS, SETS_TTL_MS, STORAGE_KEYS, SYNC_BATCH, TCGDEX_API } from "./config.js";
+import { DEFAULT_BACKEND_URL, IS_DEV, OLD_APP_URL, POCKET_SERIES, PRICE_TTL_MS, SETS_TTL_MS, STORAGE_KEYS, SYNC_BATCH, TCGDEX_API } from "./config.js";
 import { fetchJson } from "./core/http.js";
 import { storage } from "./core/storage.js";
 import { SyncApi } from "./data/syncApi.js";
@@ -52,5 +52,6 @@ window.addEventListener("online", () => {
   sync.run();
   prices.resume();
 });
+if (IS_DEV) document.documentElement.dataset.stage = "dev"; // grauer Kopf statt rot
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 navigator.storage?.persist?.().catch(() => {});

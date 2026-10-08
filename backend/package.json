@@ -6,9 +6,9 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "db:migrate:local": "wrangler d1 migrations apply pokemon-sammlung --local",
-    "db:migrate": "wrangler d1 migrations apply pokemon-sammlung --remote",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
     "user:add": "node scripts/add-user.mjs",
-    "user:list": "wrangler d1 execute pokemon-sammlung --remote --command \"SELECT id, name, datetime(created / 1000, 'unixepoch') AS angelegt FROM users\"",
+    "user:list": "wrangler d1 execute DB --remote --command \"SELECT id, name, datetime(created / 1000, 'unixepoch') AS angelegt FROM users\"",
     "test:smoke": "node test/smoke.mjs"
   },
   "devDependencies": {

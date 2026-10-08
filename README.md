@@ -34,11 +34,27 @@ backend/                   Cloudflare Worker + D1-Datenbank
   migrations/              Datenbank-Schema
   scripts/                 Personen anlegen, Listen der alten Checkliste übernehmen
   test/smoke.mjs           Test gegen ein laufendes Backend (inkl. Trennung zwischen Personen)
-.github/workflows/pages.yml    veröffentlicht frontend/ bei jedem Push auf GitHub Pages
-.github/workflows/backend.yml  veröffentlicht backend/ bei jedem Push bei Cloudflare (Migrationen + Worker)
+.github/workflows/pages.yml    veröffentlicht frontend/ von main und develop auf GitHub Pages
+.github/workflows/backend.yml  veröffentlicht backend/ von main bzw. develop bei Cloudflare (Migrationen + Worker)
 ```
 
 Erweitern: neue Ansicht → Datei in `ui/views/` und in `ui/app.js` eintragen. Neue Datenart → Repository in `backend/src/repositories/`, Regel in `validation/changeValidator.js`, Eintrag in `backend/src/index.js` und `ENTITY_TYPES` im Frontend; die Sync-Logik bleibt unverändert.
+
+## Live & Dev (Branches)
+
+| Branch | App | Backend + Datenbank |
+| --- | --- | --- |
+| `main` – nur Fertiges, Getestetes | <https://kingbob4real.github.io/pokemon-sammlung/> | `pokemon-sammlung` |
+| `develop` – in Arbeit, zum Testen | <https://kingbob4real.github.io/pokemon-sammlung/dev/> (grauer Kopf, „· DEV“) | `pokemon-sammlung-dev` |
+
+Ablauf: auf `develop` arbeiten und pushen → in der Dev-App testen → fertig: `develop` in `main` mergen und pushen → live.
+
+```bash
+git switch develop                     # arbeiten, committen, git push
+git switch main && git merge develop && git push && git switch develop   # Release
+```
+
+Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) – Testen dort berührt die echte Sammlung nie. Echte Daten zum Testen: in der Live-App unter „Mehr“ exportieren, in der Dev-App importieren. Personen für Dev: `npm run user:add -- "<Name>" --id <id> --key-file ../.keys/<id>.txt --env dev` (gleicher Schlüssel wie live). Alle anderen Befehle mit `--env dev` bzw. `npm run … -- --env dev`.
 
 ## Datenbank (Cloudflare D1, SQLite)
 
@@ -68,7 +84,7 @@ Bei Änderungen an `frontend/css/style.css` oder `frontend/js/main.js` die Versi
 
 ## Backend automatisch veröffentlichen (GitHub Action)
 
-Jeder Push mit Änderungen in `backend/` spielt neue Datenbank-Migrationen ein und veröffentlicht den Worker. Dafür braucht GitHub einmalig einen Cloudflare-API-Token:
+Jeder Push mit Änderungen in `backend/` spielt neue Datenbank-Migrationen ein und veröffentlicht den Worker (`main` → live, `develop` → Dev). Dafür braucht GitHub einmalig einen Cloudflare-API-Token:
 
 1. Cloudflare-Dashboard → oben rechts Profil → **My Profile → API Tokens → Create Token**.
 2. Vorlage **„Edit Cloudflare Workers“** → **Use template**.
