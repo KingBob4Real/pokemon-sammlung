@@ -1,7 +1,7 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, fmtSigned, norm, plural } from "../../core/format.js";
 import { COLLECTION_TARGET, links } from "../router.js";
-import { cardTile } from "../components/cardTile.js";
+import { cardTile, setPicked } from "../components/cardTile.js";
 import { scanButton } from "../components/scanSheet.js";
 import { emptyState, sortSelect, stat } from "../components/widgets.js";
 
@@ -12,9 +12,18 @@ const GROUPS = [
   ["list", "Nach Liste"],
 ];
 
-// Ansicht „Sammlung“: Kennzahlen, Karten hinzufügen, filtern, sortieren, nach Set oder Liste gruppieren
+// Ansicht „Sammlung“: Kennzahlen, Karten hinzufügen, filtern, sortieren, nach Set oder Liste gruppieren,
+// „Auswählen“ markiert mehrere Karten zum Entfernen
 export function render(main, ctx) {
   const { collection, lists, prices, sets, sorters, prefs, session } = ctx;
+  const selection = session.selection;
+  const selecting = selection.listId === COLLECTION_TARGET;
+  if (!selecting) selection.ids.clear();
+  const setSelecting = (on) => {
+    selection.listId = on ? COLLECTION_TARGET : null;
+    selection.ids.clear();
+    ctx.render();
+  };
   ctx.setTitle("Sammlung");
   const sort = sorters[prefs.get("collectionSort")] || sorters.newest;
   const entries = collection.entries().sort(sort.compare);
@@ -55,12 +64,21 @@ export function render(main, ctx) {
   );
   groupSelect.addEventListener("change", () => setPref("collectionGroup")(groupSelect.value));
   const filter = h("input", { type: "search", class: "field", placeholder: "In der Sammlung suchen …", "aria-label": "In der Sammlung suchen", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
-  main.append(h("div", { class: "toolbar wrap" }, [filter, sortSelect(sorters, SORT_KEYS, prefs.get("collectionSort"), setPref("collectionSort")), groupSelect]));
+  const selectButton = h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(!selecting) }, selecting ? "Auswahl beenden" : "Auswählen");
+  main.append(h("div", { class: "toolbar wrap" }, [filter, sortSelect(sorters, SORT_KEYS, prefs.get("collectionSort"), setPref("collectionSort")), groupSelect, selectButton]));
 
   // Abschnitte bauen: [{ title, hint, entries }]
   const sections = groupEntries(entries, prefs.get("collectionGroup"), { sets, lists, valueOf: (id) => prices.value(id) });
   const blocks = sections.map((sec) => {
-    const grid = h("div", { class: "grid" }, sec.entries.map((e) => cardTile(e.card, { mode: "view" })));
+    const grid = h(
+      "div",
+      { class: "grid" },
+      sec.entries.map((e) => {
+        const el = cardTile(e.card, { mode: selecting ? "pick" : "view" });
+        if (selecting) setPicked(el, selection.ids.has(e.card.id));
+        return el;
+      })
+    );
     const head = sec.title ? h("h2", { class: "group-title" }, [h("span", {}, sec.title), h("small", {}, sec.hint)]) : null;
     main.append(...[head, grid].filter(Boolean));
     return { head, grid, entries: sec.entries };
@@ -82,7 +100,52 @@ export function render(main, ctx) {
   filter.addEventListener("input", applyFilter);
   applyFilter();
   prices.request(entries.map((e) => e.card.id));
-  return { refresh };
+  if (!selecting) return { refresh };
+
+  // Auswahl: Leiste unten – „Alle“ (was gerade sichtbar ist) und „Entfernen“ mit „Rückgängig“
+  const label = h("span");
+  const tiles = () => blocks.flatMap((b) => b.entries.map((e, i) => ({ card: e.card, el: b.grid.children[i] })));
+  const updateBar = () => (label.textContent = selection.ids.size ? `${selection.ids.size} ausgewählt` : "Karten antippen zum Auswählen");
+  const selectAll = () => {
+    const visible = tiles().filter((t) => !t.el.hidden);
+    const all = visible.every((t) => selection.ids.has(t.card.id));
+    for (const t of visible) {
+      if (all) selection.ids.delete(t.card.id);
+      else selection.ids.add(t.card.id);
+      setPicked(t.el, !all);
+    }
+    updateBar();
+  };
+  const remove = () => {
+    const cards = entries.filter((e) => selection.ids.has(e.card.id)).map((e) => e.card);
+    if (!cards.length) return;
+    const undo = collection.removeAll(cards);
+    setSelecting(false);
+    ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung entfernt.`, {
+      type: "success",
+      force: true,
+      duration: 8000,
+      action: { label: "Rückgängig", run: () => (undo(), ctx.render()) },
+    });
+  };
+  main.append(
+    h("div", { class: "action-bar" }, [
+      label,
+      h("button", { type: "button", class: "btn btn-ghost", onclick: selectAll }, "Alle"),
+      h("button", { type: "button", class: "btn danger", onclick: remove }, "Entfernen"),
+      h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(false) }, "Fertig"),
+    ])
+  );
+  main.classList.add("has-action-bar");
+  updateBar();
+  const onPick = (card, el) => {
+    if (selection.ids.has(card.id)) selection.ids.delete(card.id);
+    else selection.ids.add(card.id);
+    setPicked(el, selection.ids.has(card.id));
+    ctx.bounce(el);
+    updateBar();
+  };
+  return { refresh, onPick };
 }
 
 function groupEntries(entries, group, { sets, lists, valueOf }) {

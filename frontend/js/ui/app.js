@@ -117,9 +117,8 @@ export class App {
     this.#showSyncState();
     this.render();
     $("#who").addEventListener("click", () => showProfiles(this.ctx));
-    // Mehrere Personen auf dem Gerät: einmal pro Sitzung fragen, wer sammelt. Neues Gerät: zum Einrichten.
-    const firstRun = !sync.enabled && store.isEmpty && !this.services.profiles.list.length;
-    if ((this.services.profiles.list.length > 1 || firstRun) && !chosenThisSession()) showProfiles(this.ctx, { start: true });
+    // Noch niemand angemeldet (neues Gerät): fragen, wer sammelt
+    if (!sync.enabled && !this.services.profiles.active && !chosenThisSession()) showProfiles(this.ctx, { start: true });
   }
 
   render() {
@@ -261,7 +260,9 @@ export class App {
 
   #onSyncProblem(problem) {
     if (problem.kind === "offline") return; // dafür gibt es den Offline-Hinweis
-    const toSettings = ["auth", "notFound"].includes(problem.kind) ? { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } : null;
+    // Abgemeldet (z. B. Passwort woanders gesetzt) → neu anmelden; falsche Adresse → „Mehr“
+    const toSettings =
+      problem.kind === "auth" ? { label: "Anmelden", run: () => showProfiles(this.ctx) } : problem.kind === "notFound" ? { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } : null;
     const retry = problem.kind === "rejected" ? null : { label: "Nochmal", run: () => this.services.sync.run() };
     this.toast.show(`Sync: ${problem.message}`, { type: problem.kind === "rejected" ? "info" : "error", action: toSettings || retry });
   }
@@ -285,14 +286,13 @@ export class App {
 
   #showSyncState() {
     const { profiles } = this.services;
-    const index = profiles.list.findIndex((p) => p.id === profiles.active);
+    const index = profiles.people.findIndex((p) => p.id === profiles.active);
+    const me = profiles.people[index];
     const who = $("#who");
-    who.hidden = index < 0; // erst, wenn die Person bekannt ist (nach dem ersten Sync)
-    if (index >= 0) {
-      who.textContent = initial(profiles.list[index].name);
-      who.style.background = avatarColor(index);
-      who.setAttribute("aria-label", `${profiles.list[index].name} – Person wechseln`);
-    }
+    who.textContent = me ? initial(me.name) : "?";
+    who.style.background = me ? avatarColor(index) : "transparent";
+    who.setAttribute("aria-label", me ? `${me.name} – Person wechseln` : "Wer sammelt? Person wählen");
+    who.hidden = false;
     const state = this.services.sync.state;
     $("#syncDot").dataset.state = state;
     $("#syncLabel").textContent = SYNC_LABELS[state];

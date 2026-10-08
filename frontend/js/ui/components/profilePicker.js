@@ -1,10 +1,10 @@
-import { h, ICONS } from "../../core/dom.js";
+import { h } from "../../core/dom.js";
 
 const COLORS = ["#e8443a", "#3b7fd6", "#3a9a48", "#f0a020", "#8e5bd8", "#e0609a"];
-const CHOSEN = "ps.profileChosen"; // pro Sitzung nur einmal fragen (nicht nach jedem Update-Neuladen)
+const CHOSEN = "ps.profileChosen"; // nach „Später“ in dieser Sitzung nicht nochmal fragen
 
 export const initial = (name) => (name || "?").trim().charAt(0).toUpperCase();
-export const avatarColor = (index) => COLORS[index % COLORS.length];
+export const avatarColor = (index) => COLORS[Math.max(0, index) % COLORS.length];
 
 export function chosenThisSession() {
   try {
@@ -23,89 +23,114 @@ function markChosen() {
 }
 
 /**
- * „Wer sammelt?“ – die Personen auf diesem Gerät zum Antippen, wie die Profilauswahl bei Netflix.
- * Antippen = wechseln (die App lädt mit deren Daten neu). „Person hinzufügen“ fragt einmal den Sync-Schlüssel ab.
- *   start – beim App-Start: ohne Schließen-Knopf; auf einem neuen Gerät mit „Ohne Sync weiter“
+ * „Wer sammelt?“ – alle Personen zum Antippen, wie die Profilauswahl bei Netflix.
+ * Antippen = wechseln (die App lädt mit deren Daten neu); mit Schloss = erst das Passwort.
+ *   start – beim ersten Öffnen auf einem Gerät: ohne „Abbrechen“, dafür „Später“
  */
 export function showProfiles(ctx, { start = false } = {}) {
-  const { profiles, sync } = ctx;
+  const { profiles } = ctx;
   const dialog = h("dialog", { class: "profiles", "aria-label": "Person wählen" });
-  let editing = false;
+  const grid = h("div", { class: "profiles-grid" });
+  const info = h("p", { class: "muted" });
+  let asking = null; // Person, deren Passwort gerade gefragt ist
+  let switched = false; // schon gewechselt (nur noch Passwort-Angebot offen) → beim Schließen neu laden
 
   const done = () => {
     markChosen();
+    if (switched) return location.reload();
     dialog.close();
   };
-  const switchTo = (id) => {
-    markChosen();
-    profiles.switchTo(id);
-    location.reload(); // neu starten, damit alles mit den Daten (und dem Schlüssel) dieser Person läuft
-  };
-  const choose = (id) => (id === profiles.active ? done() : switchTo(id));
 
-  const key = h("input", { type: "text", class: "field", placeholder: "Sync-Schlüssel, z. B. ABCD-1234", "aria-label": "Sync-Schlüssel", autocomplete: "off", autocapitalize: "characters", spellcheck: "false", enterkeyhint: "go" });
+  const password = h("input", { type: "password", class: "field", placeholder: "Passwort", "aria-label": "Passwort", autocomplete: "current-password", enterkeyhint: "go" });
   const note = h("p", { class: "field-note", role: "alert" });
-  const addButton = h("button", { type: "submit", class: "btn" }, "Hinzufügen");
-  const form = h("form", { class: "profiles-add", hidden: true }, [
-    h("p", { class: "muted" }, "Jede Person hat ihren eigenen Sync-Schlüssel. Auf diesem Gerät musst du ihn nur einmal eingeben."),
-    h("div", { class: "toolbar tight" }, [key, addButton]),
-    note,
-  ]);
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  const go = h("button", { type: "submit", class: "btn" }, "Weiter");
+  const form = h("form", { class: "toolbar tight profiles-add", hidden: true }, [password, go]);
+
+  async function choose(person, pw = "") {
+    if (person.id === profiles.active) return done();
     note.textContent = "";
-    addButton.disabled = true;
-    const result = await profiles.add(sync.config.url, key.value);
-    addButton.disabled = false;
+    go.disabled = true;
+    const result = await profiles.choose(person.id, pw);
+    go.disabled = false;
+    if (result.needPassword) {
+      asking = person;
+      draw();
+      form.hidden = false;
+      password.value = "";
+      return password.focus();
+    }
     if (result.error) {
       note.textContent = result.error;
-      return key.focus();
+      return asking && password.select();
     }
-    switchTo(result.id); // auch die gerade aktive: ihr Schlüssel ist neu
+    markChosen();
+    switched = true;
+    if (result.firstLogin) return offerPassword(person);
+    location.reload(); // neu starten, damit alles mit den Daten dieser Person läuft
+  }
+
+  // Zum ersten Mal da und ohne Passwort: eins anbieten (freiwillig). Ändern geht später nur mit diesem.
+  function offerPassword(person) {
+    const fresh = h("input", { type: "password", class: "field", placeholder: "Neues Passwort (mind. 4 Zeichen)", "aria-label": "Neues Passwort", autocomplete: "new-password", enterkeyhint: "done" });
+    const hint = h("p", { class: "field-note", role: "alert" });
+    const save = h("button", { type: "submit", class: "btn" }, "Festlegen");
+    const setForm = h("form", { class: "toolbar tight profiles-add" }, [fresh, save]);
+    setForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      save.disabled = true;
+      const result = await profiles.setPassword(fresh.value);
+      save.disabled = false;
+      if (result.error) {
+        hint.textContent = result.error;
+        return fresh.select();
+      }
+      location.reload();
+    });
+    inner.replaceChildren(
+      h("h1", {}, `Hallo, ${person.name}!`),
+      h("p", { class: "profiles-text" }, "Möchtest du ein Passwort festlegen? Dann kann nur, wer es kennt, dein Profil öffnen. Ändern oder entfernen geht später nur mit diesem Passwort."),
+      setForm,
+      hint,
+      h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: () => location.reload() }, "Ohne Passwort weiter")])
+    );
+    fresh.focus();
+  }
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    if (asking) choose(asking, password.value);
   });
 
-  const grid = h("div", { class: "profiles-grid" });
-  const draw = () => {
+  function draw() {
+    const people = profiles.people;
+    info.textContent = people.length ? "" : "Die Personen werden geladen … (beim ersten Mal braucht es Internet)";
     grid.replaceChildren(
-      ...profiles.list.map((p, i) => {
-        const current = p.id === profiles.active;
-        const remove = editing && !current;
-        return h("button", {
+      ...people.map((p, i) =>
+        h("button", {
           type: "button",
-          class: `profile${current ? " is-current" : ""}${remove ? " is-removable" : ""}`,
-          "aria-label": remove ? `${p.name} von diesem Gerät entfernen` : `${p.name}${current ? " (aktuell)" : ""}`,
+          class: `profile${p.id === profiles.active ? " is-current" : ""}${asking?.id === p.id ? " is-asking" : ""}`,
+          "aria-label": `${p.name}${p.locked ? " (mit Passwort)" : ""}${p.id === profiles.active ? " (aktuell)" : ""}`,
           onclick: () => {
-            if (!remove) return choose(p.id);
-            if (!confirm(`${p.name} von diesem Gerät entfernen? Im Backend bleibt alles, mit dem Schlüssel ist die Person jederzeit wieder da.`)) return;
-            profiles.remove(p.id);
-            draw();
+            asking = null;
+            form.hidden = true;
+            choose(p);
           },
-        }, [h("span", { class: "profile-avatar", style: `background:${avatarColor(i)}`, html: remove ? ICONS.close : "" }, remove ? [] : initial(p.name)), h("span", { class: "profile-name" }, p.name)]);
-      }),
-      h("button", {
-        type: "button",
-        class: "profile",
-        onclick: () => {
-          form.hidden = false;
-          key.focus();
-        },
-      }, [h("span", { class: "profile-avatar profile-plus" }, "+"), h("span", { class: "profile-name" }, "Person hinzufügen")])
+        }, [
+          h("span", { class: "profile-avatar", style: `background:${avatarColor(i)}` }, [initial(p.name), p.locked ? h("span", { class: "profile-lock", "aria-hidden": "true" }, "🔒") : null]),
+          h("span", { class: "profile-name" }, p.name),
+        ])
+      )
     );
-  };
+  }
 
-  const others = profiles.list.some((p) => p.id !== profiles.active);
-  dialog.append(
-    h("div", { class: "profiles-inner" }, [
-      h("h1", {}, "Wer sammelt?"),
-      grid,
-      form,
-      h("div", { class: "buttons center" }, [
-        others ? h("button", { type: "button", class: "btn btn-ghost", onclick: (e) => ((editing = !editing), (e.target.textContent = editing ? "Fertig" : "Bearbeiten"), draw()) }, "Bearbeiten") : null,
-        start && !profiles.list.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: done }, "Ohne Sync weiter") : null,
-        start ? null : h("button", { type: "button", class: "btn btn-ghost", onclick: done }, "Abbrechen"),
-      ]),
-    ])
-  );
+  const inner = h("div", { class: "profiles-inner" }, [
+    h("h1", {}, "Wer sammelt?"),
+    grid,
+    form,
+    note,
+    info,
+    h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: done }, start ? "Später" : "Abbrechen")]),
+  ]);
+  dialog.append(inner);
   // Escape: bleibt bei der aktuellen Person
   dialog.addEventListener("cancel", (e) => {
     e.preventDefault();
@@ -115,4 +140,10 @@ export function showProfiles(ctx, { start = false } = {}) {
   draw();
   document.body.append(dialog);
   dialog.showModal();
+  // Liste auffrischen (neue Namen, Schloss gesetzt?), dann neu zeichnen
+  profiles.refresh().then((ok) => {
+    if (!dialog.isConnected) return;
+    if (!ok && !profiles.people.length) info.textContent = "Keine Verbindung – zum ersten Mal braucht es Internet.";
+    draw();
+  });
 }

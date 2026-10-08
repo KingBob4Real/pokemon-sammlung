@@ -9,6 +9,7 @@ import { fetchJson } from "./core/http.js";
 import { shrinkPhoto } from "./core/image.js";
 import { storage } from "./core/storage.js";
 import { ScanApi } from "./data/scanApi.js";
+import { AccountApi } from "./data/accountApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
 import { withEnglishImage } from "./domain/card.js";
@@ -30,9 +31,9 @@ import { createPrefs } from "./ui/prefs.js";
 
 const tcgdex = new TcgdexClient(TCGDEX_API, fetchJson);
 const syncApi = new SyncApi(fetchJson);
-// Wer sammelt? Jede Person auf dem Gerät hat ihre eigenen Speicher-Namen (siehe config.js)
-const profiles = new ProfileService(storage, PROFILES_KEY, storageKeys, syncApi);
-const STORAGE_KEYS = storageKeys(profiles.active);
+// Wer sammelt? Jede Person auf dem Gerät hat ihren eigenen Speicher-Platz (siehe config.js)
+const profiles = new ProfileService(storage, PROFILES_KEY, storageKeys, new AccountApi(fetchJson), DEFAULT_BACKEND_URL);
+const STORAGE_KEYS = storageKeys(profiles.slot);
 const store = new EntityStore(storage, STORAGE_KEYS);
 const sets = new SetService(tcgdex, storage, STORAGE_KEYS.sets, SETS_TTL_MS, POCKET_SERIES);
 const prices = new PriceService(tcgdex, storage, STORAGE_KEYS.prices, PRICE_TTL_MS);
@@ -40,7 +41,7 @@ const collection = new CollectionService(store);
 const lists = new ListService(store);
 const catalog = new CatalogService(tcgdex, sets);
 const sync = new SyncService(store, syncApi, storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH);
-sync.addEventListener("status", () => profiles.remember(sync.config.user)); // Name kommt vom Backend
+sync.addEventListener("status", () => profiles.remember(sync.config.userId, sync.config.user)); // wer angemeldet ist, sagt das Backend
 const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto);
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
@@ -53,6 +54,8 @@ app.start();
 
 // Karten ohne Bild (deutsches fehlt) bekommen das englische, sobald bekannt ist, zu welcher Serie ihr Set gehört
 sets.ready.then(() => store.fixCards((card) => withEnglishImage(card, sets.info(card.set)?.serie)) && app.render());
+
+profiles.refresh(); // Namen und Schlösser aktuell halten
 
 // Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
 // Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates

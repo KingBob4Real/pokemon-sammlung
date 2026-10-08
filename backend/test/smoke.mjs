@@ -75,6 +75,45 @@ assert.equal((await call({ since: 0, changes: [{ type: "böse", id: "x", updated
 const rejected = await call({ since: 0, changes: [list, { ...item, id: "falsch:id" }] });
 assert.equal(rejected.status, 400, "unstimmige ID wird abgewiesen");
 assert.equal(rejected.body.index, 1, "Server nennt die abgelehnte Änderung");
+// „Wer sammelt?“: Personen-Liste ist öffentlich, Sync nennt die eigene ID
+const post = async (path, payload, k) => {
+  const r = await fetch(`${base}${path}`, { method: "POST", headers: { ...(k ? { Authorization: `Bearer ${k}` } : {}), "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  return { status: r.status, body: await r.json() };
+};
+const { people } = await (await fetch(`${base}/people`)).json();
+const me = people.find((p) => p.id === start.body.userId);
+assert.ok(me && me.name === start.body.user, "Person steht in der Liste, Sync nennt ihre ID");
+
+// Anmelden & Passwort – setzt kurz ein Passwort und meldet dabei andere Geräte dieser Person ab.
+// Darum nur auf Wunsch und am besten mit einer Test-Person: SMOKE_ACCOUNTS=1 node test/smoke.mjs <Dev-URL> <Test-Schlüssel>
+if (process.env.SMOKE_ACCOUNTS === "1" && !me.locked) {
+  const id = me.id;
+  const a = await post("/login", { id });
+  assert.equal(a.status, 200, "ohne Passwort: Antippen genügt");
+  assert.equal(typeof a.body.firstLogin, "boolean", "App erfährt, ob die Person zum ersten Mal da ist");
+  const other = (await post("/login", { id })).body.token; // zweites Gerät
+  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "Sitzung gilt wie der Schlüssel");
+  assert.equal((await post("/me/password", { password: "abc" }, a.body.token)).status, 400, "zu kurzes Passwort abgelehnt");
+  assert.equal((await post("/me/password", { password: "test-1234" }, a.body.token)).status, 200);
+  assert.ok((await (await fetch(`${base}/people`)).json()).people.find((p) => p.id === id).locked, "Person ist jetzt gesperrt");
+  assert.equal((await post("/login", { id })).status, 401, "ohne Passwort kein Zutritt");
+  assert.equal((await post("/login", { id, password: "falsch" })).status, 401, "falsches Passwort");
+  const b = await post("/login", { id, password: "test-1234" });
+  assert.equal(b.status, 200, "richtiges Passwort");
+  assert.equal(b.body.firstLogin, false, "mit Passwort ist es nie der erste Login");
+  assert.equal((await call({ since: 0, changes: [] }, other)).status, 401, "anderes Gerät wurde abgemeldet");
+  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "dieses Gerät bleibt angemeldet");
+  assert.equal((await call({ since: 0, changes: [] })).status, 200, "Sync-Schlüssel gilt weiter");
+  assert.equal((await post("/me/password", { password: "neu-12345" }, b.body.token)).status, 401, "ändern ohne altes Passwort geht nicht");
+  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "falsch" }, b.body.token)).status, 401, "ändern mit falschem alten geht nicht");
+  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "test-1234" }, b.body.token)).status, 200, "ändern mit dem alten Passwort");
+  assert.equal((await post("/me/password", { password: "" }, b.body.token)).status, 401, "entfernen nur mit altem Passwort");
+  assert.equal((await post("/me/password", { password: "", oldPassword: "neu-12345" }, b.body.token)).status, 200, "Passwort wieder weg");
+  assert.equal((await post("/me/name", { name: "Smoke-Name" }, key)).body.name, "Smoke-Name", "Name ändern");
+  await post("/me/name", { name: me.name }, key);
+  console.log("Anmelden & Passwort ok");
+}
+
 // Karten-Scanner
 const scan = async (image, k = key) => {
   const r = await fetch(`${base}/scan`, { method: "POST", headers: { Authorization: `Bearer ${k}`, "Content-Type": "application/json" }, body: JSON.stringify({ image }) });

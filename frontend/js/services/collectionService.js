@@ -53,6 +53,19 @@ export class CollectionService {
     });
   }
 
+  // Karten ganz aus der Sammlung nehmen (Anzahl 0) → Funktion, die alles zurückholt („Rückgängig“)
+  removeAll(cards) {
+    const before = cards.map((card) => [card.id, this.entry(card.id)]);
+    this.store.batch(() => {
+      for (const card of cards) this.setQuantity(card, 0);
+    });
+    // genau den alten Stand zurück – auch „hinzugefügt am“, sonst rutscht die Karte bei „Neueste“ nach vorn
+    return () =>
+      this.store.batch(() => {
+        for (const [id, entry] of before) if (entry) this.store.put("collection", id, entry);
+      });
+  }
+
   update(cardId, patch) {
     const e = this.entry(cardId);
     if (e) this.store.put("collection", cardId, { ...e, ...patch });

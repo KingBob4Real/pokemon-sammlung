@@ -25,6 +25,7 @@ export class SyncService {
     const readResults = results.slice(writes.length, writes.length + reads.length);
     return {
       user: user.name,
+      userId: user.id,
       rev: results[results.length - 1].results[0].rev,
       changes: readResults.flatMap((r, i) => r.results.map((row) => this.tables[i].toEntity(row))),
     };

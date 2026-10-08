@@ -18,7 +18,7 @@ export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
-export const PROFILES_KEY = `${P}profiles.v1`; // Personen auf diesem Gerät (services/profileService.js)
+export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
 
 // Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel und Einstellungen gehören ihr allein,
 // Preise und Sets teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.

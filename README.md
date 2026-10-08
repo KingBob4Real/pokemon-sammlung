@@ -3,8 +3,8 @@
 Kartensammlung als iPhone-taugliche Web-App: alle deutschen und englischen Karten suchen und scannen, Sammlung pflegen, eigene Listen anlegen, Marktwerte sehen. Läuft offline und gleicht sich über ein kleines Cloudflare-Backend zwischen Geräten ab. Mehrere Personen, jede mit eigenem Schlüssel und eigener Sammlung.
 
 - **Suche:** alle Karten auf Deutsch und Englisch über die [TCGdex-API](https://tcgdex.dev), nach Name (`Glurak` oder `Charizard`) und/oder Nummer (`199`, `199/165`), oder Set für Set – Set-Namen findet die Suche auch (`Erhabene Helden`, `Evolving Skies`). Sets, die es nur auf Englisch gibt (z. B. Gym Heroes, McDonald's), sind dabei und als „nur Englisch“ markiert. Gibt es eine Karte in beiden Sprachen, gewinnt die deutsche. TCG-Pocket-Karten sind ausgeblendet. Fehlt das deutsche Bild (ältere Sets, manche Promos), kommt das englische – auch bei schon gespeicherten Karten (wird beim Start nachgetragen); hat TCGdex gar keins (Shiny Vault, Trainer-Galerien, Galarian Gallery, Drachenwandel …), kommt es von [pokemontcg.io](https://pokemontcg.io) (`nextImage` in `domain/card.js`).
-- **Wer sammelt?** Mehrere Personen auf einem Gerät, wie Profile bei Netflix: jede gibt ihren Sync-Schlüssel pro Gerät einmal ein (Startbild oder „Mehr“), danach reicht Antippen. Jede Person hat auf dem Gerät eigene Sammlung, Listen und Einstellungen; Wechsel über das Rund-Symbol oben rechts. Bei mehreren Personen fragt die App beim Start, wer sammelt. Kein Passwort zwischen den Personen – wer das Gerät hat, kann wechseln.
-- **Sammlung:** pro Karte Anzahl, Zustand, Sprache und Kaufpreis; „Aus der Sammlung entfernen“ in der Kartenansicht (mit „Rückgängig“). Oben Gesamtwert, Bezahlt und Gewinn/Verlust. Sortieren und gruppieren nach Set oder Liste. „+ Karten hinzufügen“: suchen oder Set öffnen und Karten einfach antippen.
+- **Wer sammelt?** Profilauswahl wie bei Netflix: alle Personen (Lukas, Lucas, Tim) sind auf jedem Gerät da, Antippen meldet an – kein Sync-Schlüssel nötig. Beim ersten Mal kann jede Person ein Passwort festlegen; dann wird es bei jedem Wechsel zu ihr abgefragt, ändern oder entfernen geht nur mit dem alten (unter „Mehr“, dort auch den Namen ändern). Neues Passwort = alle anderen Geräte dieser Person abgemeldet. 5 falsche Versuche → 15 Minuten Pause. Jede Person hat auf dem Gerät eigene Daten; Wechsel über das Rund-Symbol oben rechts. Ohne Passwort kann jeder mit der App-Adresse eine Person antippen – gewollt, die App ist nur für uns.
+- **Sammlung:** pro Karte Anzahl, Zustand, Sprache und Kaufpreis; „Aus der Sammlung entfernen“ in der Kartenansicht, „Auswählen“ für mehrere Karten auf einmal (beides mit „Rückgängig“). Oben Gesamtwert, Bezahlt und Gewinn/Verlust. Sortieren und gruppieren nach Set oder Liste. „+ Karten hinzufügen“: suchen oder Set öffnen und Karten einfach antippen.
 - **Listen:** beliebig viele, umbenennen, löschen, sortieren (Dropdown) und per Gedrückt-halten-und-ziehen umordnen – die Listen selbst und die Karten darin. Karten sortieren auch nach Pokédex (hält Entwicklungsreihen zusammen), Set & Nummer, Name, Wert; filtern (fehlend/vorhanden). „+ Hinzufügen“ wie bei der Sammlung; „Auswählen“ markiert mehrere Karten für „Hab ich“ (in die Sammlung) oder „Entfernen“. Haken an einer Karte = in der Sammlung.
 - **Updates:** Die App prüft beim Öffnen und bei jeder Rückkehr, ob es eine neue Version gibt, und lädt dann neu – auch als iPhone-App vom Home-Bildschirm.
 - **Marktwert:** Cardmarket-Trend aus TCGdex (alle Sprachen & Zustände gemischt), 24 h zwischengespeichert. Der Cardmarket-Link in der Kartenansicht filtert auf die Sprache der Karte (Deutsch, Englisch …) ab Excellent.
@@ -25,7 +25,7 @@ frontend/                  App für GitHub Pages (ES-Module, kein Build-Schritt)
   js/domain/               reine Fachlogik: Karte, Preis, Sortierung, Scan-Zuordnung
   js/services/             Anwendungslogik: lokaler Speicher, Sammlung, Listen, Preise, Sets, Katalog, Sync, Scanner, Sicherung, Import
   js/ui/                   App-Hülle, Router, Komponenten, Ansichten
-  test/                    Tests ohne Netz: node frontend/test/<scan|catalog|profiles>.test.mjs
+  test/                    Tests ohne Netz: node frontend/test/<scan|catalog|profiles|collection>.test.mjs
 backend/                   Cloudflare Worker + D1-Datenbank
   src/index.js             Composition Root
   src/http/                Router, Antworten (CORS), Schlüssel-Prüfung
@@ -79,17 +79,20 @@ Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) –
 | `list_items` | welche Karte in welcher Liste |
 | `users` | Personen: Name und SHA-256-Hash ihres Schlüssels |
 | `scan_usage` | Scans pro Person und Tag (fürs Tageslimit) |
+| `sessions` | angemeldete Geräte (Hash der Sitzung → Person); dazu in `users`: Passwort-Hash (PBKDF2), Fehlversuche |
 
 Sammlung, Listen und Listeneinträge gehören je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen, seinem letzten Stand und dem Schlüssel der Person und bekommt alles Neue dieser Person zurück. Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstellung (Time Travel).
 
 ## Personen & Schlüssel
 
-Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. In der App: „Mehr“ → Sync-Schlüssel eintragen → „Speichern & synchronisieren“. Im Ordner `backend/`:
+Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. In der App meldet man sich per Antippen an („Wer sammelt?“); der Schlüssel ist der Notfall-Zugang unter „Mehr“ → „Speichern & synchronisieren“. Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/`:
 
 ```bash
 npm run user:add -- "Max"                      # neue Person, Schlüssel in .keys/max.txt
 npm run user:add -- "Max" --id max             # gleiche ID nochmal = neuer Schlüssel (alter ist ungültig, Daten bleiben)
 npm run user:list
+# Passwort vergessen? Zurücksetzen (Person ist danach wieder ohne Passwort; mit --env dev für Dev):
+npx wrangler d1 execute DB --remote --command "UPDATE users SET password_hash = NULL, failed_logins = 0 WHERE id = 'lucas'"
 node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Listen der alten Checkliste für diese Person
 ```
 

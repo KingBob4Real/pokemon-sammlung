@@ -105,6 +105,7 @@ export class SyncService extends EventTarget {
         }
         this.store.applySyncResult(sent, result);
         this.config.user = result.user || "";
+        this.config.userId = result.userId || "";
         if (!this.store.pendingCount || !sent.length) break;
       }
       this.config.at = Date.now();

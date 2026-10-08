@@ -60,15 +60,10 @@ Weiter?`)) return;
     ctx.render();
   };
 
-  const me = ctx.profiles.list.find((p) => p.id === ctx.profiles.active);
   main.append(
-    panel("Wer sammelt?", [
-      h("p", {}, me ? `Auf diesem Gerät gerade: ${me.name}.` : "Noch niemand angemeldet – Sammlung und Listen liegen nur auf diesem Gerät."),
-      h("p", { class: "muted" }, "Mehrere Personen können dasselbe Gerät nutzen, jede mit eigener Sammlung. Den Sync-Schlüssel gibt jede Person hier nur einmal ein, danach reicht Antippen."),
-      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: ctx.openProfiles }, "Person wechseln oder hinzufügen")]),
-    ]),
+    accountPanel(ctx),
     panel("Sync zwischen Geräten", [
-      h("p", {}, "Jede Person hat einen eigenen Schlüssel und damit eine eigene Sammlung. Trag deinen Schlüssel auf jedem deiner Geräte einmal ein, dann sind Sammlung und Listen überall gleich."),
+      h("p", {}, "Anmelden geht oben unter „Wer sammelt?“ per Antippen. Hier nur, falls du lieber deinen Sync-Schlüssel nutzt – er gilt immer, auch wenn du dein Passwort vergessen hast."),
       h("label", { class: "label" }, ["Backend-Adresse", url]),
       h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
       keyNote,
@@ -130,4 +125,50 @@ function syncStatusText(sync) {
       return sync.config.at ? `${who}Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
     }
   }
+}
+
+// „Wer sammelt?“: wer angemeldet ist, Person wechseln, Name und Passwort
+function accountPanel(ctx) {
+  const { profiles, sync } = ctx;
+  const me = profiles.people.find((p) => p.id === profiles.active);
+  const switchButton = h("button", { type: "button", class: "btn", onclick: ctx.openProfiles }, "Person wechseln");
+  if (!me || !sync.enabled) {
+    return panel("Wer sammelt?", [h("p", {}, "Noch niemand angemeldet – Sammlung und Listen liegen nur auf diesem Gerät."), h("div", { class: "buttons" }, [switchButton])]);
+  }
+  const note = h("p", { class: "field-note", role: "alert" });
+  const run = async (button, action, success) => {
+    note.textContent = "";
+    button.disabled = true;
+    const result = await action();
+    button.disabled = false;
+    if (result.error) {
+      note.textContent = result.error;
+      return;
+    }
+    ctx.notify(success, { type: "success" });
+    ctx.render();
+  };
+
+  const name = h("input", { type: "text", class: "field", value: me.name, maxlength: 40, "aria-label": "Name", autocomplete: "off", enterkeyhint: "done" });
+  const renameButton = h("button", { type: "button", class: "btn btn-ghost" }, "Speichern");
+  renameButton.addEventListener("click", () => run(renameButton, () => profiles.rename(name.value), "Name gespeichert."));
+
+  const old = h("input", { type: "password", class: "field", placeholder: "Bisheriges Passwort", "aria-label": "Bisheriges Passwort", autocomplete: "current-password" });
+  const fresh = h("input", { type: "password", class: "field", placeholder: "Neues Passwort (mind. 4 Zeichen)", "aria-label": "Neues Passwort", autocomplete: "new-password" });
+  const setButton = h("button", { type: "button", class: "btn" }, me.locked ? "Passwort ändern" : "Passwort festlegen");
+  setButton.addEventListener("click", () => run(setButton, () => profiles.setPassword(fresh.value, old.value), "Passwort gespeichert. Andere Geräte von dir sind jetzt abgemeldet."));
+  const removeButton = h("button", { type: "button", class: "btn btn-ghost danger" }, "Passwort entfernen");
+  removeButton.addEventListener("click", () => run(removeButton, () => profiles.setPassword("", old.value), "Passwort entfernt."));
+
+  return panel("Wer sammelt?", [
+    h("p", {}, `Angemeldet als ${me.name}.`),
+    h("div", { class: "buttons" }, [switchButton]),
+    h("label", { class: "label" }, ["Dein Name", h("div", { class: "toolbar tight" }, [name, renameButton])]),
+    h("h3", { class: "label" }, "Passwort"),
+    h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Ändern oder entfernen geht nur mit dem bisherigen." : "Ohne Passwort kann jeder mit der App dein Profil öffnen. Mit Passwort wird es bei jedem Wechsel zu dir abgefragt."),
+    me.locked ? h("label", { class: "label" }, ["Bisheriges Passwort", old]) : null,
+    h("label", { class: "label" }, ["Neues Passwort", fresh]),
+    note,
+    h("div", { class: "buttons" }, [setButton, me.locked ? removeButton : null]),
+  ]);
 }

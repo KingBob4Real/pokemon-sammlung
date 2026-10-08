@@ -62,14 +62,13 @@ export function renderCardSheet(body, card, ctx) {
   const fields = [cond, lang, paid];
   // Ganz raus aus der Sammlung – mit „Rückgängig“ (Zustand & Kaufpreis bleiben ohnehin gespeichert)
   const removeAll = () => {
-    const before = collection.quantity(card.id);
-    collection.setQuantity(card, 0);
+    const undo = collection.removeAll([card]);
     ctx.afterChange(false);
     ctx.close();
     ctx.notify(`${card.name} ${cardNumber(card)} aus der Sammlung entfernt.`, {
       type: "success",
       force: true,
-      action: { label: "Rückgängig", run: () => (collection.setQuantity(card, before), ctx.afterChange(false)) },
+      action: { label: "Rückgängig", run: () => (undo(), ctx.afterChange(false)) },
     });
   };
   const remove = h("button", { type: "button", class: "btn btn-ghost danger", onclick: removeAll }, "Aus der Sammlung entfernen");

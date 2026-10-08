@@ -1,44 +1,63 @@
-// Test der Personen auf einem Gerät („Wer sammelt?“): node frontend/test/profiles.test.mjs
+// Test von „Wer sammelt?“ (Personen vom Backend, Antippen, Passwort): node frontend/test/profiles.test.mjs
 import assert from "node:assert/strict";
 import { ProfileService } from "../js/services/profileService.js";
 
 Object.defineProperty(navigator, "onLine", { value: true, configurable: true }); // Node kennt kein onLine
 const mem = new Map();
-const storage = { get: (k, f) => (mem.has(k) ? structuredClone(mem.get(k)) : f), set: (k, v) => (mem.set(k, structuredClone(v)), true), remove: (k) => mem.delete(k) };
-const keysOf = (p) => ({ entities: `ps.${p}entities`, dirty: `ps.${p}dirty`, rev: `ps.${p}rev`, sync: `ps.${p}sync`, prefs: `ps.${p}prefs`, prices: "ps.prices" });
-const users = { "AAAA-1111": "Lukas", "BBBB-2222": "Tim" };
-const api = { sync: async ({ key }) => (users[key] ? { user: users[key], rev: 0, changes: [] } : Promise.reject(Object.assign(new Error("401"), { status: 401 }))) };
-const fresh = () => new ProfileService(storage, "ps.profiles", keysOf, api);
+const storage = { get: (k, f) => (mem.has(k) ? structuredClone(mem.get(k)) : f), set: (k, v) => (mem.set(k, structuredClone(v)), true) };
+const keysOf = (slot) => ({ sync: `ps.${slot ? `${slot}.` : ""}sync` });
+const fail = (status, error) => Promise.reject(Object.assign(new Error(error), { status, body: { error } }));
 
-// Neues Gerät ohne Sync: die erste Person bekommt den bisherigen Platz ""
+// Kleines Backend: Lukas ohne Passwort, Lucas mit Passwort „geheim“
+const people = [{ id: "owner", name: "Lukas", locked: false }, { id: "lucas", name: "Lucas", locked: true }];
+let logins = 0;
+const api = {
+  people: async () => ({ people: structuredClone(people) }),
+  login: async (url, id, password) => {
+    const p = people.find((x) => x.id === id);
+    if (p.locked && password !== "geheim") return fail(401, "Falsches Passwort.");
+    return { token: `token-${id}-${++logins}`, user: { id, name: p.name }, firstLogin: !p.locked && logins === 1 };
+  },
+  setPassword: async ({ key }, password, oldPassword) => (people[0].locked && oldPassword !== "alt1" ? fail(401, "Bitte das bisherige Passwort angeben.") : ((people[0].locked = Boolean(password)), { ok: true })),
+  rename: async (_, name) => ((people[0].name = name), { ok: true, name }),
+};
+const fresh = () => new ProfileService(storage, "ps.profiles", keysOf, api, "https://b");
+
+// Neues Gerät: alle Personen sind da, Antippen meldet an, die erste Person bekommt den bisherigen Platz
 let profiles = fresh();
-assert.deepEqual(await profiles.add("https://b", "zzzz-9999"), { error: "Dieser Schlüssel stimmt nicht." }, "falscher Schlüssel → nichts angelegt");
-assert.deepEqual(await profiles.add("https://b", "aaaa 1111"), { id: "" }, "erste Person nutzt den bisherigen Platz");
-assert.equal(storage.get(keysOf("").sync).key, "AAAA-1111", "Schlüssel normalisiert gespeichert");
+assert.equal(await profiles.refresh(), true);
+assert.deepEqual(profiles.people.map((p) => p.name), ["Lukas", "Lucas"], "Personen kommen vom Backend");
+assert.deepEqual(await profiles.choose("owner"), { firstLogin: true }, "Antippen genügt, erster Login");
+assert.equal(profiles.slot, "", "erste Person nutzt die bisherigen Speicher-Namen");
+assert.equal(storage.get("ps.sync").key, "token-owner-1", "Sitzung statt Sync-Schlüssel gespeichert");
 
-// Zweite Person bekommt einen eigenen Platz; derselbe Schlüssel nochmal → kein Duplikat
-const tim = await profiles.add("https://b", "BBBB-2222");
-assert.ok(tim.id && tim.id !== "", "eigener Platz für Tim");
-assert.deepEqual(await profiles.add("https://b", "BBBB-2222"), { id: tim.id }, "schon da → dorthin wechseln");
-assert.deepEqual(profiles.list.map((p) => p.name), ["Lukas", "Tim"]);
+// Mit Passwort: ohne → nachfragen, falsch → Meldung, richtig → eigener Platz
+assert.deepEqual(await profiles.choose("lucas"), { needPassword: true });
+assert.deepEqual(await profiles.choose("lucas", "falsch"), { error: "Falsches Passwort." });
+assert.deepEqual(await profiles.choose("lucas", "geheim"), { firstLogin: false });
+assert.equal(fresh().slot, "lucas", "eigener Platz, nach Neustart noch aktiv");
 
-// Wechseln bleibt gespeichert (die App lädt danach neu)
-profiles.switchTo(tim.id);
-assert.equal(fresh().active, tim.id);
-
-// Entfernen: nur andere Personen, ihre Daten auf dem Gerät sind weg, gemeinsame Preise bleiben
-storage.set(keysOf("").entities, { x: 1 });
-storage.set("ps.prices", { y: 1 });
+// Zurück zu Lukas: schon angemeldet → ohne neuen Login; zu Lucas immer mit Passwort (wie die PIN bei Netflix)
 profiles = fresh();
-profiles.remove(tim.id);
-assert.equal(profiles.list.length, 2, "aktive Person lässt sich nicht entfernen");
-profiles.remove("");
-assert.deepEqual(profiles.list.map((p) => p.name), ["Tim"]);
-assert.equal(storage.get(keysOf("").entities, null), null, "Daten der entfernten Person gelöscht");
-assert.deepEqual(storage.get("ps.prices"), { y: 1 }, "Preise bleiben");
+const before = logins;
+assert.deepEqual(await profiles.choose("owner"), { firstLogin: false });
+assert.equal(logins, before, "kein neuer Login nötig");
+assert.deepEqual(await profiles.choose("lucas"), { needPassword: true }, "geschützt: bei jedem Wechsel fragen");
 
-// Name kommt beim Sync vom Backend
-profiles.remember("Tim B.");
-assert.equal(profiles.list[0].name, "Tim B.");
+// Gerät mit altem Sync-Schlüssel: Sync nennt die Person → sie übernimmt den bisherigen Platz
+mem.clear();
+storage.set("ps.sync", { key: "ALTER-SCHLUESSEL" });
+profiles = fresh();
+profiles.remember("owner", "Lukas");
+assert.deepEqual([profiles.active, profiles.slot], ["owner", ""]);
+
+// Passwort festlegen (frei), ändern nur mit dem alten; Name ändern
+await profiles.refresh();
+assert.deepEqual(await profiles.setPassword("alt1"), { ok: true });
+assert.equal(profiles.people[0].locked, true, "Liste zeigt das Schloss");
+assert.deepEqual(await profiles.setPassword("neu2"), { error: "Bitte das bisherige Passwort angeben." });
+assert.deepEqual(await profiles.setPassword("neu2", "alt1"), { ok: true });
+assert.equal((await profiles.rename("Lukas N.")).name, "Lukas N.");
+assert.equal(profiles.people[0].name, "Lukas N.");
 
 console.log("Personen ok");
