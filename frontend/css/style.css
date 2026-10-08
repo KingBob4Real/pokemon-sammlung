@@ -428,7 +428,7 @@ select.field { padding-right: 8px; }
 
 .prices { margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .prices p { margin: 4px 0; font-size: 13px; }
-.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.price-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; } /* 2 × 2: Ø 7, Ø 30, Trend, ab */
 .price-grid div { display: flex; flex-direction: column; }
 .price-grid span { font-size: 11.5px; font-weight: 800; color: var(--muted); }
 .price-grid b { font-family: var(--font-head); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }

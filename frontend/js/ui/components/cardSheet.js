@@ -17,8 +17,8 @@ export function cardHead(card, prices, language = () => "Deutsch") {
     rarity.textContent = p?.rarity || "";
     const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, fmtEur(value))]);
     priceBox.replaceChildren(
-      p && (p.trend || p.low || p.avg30)
-        ? h("div", { class: "price-grid" }, [cell("Ø 30 Tage", p.avg30), cell("Trend", p.trend), cell("ab", p.low)])
+      p && (p.avg7 || p.avg30 || p.trend || p.low)
+        ? h("div", { class: "price-grid" }, [cell("Ø 7 Tage", p.avg7), cell("Ø 30 Tage", p.avg30), cell("Trend", p.trend), cell("ab", p.low)])
         : p
           ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
           : !navigator.onLine

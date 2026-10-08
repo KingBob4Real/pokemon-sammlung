@@ -241,7 +241,7 @@ function scanFlow(body, ctx, file, listId) {
     head.elements[0].classList.add("small"); // Bild kleiner, damit Angaben und Preise gleich zu sehen sind
     const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
     const paidNote = h("p", { class: "field-note", role: "alert" });
-    const takePrice = h("button", { type: "button", class: "btn btn-ghost", onclick: () => (paid.value = fmtPriceInput(prices.value(card.id))) }, "Preis übernehmen"); // Marktwert (Ø 30 Tage)
+    const takePrice = h("button", { type: "button", class: "btn btn-ghost", onclick: () => (paid.value = fmtPriceInput(prices.value(card.id))) }, "Preis übernehmen"); // Marktwert (Ø 7 Tage)
     const checks = lists.all().map((list) => [list, h("input", { type: "checkbox", checked: list.id === listId || lists.contains(list.id, card.id) })]);
     const add = button("", () => save(), "btn btn-big");
     const label = () => (add.textContent = owned ? `Anzahl erhöhen (${owned} → ${owned + qty})` : qty > 1 ? `${qty}× in die Sammlung` : "In Sammlung");
