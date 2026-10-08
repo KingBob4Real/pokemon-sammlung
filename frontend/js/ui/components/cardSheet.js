@@ -59,7 +59,24 @@ export function renderCardSheet(body, card, ctx) {
   const cond = h("select", { class: "field" }, CONDITIONS.map((c) => h("option", { selected: (entry?.cond || "Near Mint") === c }, c)));
   const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: (entry?.lang || "Deutsch") === l }, l)));
   const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
-  const fields = [cond, lang, paid];
+  // Abteilung: eigene Fächer der Sammlung („Ordner 1“ …); „Neue Abteilung …“ legt eine an
+  const section = h("select", { class: "field" }, [
+    h("option", { value: "" }, "Keine"),
+    ...collection.sections().map((s) => h("option", { value: s.id, selected: entry?.section === s.id }, s.name)),
+    h("option", { value: "+" }, "Neue Abteilung …"),
+  ]);
+  section.addEventListener("change", () => {
+    let id = section.value || null;
+    if (id === "+") {
+      id = collection.createSection(prompt("Name der neuen Abteilung, z. B. „Ordner 1“:") || "");
+      if (!id) return (section.value = collection.entry(card.id)?.section || "");
+      section.insertBefore(h("option", { value: id }, collection.sections().find((s) => s.id === id).name), section.lastChild);
+      section.value = id;
+    }
+    collection.setSection([card], id);
+    ctx.afterChange(false);
+  });
+  const fields = [cond, lang, paid, section];
   // Ganz raus aus der Sammlung – mit „Rückgängig“ (Zustand & Kaufpreis bleiben ohnehin gespeichert)
   const removeAll = () => {
     const undo = collection.removeAll([card]);
@@ -139,6 +156,7 @@ export function renderCardSheet(body, card, ctx) {
       h("label", { class: "label" }, ["Zustand", cond]),
       h("label", { class: "label" }, ["Sprache", lang]),
       h("label", { class: "label" }, ["Kaufpreis pro Stück", paid]),
+      h("label", { class: "label" }, ["Abteilung", section]),
       h("div", { class: "buttons" }, [remove]),
     ]),
     h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), listBox])

@@ -56,7 +56,7 @@ export class App {
         search: { query: "", results: null },
         add: { query: "", results: null },
         collectionFilter: "",
-        selection: { listId: null, ids: new Set() },
+        selection: { where: null, cards: new Map() }, // Mehrfach-Auswahl (components/selection.js)
       },
       setTitle: (text) => this.setTitle(text),
       render: () => this.render(),

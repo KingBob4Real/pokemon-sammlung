@@ -17,6 +17,7 @@ import { ListItemRepository } from "./repositories/listItemRepository.js";
 import { ListRepository } from "./repositories/listRepository.js";
 import { RevisionRepository } from "./repositories/revisionRepository.js";
 import { ScanUsageRepository } from "./repositories/scanUsageRepository.js";
+import { SectionRepository } from "./repositories/sectionRepository.js";
 import { UserRepository } from "./repositories/userRepository.js";
 import { AuthService } from "./services/authService.js";
 import { ScanService } from "./services/scanService.js";
@@ -29,6 +30,7 @@ export function createApp(env) {
     new CollectionRepository(db),
     new ListRepository(db),
     new ListItemRepository(db),
+    new SectionRepository(db),
   ]);
   const syncController = new SyncController(syncService);
   const scanService = new ScanService(env.AI, new ScanUsageRepository(db), { model: SCAN_MODEL, perUser: SCANS_PER_DAY, total: SCANS_PER_DAY_TOTAL });

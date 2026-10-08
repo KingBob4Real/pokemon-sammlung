@@ -18,7 +18,7 @@ export function createSorters({ valueOf, setOrder, dexOf }) {
   const bySet = (a, b) => setOrder(b.card.set) - setOrder(a.card.set) || a.card.set.localeCompare(b.card.set) || numCmp(a.card.num, b.card.num);
   const dex = (e) => dexOf(e.card.id) ?? 1e6; // Trainer & Unbekanntes ans Ende
   return {
-    newest: { label: "Neueste zuerst", compare: (a, b) => b.added - a.added },
+    newest: { label: "Zuletzt hinzugefügt", compare: (a, b) => b.added - a.added },
     order: { label: "Eigene Reihenfolge", compare: (a, b) => orderOf(a) - orderOf(b) },
     value: { label: "Höchster Wert", compare: (a, b) => (valueOf(b.card.id) ?? -1) - (valueOf(a.card.id) ?? -1) },
     name: { label: "Name", compare: (a, b) => a.card.name.localeCompare(b.card.name, "de") || bySet(a, b) },

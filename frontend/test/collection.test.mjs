@@ -24,4 +24,24 @@ undo();
 assert.deepEqual(collection.entry("a"), before, "Rückgängig: genau wie vorher – Anzahl, Zustand, Kaufpreis, hinzugefügt am");
 assert.equal(collection.entries().length, 3);
 
+// Abteilungen: anlegen, Karten hineinlegen, löschen → Karten bleiben, nur ohne Abteilung
+const ordner = collection.createSection("  Ordner 1 ");
+assert.deepEqual(collection.sections().map((x) => x.name), ["Ordner 1"], "Name ohne Leerzeichen drumherum");
+assert.equal(collection.createSection("   "), null, "leerer Name → keine Abteilung");
+collection.setSection([a, b], ordner);
+assert.deepEqual(collection.entries().filter((e) => e.section === ordner).map((e) => e.card.id), ["a", "b"]);
+collection.setQuantity(a, 3);
+assert.equal(collection.entry("a").section, ordner, "Anzahl ändern lässt die Abteilung in Ruhe");
+collection.removeSection(ordner);
+assert.equal(collection.sections().length, 0);
+assert.deepEqual([collection.entry("a").section, collection.entries().length], [null, 3], "Karten bleiben, nur ohne Abteilung");
+
+// Eigene Reihenfolge: verschieben und neu durchnummerieren
+const { orderOf } = await import("../js/domain/sorting.js");
+const ordered = () => collection.entries().sort((x, y) => orderOf(x) - orderOf(y)).map((e) => e.card.id);
+collection.renumber(["c", "a", "b"]);
+assert.deepEqual(ordered(), ["c", "a", "b"]);
+collection.move("b", 500); // vor „c“ (1000)
+assert.deepEqual(ordered(), ["b", "c", "a"]);
+
 console.log("Sammlung ok");

@@ -1,29 +1,27 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, fmtSigned, norm, plural } from "../../core/format.js";
+import { orderOf, positionBetween } from "../../domain/sorting.js";
 import { COLLECTION_TARGET, links } from "../router.js";
-import { cardTile, setPicked } from "../components/cardTile.js";
+import { cardTile, tileCard } from "../components/cardTile.js";
+import { enableReorder } from "../components/reorder.js";
 import { scanButton } from "../components/scanSheet.js";
+import { useSelection } from "../components/selection.js";
 import { emptyState, sortSelect, stat } from "../components/widgets.js";
 
-const SORT_KEYS = ["newest", "pokedex", "value", "name", "set"];
+const SORT_KEYS = ["newest", "order", "set", "pokedex", "value", "name"];
 const GROUPS = [
   ["none", "Ohne Gruppen"],
+  ["section", "Nach Abteilung"],
   ["set", "Nach Set"],
   ["list", "Nach Liste"],
 ];
 
-// Ansicht „Sammlung“: Kennzahlen, Karten hinzufügen, filtern, sortieren, nach Set oder Liste gruppieren,
-// „Auswählen“ markiert mehrere Karten zum Entfernen
+// Ansicht „Sammlung“: Kennzahlen, Karten hinzufügen, filtern, sortieren (auch eigene Reihenfolge per Ziehen),
+// gruppieren nach eigenen Abteilungen, Set oder Liste. „Auswählen“ markiert mehrere Karten zum Einsortieren
+// (Abteilung, Liste) oder Entfernen.
 export function render(main, ctx) {
   const { collection, lists, prices, sets, sorters, prefs, session } = ctx;
-  const selection = session.selection;
-  const selecting = selection.listId === COLLECTION_TARGET;
-  if (!selecting) selection.ids.clear();
-  const setSelecting = (on) => {
-    selection.listId = on ? COLLECTION_TARGET : null;
-    selection.ids.clear();
-    ctx.render();
-  };
+  const selection = useSelection(ctx, COLLECTION_TARGET);
   ctx.setTitle("Sammlung");
   const sort = sorters[prefs.get("collectionSort")] || sorters.newest;
   const entries = collection.entries().sort(sort.compare);
@@ -64,25 +62,48 @@ export function render(main, ctx) {
   );
   groupSelect.addEventListener("change", () => setPref("collectionGroup")(groupSelect.value));
   const filter = h("input", { type: "search", class: "field", placeholder: "In der Sammlung suchen …", "aria-label": "In der Sammlung suchen", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
-  const selectButton = h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(!selecting) }, selecting ? "Auswahl beenden" : "Auswählen");
-  main.append(h("div", { class: "toolbar wrap" }, [filter, sortSelect(sorters, SORT_KEYS, prefs.get("collectionSort"), setPref("collectionSort")), groupSelect, selectButton]));
+  const sortKey = sorters[prefs.get("collectionSort")] ? prefs.get("collectionSort") : "newest";
+  const group = prefs.get("collectionGroup");
+  const canReorder = sortKey === "order" && !selection.active;
+  main.append(
+    h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]),
+    h("div", { class: "toolbar pair" }, [sortSelect(sorters, SORT_KEYS, sortKey, setPref("collectionSort")), groupSelect])
+  );
+  const newSection = () => {
+    if (collection.createSection(prompt("Name der neuen Abteilung, z. B. „Ordner 1“:") || "")) ctx.render();
+  };
+  if (group === "section") main.append(h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: newSection }, "+ Neue Abteilung")]));
+  if (canReorder) main.append(h("p", { class: "muted pad" }, "Karte gedrückt halten und ziehen zum Verschieben."));
 
-  // Abschnitte bauen: [{ title, hint, entries }]
-  const sections = groupEntries(entries, prefs.get("collectionGroup"), { sets, lists, valueOf: (id) => prices.value(id) });
+  // Abschnitte bauen: [{ title, hint, entries, section? }]
+  const sections = groupEntries(entries, group, { sets, lists, sections: collection.sections(), valueOf: (id) => prices.value(id) });
   const blocks = sections.map((sec) => {
     const grid = h(
       "div",
       { class: "grid" },
-      sec.entries.map((e) => {
-        const el = cardTile(e.card, { mode: selecting ? "pick" : "view" });
-        if (selecting) setPicked(el, selection.ids.has(e.card.id));
-        return el;
-      })
+      sec.entries.map((e) => selection.mark(cardTile(e.card, { mode: selection.active ? "pick" : "view" }), e.card))
     );
-    const head = sec.title ? h("h2", { class: "group-title" }, [h("span", {}, sec.title), h("small", {}, sec.hint)]) : null;
+    const head = sec.title ? h("h2", { class: "group-title" }, [h("span", {}, sec.title), h("small", {}, sec.hint), sec.section ? sectionMenu(ctx, sec.section) : null]) : null;
     main.append(...[head, grid].filter(Boolean));
+    if (sec.section && !sec.entries.length) main.append(h("p", { class: "muted pad" }, "Noch leer – „Auswählen“, Karten antippen, „Einsortieren …“."));
     return { head, grid, entries: sec.entries };
   });
+
+  // Eigene Reihenfolge: in jedem Abschnitt gedrückt halten und ziehen
+  const drops = canReorder
+    ? blocks.map(({ grid }) =>
+        enableReorder(grid, {
+          itemSelector: ".tile",
+          onDrop: (el, prev, next) => {
+            const at = (tile) => (tile ? orderOf(collection.entry(tileCard(tile).id)) : null);
+            const position = positionBetween(at(prev), at(next));
+            if (position == null) collection.renumber([...grid.querySelectorAll(".tile")].map((t) => tileCard(t).id));
+            else collection.move(tileCard(el).id, position);
+          },
+        })
+      )
+    : [];
+  const dispose = () => drops.forEach((stop) => stop());
 
   const applyFilter = () => {
     session.collectionFilter = filter.value;
@@ -94,33 +115,20 @@ export function render(main, ctx) {
         b.grid.children[i].hidden = !show;
         any ||= show;
       });
-      if (b.head) b.head.hidden = !any;
+      if (b.head) b.head.hidden = terms.length > 0 && !any; // leere Abteilungen ohne Suche trotzdem zeigen
     }
   };
   filter.addEventListener("input", applyFilter);
   applyFilter();
   prices.request(entries.map((e) => e.card.id));
-  if (!selecting) return { refresh };
+  if (!selection.active) return { refresh, dispose };
 
-  // Auswahl: Leiste unten – „Alle“ (was gerade sichtbar ist) und „Entfernen“ mit „Rückgängig“
-  const label = h("span");
-  const tiles = () => blocks.flatMap((b) => b.entries.map((e, i) => ({ card: e.card, el: b.grid.children[i] })));
-  const updateBar = () => (label.textContent = selection.ids.size ? `${selection.ids.size} ausgewählt` : "Karten antippen zum Auswählen");
-  const selectAll = () => {
-    const visible = tiles().filter((t) => !t.el.hidden);
-    const all = visible.every((t) => selection.ids.has(t.card.id));
-    for (const t of visible) {
-      if (all) selection.ids.delete(t.card.id);
-      else selection.ids.add(t.card.id);
-      setPicked(t.el, !all);
-    }
-    updateBar();
-  };
-  const remove = () => {
-    const cards = entries.filter((e) => selection.ids.has(e.card.id)).map((e) => e.card);
+  // Auswahl: „Einsortieren …“ (Abteilung oder Liste) und „Entfernen“ (mit „Rückgängig“)
+  const remove = (chosen, stop) => {
+    const cards = chosen();
     if (!cards.length) return;
     const undo = collection.removeAll(cards);
-    setSelecting(false);
+    stop();
     ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung entfernt.`, {
       type: "success",
       force: true,
@@ -128,27 +136,48 @@ export function render(main, ctx) {
       action: { label: "Rückgängig", run: () => (undo(), ctx.render()) },
     });
   };
-  main.append(
-    h("div", { class: "action-bar" }, [
-      label,
-      h("button", { type: "button", class: "btn btn-ghost", onclick: selectAll }, "Alle"),
-      h("button", { type: "button", class: "btn danger", onclick: remove }, "Entfernen"),
-      h("button", { type: "button", class: "btn btn-ghost", onclick: () => setSelecting(false) }, "Fertig"),
-    ])
-  );
-  main.classList.add("has-action-bar");
-  updateBar();
-  const onPick = (card, el) => {
-    if (selection.ids.has(card.id)) selection.ids.delete(card.id);
-    else selection.ids.add(card.id);
-    setPicked(el, selection.ids.has(card.id));
-    ctx.bounce(el);
-    updateBar();
+  const inSection = (id, name) => (cards) => (collection.setSection(cards, id), { message: id ? `in „${name}“` : "ohne Abteilung" });
+  const createAndPut = (cards) => {
+    const name = prompt("Name der neuen Abteilung, z. B. „Ordner 1“:") || "";
+    const id = collection.createSection(name);
+    return id ? inSection(id, name.trim())(cards) : null;
   };
+  const onPick = selection.bar(main, {
+    except: COLLECTION_TARGET,
+    menu: "Einsortieren …",
+    groups: [
+      {
+        label: "Abteilung",
+        items: [...collection.sections().map((s) => [`In „${s.name}“`, inSection(s.id, s.name)]), ["Neue Abteilung …", createAndPut], ["Aus der Abteilung nehmen", inSection(null)]],
+      },
+    ],
+    buttons: (chosen, stop) => [h("button", { type: "button", class: "btn danger", onclick: () => remove(chosen, stop) }, "Entfernen")],
+  });
   return { refresh, onPick };
 }
 
-function groupEntries(entries, group, { sets, lists, valueOf }) {
+// Kopf einer Abteilung: kleines Menü „⋯“ mit Umbenennen und Löschen
+function sectionMenu(ctx, section) {
+  const { collection } = ctx;
+  const select = h("select", { class: "section-menu", "aria-label": `Abteilung „${section.name}“ bearbeiten` }, [
+    h("option", { value: "" }, "⋯"),
+    h("option", { value: "rename" }, "Umbenennen"),
+    h("option", { value: "remove" }, "Löschen"),
+  ]);
+  select.addEventListener("change", () => {
+    const action = select.value;
+    select.value = "";
+    if (action === "rename") {
+      const name = prompt("Neuer Name der Abteilung:", section.name);
+      if (name && name.trim()) collection.renameSection(section.id, name);
+    }
+    if (action === "remove" && confirm(`Abteilung „${section.name}“ löschen? Die Karten bleiben in der Sammlung, nur ohne Abteilung.`)) collection.removeSection(section.id);
+    if (action) ctx.render();
+  });
+  return select;
+}
+
+function groupEntries(entries, group, { sets, lists, sections, valueOf }) {
   const hint = (list) => {
     const count = list.reduce((n, e) => n + e.qty, 0);
     const worth = list.reduce((sum, e) => sum + (valueOf(e.card.id) ?? 0) * e.qty, 0);
@@ -163,6 +192,17 @@ function groupEntries(entries, group, { sets, lists, valueOf }) {
     return [...bySet.entries()]
       .sort(([a], [b]) => sets.order(b) - sets.order(a)) // neueste Sets zuerst
       .map(([, list]) => ({ title: list[0].card.setName, hint: hint(list), entries: list }));
+  }
+  if (group === "section") {
+    // Alle Abteilungen (auch leere), dann was in keiner liegt
+    const known = new Set(sections.map((s) => s.id));
+    const out = sections.map((s) => {
+      const own = entries.filter((e) => e.section === s.id);
+      return { title: s.name, hint: own.length ? hint(own) : "leer", entries: own, section: s };
+    });
+    const rest = entries.filter((e) => !known.has(e.section));
+    if (rest.length) out.push({ title: "Ohne Abteilung", hint: hint(rest), entries: rest });
+    return out;
   }
   if (group === "list") {
     const sections = [];

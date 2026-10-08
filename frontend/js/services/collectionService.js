@@ -1,9 +1,13 @@
 import { isObj, positive } from "../core/format.js";
+import { orderOf } from "../domain/sorting.js";
+
+const cleanName = (name) => String(name ?? "").trim().slice(0, 80);
 
 /**
- * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis.
+ * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis, dazu Abteilung und eigene Position.
  * Anzahl 0 = nicht vorhanden. Zustand & Kaufpreis bleiben dabei erhalten,
  * versehentlich entfernt ist also nichts verloren.
+ * Abteilungen (Art „section“) sind eigene Fächer in der Sammlung, z. B. „Ordner 1“ – eine Karte liegt in höchstens einer.
  */
 export class CollectionService {
   constructor(store) {
@@ -69,6 +73,57 @@ export class CollectionService {
   update(cardId, patch) {
     const e = this.entry(cardId);
     if (e) this.store.put("collection", cardId, { ...e, ...patch });
+  }
+
+  // --- Eigene Reihenfolge (Drag & Drop) ---
+  move(cardId, position) {
+    const e = this.entry(cardId);
+    if (e) this.store.put("collection", cardId, { ...e, position });
+  }
+
+  // Alle Positionen neu vergeben (wenn zwischen zwei Nachbarn kein Platz mehr ist)
+  renumber(orderedCardIds) {
+    this.store.batch(() => orderedCardIds.forEach((id, i) => this.move(id, (i + 1) * 1000)));
+  }
+
+  // --- Abteilungen ---
+  sections() {
+    return this.store
+      .all("section")
+      .map(({ id, data }) => ({ id, ...data }))
+      .sort((a, b) => orderOf(a) - orderOf(b));
+  }
+
+  createSection(name) {
+    const n = cleanName(name);
+    if (!n) return null;
+    const id = crypto.randomUUID();
+    this.store.put("section", id, { name: n, created: Date.now() });
+    return id;
+  }
+
+  renameSection(id, name) {
+    const section = this.store.get("section", id);
+    const n = cleanName(name);
+    if (section && n) this.store.put("section", id, { ...section, name: n });
+  }
+
+  // Abteilung löschen: die Karten bleiben in der Sammlung, nur ohne Abteilung
+  removeSection(id) {
+    this.store.batch(() => {
+      for (const { id: cardId, data } of this.store.all("collection")) if (data.section === id) this.store.put("collection", cardId, { ...data, section: null });
+      this.store.put("section", id, null);
+    });
+  }
+
+  // Karten in eine Abteilung legen (null = aus der Abteilung nehmen)
+  setSection(cards, sectionId) {
+    this.store.batch(() => {
+      for (const card of cards) {
+        const e = this.entry(card.id);
+        if (e) this.store.put("collection", card.id, { ...e, section: sectionId });
+      }
+    });
   }
 
   // Kennzahlen für die Übersicht; valueOf(cardId) → Marktwert oder null

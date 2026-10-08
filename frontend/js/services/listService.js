@@ -75,6 +75,14 @@ export class ListService {
     return this.store.all("listItem").map((e) => e.data).filter((i) => isObj(i.card));
   }
 
+  // Mehrere Karten aufnehmen; was schon drin ist, bleibt wie es ist
+  addCards(listId, cards) {
+    const added = Date.now();
+    this.store.batch(() => {
+      for (const card of cards) this.addIfMissing(listId, card, added);
+    });
+  }
+
   removeCards(listId, cards) {
     this.store.batch(() => {
       for (const card of cards) this.store.put("listItem", itemId(listId, card.id), null);

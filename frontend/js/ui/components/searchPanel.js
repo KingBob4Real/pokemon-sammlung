@@ -12,8 +12,9 @@ const TYPING_PAUSE_MS = 250;
  *   session  – { query, results }, bleibt beim Wechseln der Ansicht erhalten
  *   tile     – card → Kachel-Element
  *   setHref  – setId → Link zur Set-Ansicht
+ *   extra    – optional ein Knopf neben dem Suchfeld (z. B. „Auswählen“)
  */
-export function searchPanel(ctx, { session, tile, setHref }) {
+export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
   const { catalog, sets } = ctx;
   const input = h("input", {
     type: "search",
@@ -28,7 +29,7 @@ export function searchPanel(ctx, { session, tile, setHref }) {
   });
   const box = h("div");
   const bar = progressBar();
-  const panel = h("div", {}, [h("div", { class: "toolbar" }, [input]), bar.el, box]);
+  const panel = h("div", {}, [h("div", { class: "toolbar" }, [input, extra]), bar.el, box]);
   const setRow = (s) => h("a", { class: "row set-row", href: setHref(s.id) }, [h("b", {}, s.name), h("small", {}, [s.en ? "nur Englisch · " : "", s.total ? `${s.total} Karten` : ""].join(""))]);
   // „Erhabene Helden“ → das Set zum Öffnen, über den Karten
   const matchingSets = (query) => {

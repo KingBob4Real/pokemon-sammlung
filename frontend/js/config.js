@@ -38,6 +38,6 @@ export function storageKeys(profile = "") {
   };
 }
 
-export const ENTITY_TYPES = ["collection", "list", "listItem"];
+export const ENTITY_TYPES = ["collection", "list", "listItem", "section"];
 export const CONDITIONS = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"];
 export const LANGUAGES = ["Deutsch", "Englisch", "Japanisch", "Französisch", "Italienisch", "Spanisch", "Andere"];

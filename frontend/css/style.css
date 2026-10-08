@@ -445,6 +445,8 @@ select.field { padding-right: 8px; }
 
 /* ===== Sammlung gruppieren ===== */
 .toolbar.wrap { flex-wrap: wrap; }
+.toolbar.tight-row { margin-bottom: 8px; }
+.toolbar.pair > .field { flex: 1 1 0; width: auto; max-width: none; } /* zwei Auswahlfelder nebeneinander, gleich breit */
 .toolbar.wrap > .field:first-child { flex: 1 1 100%; }
 .toolbar.wrap select.field { flex: 1 1 0; max-width: none; }
 .group-title {
@@ -459,6 +461,8 @@ select.field { padding-right: 8px; }
   font-weight: 600;
 }
 .group-title small { flex: none; font-family: var(--font-body); font-size: 13px; font-weight: 800; color: var(--muted); }
+/* „⋯“ am Kopf einer Abteilung: eingebautes Auswahlmenü (Umbenennen, Löschen) */
+.section-menu { flex: none; width: 40px; height: 36px; padding: 0; border: 0; border-radius: 99px; -webkit-appearance: none; appearance: none; text-align: center; text-align-last: center; font: inherit; font-weight: 800; color: var(--text); background: var(--surface); box-shadow: var(--shadow); cursor: pointer; }
 .buttons + .toolbar, .stats + .buttons { margin-top: 0; }
 .stats + .buttons { margin-bottom: 14px; }
 
@@ -511,6 +515,8 @@ select.field { padding-right: 8px; }
 .action-bar span { flex: 1 1 140px; padding-left: 6px; font-size: 14px; font-weight: 800; }
 .action-bar .btn { flex: 1 0 auto; min-height: 42px; padding: 8px 14px; font-size: 14px; color: var(--ink); background: #fff; }
 .action-bar .btn.danger { color: #d6336c; }
+/* „Hinzufügen …“ ist ein eingebautes Auswahlmenü, sieht aber aus wie die Knöpfe daneben */
+.action-bar select.btn { -webkit-appearance: none; appearance: none; width: auto; text-align: center; text-align-last: center; }
 .action-bar .btn-ghost { color: #fff; background: transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
 main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area-inset-bottom, 0px)); }
 

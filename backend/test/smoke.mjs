@@ -33,7 +33,7 @@ const call = async (body, k = key) => {
 
 const t = Date.now();
 const card = { id: "smoke-test-1", name: "Smoke-Test", num: "1", set: "smoke", setName: "Test", total: null, img: null };
-const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, card } });
+const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, section: null, position: null, card } });
 const find = (res, type, id) => res.body.changes.find((c) => c.type === type && c.id === id);
 
 assert.equal((await fetch(base)).status, 200, "Backend antwortet");
@@ -67,8 +67,16 @@ if (otherKey) {
   assert.ok(!other.body.changes.some((c) => c.id === card.id || c.id === "smoke-list" || c.id === item.id), "zweite Person sieht diese Daten nicht");
 }
 
+// Abteilung + Karte darin mit eigener Position
+const section = { type: "section", id: "smoke-section", updated: t, deleted: 0, data: { name: "Smoke-Abteilung", created: t, position: 2 } };
+const placed = { ...entry(t + 1, 1), data: { ...entry(t + 1, 1).data, section: "smoke-section", position: 1.5 } };
+const s1 = await call({ since: b.body.rev, changes: [section, placed] });
+assert.equal(find(s1, "section", "smoke-section").data.name, "Smoke-Abteilung", "Abteilung kommt an");
+assert.deepEqual([find(s1, "collection", card.id).data.section, find(s1, "collection", card.id).data.position], ["smoke-section", 1.5], "Karte kennt Abteilung und Position");
+await call({ since: s1.body.rev, changes: [{ ...section, updated: t + 2, deleted: 1, data: null }] });
+
 const gone = { type: "listItem", id: item.id, updated: t + 1, deleted: 1, data: null };
-const c = await call({ since: b.body.rev, changes: [gone, { ...list, updated: t + 1, deleted: 1, data: null }, entry(t + 1, 0)] });
+const c = await call({ since: b.body.rev, changes: [gone, { ...list, updated: t + 1, deleted: 1, data: null }, entry(t + 3, 0)] });
 assert.equal(find(c, "listItem", item.id).deleted, 1, "Löschen kommt an");
 
 assert.equal((await call({ since: 0, changes: [{ type: "böse", id: "x", updated: 1, deleted: 0, data: {} }] })).status, 400, "unbekannte Art wird abgewiesen");
