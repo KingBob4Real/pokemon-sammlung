@@ -68,6 +68,7 @@ Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) –
 - **Tageslimit:** 50 Scans pro Person, 150 für alle zusammen (pro Datenbank, also Live und Dev getrennt), Zähler in `scan_usage`. Ein Scan kostet gemessen ~7 Neurons, der Gratis-Tarif hat 10.000 pro Tag für das ganze Cloudflare-Konto – beide Limits zusammen nutzen höchstens ein Fünftel davon. Werte in `backend/src/config.js`.
 - **Datenschutz:** Das Foto geht nur zur Erkennung an Cloudflare Workers AI und wird nirgends gespeichert – weder auf dem Gerät noch in der Datenbank.
 - Scannen braucht Internet und einen Sync-Schlüssel (das Backend zählt pro Person).
+- **Geplant:** Limit lockern, fehlende SVP-Bilder, Serien-Scan und ganze Ordnerseite – Bau-Prompt in [`docs/PROMPT-scanner-ausbau.md`](docs/PROMPT-scanner-ausbau.md).
 - **Was wurde gelesen?** Jeder Scan schreibt das Erkannte (Name, Nummer, Kürzel – kein Foto) ins Log: Cloudflare-Dashboard → Workers → `pokemon-sammlung(-dev)` → Logs (3 Tage).
 
 ## Datenbank (Cloudflare D1, SQLite)
