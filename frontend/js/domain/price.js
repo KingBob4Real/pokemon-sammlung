@@ -8,8 +8,6 @@ export function toPrice(card) {
   const first = (...values) => values.map(positive).find((x) => x != null) ?? null;
   return {
     at: Date.now(),
-    low: cm ? first(cm.low, cm["low-holo"]) : null,
-    trend: cm ? first(cm.trend, cm["trend-holo"]) : null,
     avg7: cm ? first(cm.avg7, cm["avg7-holo"]) : null,
     avg30: cm ? first(cm.avg30, cm["avg30-holo"]) : null,
     cardmarketId: cm?.idProduct || null,
@@ -19,9 +17,10 @@ export function toPrice(card) {
   };
 }
 
-// Marktwert = Ø 7 Tage (aktueller als Ø 30 Tage; der Trend ist bei neuen Sets oft unbrauchbar, z. B. Mew-ex 30th-158:
-// Trend 19 €, Ø 7 Tage 60 €, Ø 30 Tage 80 €), sonst Ø 30 Tage, sonst Trend, sonst „ab“
-export const marketValue = (price) => (price ? price.avg7 ?? price.avg30 ?? price.trend ?? price.low : null);
+// Marktwert = Ø 7 Tage, sonst Ø 30 Tage (keine Verkäufe in 30 Tagen = ohne Preis). Trend und „ab“ zählen nicht: der Trend ist
+// bei neuen Sets oft unbrauchbar, „ab“ mischt beschädigte und fremdsprachige Karten (Mew-ex 30th-158: Trend 19 €, ab 35 €,
+// Ø 7 Tage 60 €, Ø 30 Tage 80 €)
+export const marketValue = (price) => (price ? price.avg7 ?? price.avg30 : null);
 
 // Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
 export function cardmarketUrl(card, price, language = "Deutsch") {
