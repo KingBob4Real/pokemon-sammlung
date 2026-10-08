@@ -63,10 +63,9 @@ export function render(main, ctx, folderId = "") {
       return ctx.render();
     }
     const s = collection.summary(valueOf, entries);
-    const notes = [s.unknown && `${s.unknown} ohne Preis`, s.estimated && `${s.estimated} geschätzt`].filter(Boolean);
     stats.replaceChildren(
       stat("Karten", String(s.count), `${s.distinct} verschiedene`),
-      stat("Marktwert", fmtEur(s.worth), notes.length ? `Cardmarket ab · ${notes.join(" · ")}` : "Cardmarket ab · DE/EN · ab EX"),
+      stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket-Trend"),
       stat("Bezahlt", s.paid ? fmtEur(s.paid) : "–", "deine Kaufpreise"),
       stat("Gewinn/Verlust", s.diffCount ? fmtSigned(s.diff) : "–", s.diffCount ? `bei ${plural(s.diffCount, "Karte", "Karten")} mit Kaufpreis` : "Kaufpreise eintragen")
     );

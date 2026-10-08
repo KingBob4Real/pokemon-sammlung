@@ -1,4 +1,4 @@
-// Test der Sammlung (entfernen mit „Rückgängig“, Ordner, eigener Preis, Reihenfolge): node frontend/test/collection.test.mjs
+// Test der Sammlung (entfernen mit „Rückgängig“, Ordner, Reihenfolge): node frontend/test/collection.test.mjs
 import assert from "node:assert/strict";
 
 globalThis.location ??= { pathname: "/" }; // config.js schaut auf die Adresse (Live oder Dev)
@@ -48,16 +48,6 @@ collection.removeSection(ordner);
 assert.deepEqual(collection.sections().map((x) => x.name), ["Tauschkarten"]);
 assert.deepEqual([collection.entry("a").section, collection.entries().length], [null, 3], "Ordner gelöscht: Karten bleiben, nur ohne Ordner");
 collection.removeSection(tausch);
-
-// Selbst eingetragener Cardmarket-Preis „ab“: zählt statt der Näherung, auch für Karten außerhalb der Sammlung
-const d = card("d");
-collection.setCmLow(a, 39);
-collection.setCmLow(d, 5); // nur in einer Liste, nicht in der Sammlung
-assert.deepEqual([collection.cmLow("a").value, collection.cmLow("d").value, collection.has("d")], [39, 5, false], "Preis gemerkt, d bleibt außerhalb der Sammlung");
-const s = collection.summary((id) => ({ a: 39, b: 2 })[id] ?? null);
-assert.deepEqual([s.worth, s.unknown, s.estimated], [39 * 3 + 2, 1, 1], "Gesamtwert, c ohne Preis, b nur geschätzt");
-collection.setCmLow(a, null);
-assert.equal(collection.cmLow("a"), null, "leer = wieder die Näherung");
 
 // Eigene Reihenfolge: verschieben und neu durchnummerieren
 const { orderOf } = await import("../js/domain/sorting.js");

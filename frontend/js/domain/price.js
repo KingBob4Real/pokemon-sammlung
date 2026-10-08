@@ -1,7 +1,7 @@
 import { CARDMARKET_LANGUAGES, CARDMARKET_MIN_CONDITION } from "../config.js";
 import { positive } from "../core/format.js";
 
-// Cardmarket-Preisliste aus einer TCGdex-Karte (mischt alle Sprachen und Zustände; Trend & Ø nur als Zusatzinfo),
+// Cardmarket-Richtwerte aus einer TCGdex-Karte (mischen alle Sprachen und Zustände),
 // dazu Kartendetails, die nur die volle Karte hat: Seltenheit und Pokédex-Nummer (Trainer/Energie: null).
 export function toPrice(card) {
   const cm = card?.pricing?.cardmarket;
@@ -18,15 +18,12 @@ export function toPrice(card) {
   };
 }
 
-// Wert einer Karte = günstigstes Cardmarket-Angebot („ab“) auf Deutsch oder Englisch ab Excellent. Den gibt es kostenlos
-// nirgends als Daten (Preisliste ohne Sprache/Zustand, API geschlossen) → selbst eingetragen über den gefilterten Link,
-// sonst das ungefilterte „ab“ der Preisliste als Näherung (Untergrenze: alle Sprachen & Zustände). Trend & Ø nie.
-export const marketValue = (price, ownLow = null) => positive(ownLow) ?? price?.low ?? null;
+// Marktwert = Trend, sonst 30-Tage-Schnitt, sonst „ab“
+export const marketValue = (price) => (price ? price.trend ?? price.avg30 ?? price.low : null);
 
-// Link mit Filter „Deutsch/Englisch (sonst Sprache der Karte), ab Excellent“ – zeigt den echten „ab“-Preis
-export const cardmarketLanguages = (language) => (["Deutsch", "Englisch"].includes(language) ? "Deutsch/Englisch" : CARDMARKET_LANGUAGES[language] ? language : "alle Sprachen");
+// Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
 export function cardmarketUrl(card, price, language = "Deutsch") {
-  const lang = ["Deutsch", "Englisch"].includes(language) ? `${CARDMARKET_LANGUAGES.Englisch},${CARDMARKET_LANGUAGES.Deutsch}` : CARDMARKET_LANGUAGES[language];
+  const lang = CARDMARKET_LANGUAGES[language];
   const filter = `${lang ? `language=${lang}&` : ""}minCondition=${CARDMARKET_MIN_CONDITION}`;
   return price?.cardmarketId
     ? `https://www.cardmarket.com/de/Pokemon/Products?idProduct=${encodeURIComponent(price.cardmarketId)}&${filter}`

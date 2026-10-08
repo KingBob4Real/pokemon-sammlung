@@ -428,10 +428,10 @@ select.field { padding-right: 8px; }
 
 .prices { margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .prices p { margin: 4px 0; font-size: 13px; }
-/* Wert der Karte: „ab 312,00 €“ und wofür er gilt */
-.price-main { display: flex; flex-direction: column; gap: 2px; }
-.price-main b { font-family: var(--font-head); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.price-main span { font-size: 12.5px; font-weight: 800; color: var(--muted); }
+.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.price-grid div { display: flex; flex-direction: column; }
+.price-grid span { font-size: 11.5px; font-weight: 800; color: var(--muted); }
+.price-grid b { font-family: var(--font-head); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .btn.cm { width: 100%; margin-top: 8px; font-size: 14px; background: var(--red); color: #fff; }
 
 .sheet-part { margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }

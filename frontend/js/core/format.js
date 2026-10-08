@@ -8,7 +8,6 @@ export const objOr = (x) => (isObj(x) ? x : {});
 export const positive = (x) => (typeof x === "number" && Number.isFinite(x) && x > 0 ? x : null);
 
 export const fmtEur = (x) => (x == null ? "–" : (x >= 100 ? eur0 : eur2).format(x));
-export const fmtCents = (x) => (x == null ? "–" : eur2.format(x)); // immer mit Cent, z. B. Preis in der Kartenansicht
 export const fmtSigned = (x) => `${x >= 0 ? "+" : "−"}${fmtEur(Math.abs(x))}`;
 export const fmtPriceInput = (x) => (positive(x) == null ? "" : x.toFixed(2).replace(".", ","));
 export const fmtDateTime = (ms) => new Date(ms).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });

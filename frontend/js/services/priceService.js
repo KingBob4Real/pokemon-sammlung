@@ -2,7 +2,7 @@ import { objOr } from "../core/format.js";
 import { marketValue, toPrice } from "../domain/price.js";
 
 /**
- * Cardmarket-Preisliste über TCGdex, pro Karte zwischengespeichert. ownLow(id) → selbst eingetragenes „ab“ { value, at } | null.
+ * Cardmarket-Richtwerte über TCGdex, pro Karte zwischengespeichert.
  * request(ids) lädt fehlende/alte Preise im Hintergrund (6 parallel) und meldet "update".
  * Klappt in einem Durchlauf gar nichts (TCGdex weg), meldet sie "error"; gespeicherte Werte bleiben.
  */
@@ -11,9 +11,8 @@ export class PriceService extends EventTarget {
   #running = false;
   #failed = new Set(); // Karten, deren Preis zuletzt nicht geladen werden konnte
 
-  constructor(tcgdex, storage, storageKey, ttlMs, ownLow = () => null) {
+  constructor(tcgdex, storage, storageKey, ttlMs) {
     super();
-    this.ownLow = ownLow;
     this.tcgdex = tcgdex;
     this.storage = storage;
     this.storageKey = storageKey;
@@ -25,14 +24,8 @@ export class PriceService extends EventTarget {
     return this.prices[cardId] || null;
   }
 
-  // Selbst eingetragenes „ab“ { value, at } oder null
-  own(cardId) {
-    return this.ownLow(cardId);
-  }
-
-  // Wert der Karte: selbst eingetragenes „ab“ (DE/EN, ab EX), sonst Näherung – siehe marketValue
   value(cardId) {
-    return marketValue(this.get(cardId), this.ownLow(cardId)?.value);
+    return marketValue(this.get(cardId));
   }
 
   hasFailed(cardId) {

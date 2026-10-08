@@ -1,11 +1,11 @@
-import { CONDITIONS, LANGUAGES } from "../../config.js";
+import { CARDMARKET_LANGUAGES, CONDITIONS, LANGUAGES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
-import { fmtCents, fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
+import { fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
 import { cardImage, cardNumber } from "../../domain/card.js";
-import { cardmarketLanguages, cardmarketUrl } from "../../domain/price.js";
+import { cardmarketUrl } from "../../domain/price.js";
 
 /**
- * Kopf der Kartenansicht: Bild, Name, Nummer & Set, Seltenheit, Wert = Cardmarket „ab“ (DE/EN, ab EX).
+ * Kopf der Kartenansicht: Bild, Name, Nummer & Set, Seltenheit, Cardmarket-Preise.
  * Auch für die Bestätigung beim Scannen. drawPrices() zeichnet die Preise neu, sobald sie geladen sind.
  * language() → gewählte Sprache der Karte, für den Cardmarket-Link.
  */
@@ -14,26 +14,20 @@ export function cardHead(card, prices, language = () => "Deutsch") {
   const priceBox = h("div", { class: "prices" });
   const drawPrices = () => {
     const p = prices.get(card.id);
-    const own = prices.own(card.id);
-    const value = prices.value(card.id);
     rarity.textContent = p?.rarity || "";
-    // Wofür der Wert gilt: selbst eingetragen (DE/EN, ab EX) oder Näherung aus der Preisliste (alle Sprachen & Zustände)
-    const basis = own
-      ? `DE/EN · ab EX · selbst eingetragen am ${fmtDate(own.at)}`
-      : `Näherung: günstigstes Angebot aller Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`;
-    const extra = [p?.trend && `Trend ${fmtEur(p.trend)}`, p?.avg30 && `Ø 30 Tage ${fmtEur(p.avg30)}`].filter(Boolean).join(" · ");
+    const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, fmtEur(value))]);
     priceBox.replaceChildren(
-      value != null
-        ? h("div", { class: "price-main" }, [h("b", {}, `ab ${fmtCents(value)}`), h("span", {}, basis)])
+      p && (p.trend || p.low || p.avg30)
+        ? h("div", { class: "price-grid" }, [cell("Trend", p.trend), cell("ab", p.low), cell("Ø 30 Tage", p.avg30)])
         : p
-          ? h("p", { class: "muted" }, "Kein Cardmarket-Preis – „ab“ über den Link unten nachsehen und eintragen.")
+          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
           : !navigator.onLine
             ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
             : prices.hasFailed(card.id)
               ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
               : h("p", { class: "muted" }, "Preis wird geladen …"),
-      extra ? h("p", { class: "muted small" }, `Nur zur Info, zählt nicht: ${extra}`) : null,
-      h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${cardmarketLanguages(language())}, ab Excellent)`)
+      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
+      h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
     );
   };
   const image = cardImage(card, "high");
@@ -149,23 +143,9 @@ export function renderCardSheet(body, card, ctx) {
   };
 
   const head = cardHead(card, prices, () => collection.entry(card.id)?.lang || "Deutsch");
-
-  // Cardmarket „ab“ selbst eintragen (über den gefilterten Link) – zählt dann statt der Näherung, auf allen Geräten
-  const own = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "leer = Näherung", value: fmtPriceInput(collection.cmLow(card.id)?.value) });
-  own.addEventListener("change", () => {
-    const n = parseEuro(own.value);
-    if (Number.isNaN(n)) return (own.value = fmtPriceInput(collection.cmLow(card.id)?.value)); // Tippfehler: alter Wert
-    collection.setCmLow(card, n);
-    own.value = fmtPriceInput(n);
-    head.drawPrices();
-    ctx.refresh();
-  });
-  own.addEventListener("keydown", (e) => e.key === "Enter" && own.blur());
-
   body.replaceChildren(
     h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close }),
     ...head.elements,
-    h("label", { class: "label" }, ["Cardmarket „ab“ selbst eintragen (Deutsch/Englisch, ab Excellent)", own]),
     h("section", { class: "sheet-part" }, [
       h("h3", {}, "In meiner Sammlung"),
       h("div", { class: "stepper" }, [
