@@ -559,26 +559,43 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
   background: var(--bg);
   box-shadow: 0 -1px 0 var(--line);
 }
-/* Live-Kamera: Bild füllt den Bildschirm, Rahmen in Kartenform (63 × 88), außen abgedunkelt */
-.camera { position: fixed; inset: 0; z-index: 5; overflow: hidden; background: #000; color: #fff; }
+/* Live-Kamera: Bild füllt den Bildschirm, Rahmen in Kartenform (63 × 88) bzw. Ordnerseite, außen abgedunkelt.
+   Oben Art des Scans, in der Mitte der Rahmen (passt sich dem freien Platz an), unten Liste der Serie und Auslöser. */
+.camera { position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column; overflow: hidden; background: #000; color: #fff; }
 .camera video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.camera-top, .camera-bottom { position: relative; z-index: 1; }
+.camera-top { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 8px; }
+.camera-row { display: flex; align-items: center; gap: 8px; }
+/* Rahmen füllt den freien Platz in der Mitte (höchstens 84 % der Breite); Liste und Meldungen ändern ihn nie –
+   sonst sähe das Vorschaubild fürs automatische Auslösen bei jeder neuen Zeile anders aus */
+.camera-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
 .camera-frame {
-  position: absolute;
-  left: 50%;
-  top: 46%;
-  width: min(80vw, calc(64dvh * 63 / 88), 420px);
-  aspect-ratio: 63 / 88;
-  transform: translate(-50%, -50%);
+  height: min(94%, calc(min(84vw, 420px) / var(--ratio)));
+  aspect-ratio: var(--ratio);
   border: 3px solid #fff;
   border-radius: 16px;
   box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.55);
 }
-.camera-hint { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 16px; right: 16px; margin: 0; text-align: center; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; }
+/* Ordnerseite: Linien zwischen den Fächern */
+.camera[data-mode="page"] .camera-frame {
+  height: min(97%, calc(96vw / var(--ratio)));
+  border-radius: 8px;
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.8) 2px, transparent 2px), linear-gradient(to bottom, rgba(255, 255, 255, 0.8) 2px, transparent 2px);
+  background-size: calc(100% / var(--cols)) 100%, 100% calc(100% / var(--rows));
+}
+.camera-hint { margin: 0; text-align: center; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; }
+.camera-modes { display: flex; gap: 4px; padding: 4px; border-radius: 99px; background: rgba(0, 0, 0, 0.6); }
+.camera-mode { min-width: 64px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 99px; background: none; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.camera-mode[aria-pressed="true"] { background: #fff; color: #111; }
+.camera-mode:disabled { opacity: 0.4; cursor: default; }
+.camera-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 99px; background: rgba(0, 0, 0, 0.6); color: #fff; font: inherit; font-size: 16px; font-weight: 800; }
+.camera-chip input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
+.camera-shoot { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.camera-left { min-height: 17px; margin: 0; font-size: 13px; font-weight: 800; text-align: center; text-shadow: 0 1px 3px #000; }
+.camera-flash { position: absolute; inset: 0; z-index: 2; background: #fff; opacity: 0; pointer-events: none; }
+.camera-flash.on { animation: flash 0.25s ease-out; }
+@keyframes flash { from { opacity: 0.7; } }
 .camera-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -591,6 +608,42 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
 .camera-shutter:active { transform: scale(0.92); }
 .camera-shutter:disabled { opacity: 0.4; cursor: default; }
 button.back { padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: var(--muted); cursor: pointer; }
+/* Serien- und Seiten-Scan: Liste der gescannten Karten (in der Kamera dunkel, beim Prüfen im Dialog) */
+.batch-tray { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 0 12px; }
+.camera[data-mode="single"] .batch-tray { display: none; }
+/* Meldung schwebt über der Liste, damit sich der Rahmen nicht verschiebt */
+.batch-tray .batch-note { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 8px); }
+.batch-note { margin: 0; padding: 8px 12px; border-radius: 12px; background: rgba(0, 0, 0, 0.78); color: #fff; font-size: 14px; font-weight: 700; }
+.batch-empty { display: grid; place-items: center; height: 100%; margin: 0; border-radius: 12px; background: rgba(20, 20, 26, 0.6); color: rgba(255, 255, 255, 0.8); font-size: 14px; font-weight: 700; }
+.batch-list { display: flex; flex-direction: column; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
+/* feste Höhe: neueste Karte oben, ältere per Wischen; alle mit ± und Löschen beim Prüfen */
+.batch-tray .batch-list { height: 56px; margin: 0; overflow-y: auto; overscroll-behavior: contain; }
+@media (min-height: 760px) { .batch-tray .batch-list { height: 118px; } }
+.camera[data-mode="page"] .batch-tray .batch-list { display: none; } /* Seite: Rahmen braucht den Platz, geprüft wird danach */
+.batch-row { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto 44px; align-items: center; gap: 8px; min-height: 56px; padding: 0 4px 0 8px; border-radius: 12px; background: var(--surface); box-shadow: var(--shadow); }
+.batch-tray .batch-row { background: rgba(20, 20, 26, 0.86); color: #fff; box-shadow: none; }
+/* unsicher, nicht gefunden, Fehler: markiert – beim Prüfen klären */
+.batch-row:is(.is-pick, .is-none, .is-error, .is-limit) { box-shadow: inset 4px 0 0 #f0a020, var(--shadow); }
+.batch-tray .batch-row:is(.is-pick, .is-none, .is-error, .is-limit) { box-shadow: inset 4px 0 0 #f0a020; }
+.batch-art { width: 32px; aspect-ratio: 63 / 88; overflow: hidden; border-radius: 4px; background: rgba(127, 127, 127, 0.25); }
+.batch-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.batch-art.no-img img { visibility: hidden; }
+.batch-info { display: flex; flex-direction: column; min-width: 0; font-size: 13px; }
+.batch-info > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.batch-info b { font-size: 15px; }
+.batch-info span { opacity: 0.8; }
+.batch-info .batch-price { font-weight: 800; opacity: 1; }
+.batch-row:is(.is-wait, .is-read, .is-find) .batch-info span { animation: pulse 1s ease-in-out infinite; }
+.batch-qty { display: flex; align-items: center; }
+.batch-qty button { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
+.batch-qty button:disabled { opacity: 0.3; cursor: default; }
+.batch-qty output { min-width: 18px; text-align: center; font-weight: 800; }
+.batch-remove { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; opacity: 0.7; cursor: pointer; }
+.batch-remove svg { width: 18px; height: 18px; }
+.btn.batch-action { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+.btn.batch-done { min-height: 48px; }
+.batch-photo { display: block; width: min(50%, 200px); margin: 8px auto 12px; border-radius: 10px; }
+.batch-hint { margin: 10px 2px 0; font-size: 13px; }
 .scan-done { padding: 48px 8px 8px; text-align: center; }
 .scan-done h2 { margin-top: 12px; }
 .scan-done-icon { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; color: #fff; background: var(--accent); }

@@ -17,6 +17,12 @@ enabled = true
 [ai]
 binding = "AI"
 
+# Tageslimits für Scans (UTC-Tag). Gratis-Tarif: 10.000 Neurons/Tag für Live + Dev zusammen, ein Scan kostet
+# höchstens ~10,3 → Live-Gesamt + Dev-Gesamt ≤ 960 hält das sicher ein (Rechnung in src/config.js).
+[vars]
+SCANS_PER_DAY = "360"        # pro Person
+SCANS_PER_DAY_TOTAL = "900"  # alle Personen zusammen
+
 # Dev-Stufe (Branch develop): eigener Worker + eigene Datenbank. Aufruf mit --env dev.
 [env.dev]
 name = "pokemon-sammlung-dev"
@@ -29,3 +35,7 @@ migrations_dir = "migrations"
 
 [env.dev.ai]
 binding = "AI"
+
+[env.dev.vars]
+SCANS_PER_DAY = "60"
+SCANS_PER_DAY_TOTAL = "60"   # Dev braucht nur zum Testen, der Rest des Gratis-Tarifs bleibt für Live

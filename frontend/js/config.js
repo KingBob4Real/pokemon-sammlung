@@ -4,8 +4,11 @@ export const TCGDEX_API = "https://api.tcgdex.net/v2";
 // Dev-Stufe: der develop-Branch liegt unter …/dev/ (siehe .github/workflows/pages.yml) – eigenes Backend, eigener Speicher.
 export const IS_DEV = location.pathname.includes("/dev/");
 export const OLD_APP_URL = "https://kingbob4real.github.io/pokemon-karten-checkliste/";
-// Adresse des Cloudflare-Backends (unter „Mehr“ änderbar)
-export const DEFAULT_BACKEND_URL = `https://pokemon-sammlung${IS_DEV ? "-dev" : ""}.pokemon-sammlung-backend.workers.dev`;
+// Adresse des Cloudflare-Backends (fest, in der App nicht sichtbar). Lokal (localhost) das Backend aus `npm run dev`.
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+export const DEFAULT_BACKEND_URL = LOCAL ? "http://127.0.0.1:8787" : `https://pokemon-sammlung${IS_DEV ? "-dev" : ""}.pokemon-sammlung-backend.workers.dev`;
+// Kartenbilder von Limitless reicht das Backend durch (domain/card.js → nextImage)
+export const IMAGE_PROXY = `${DEFAULT_BACKEND_URL}/img`;
 // Cardmarket-Link: Angebote in der Sprache der Karte ab Zustand Excellent (Cardmarkets Nummern der Sprachen)
 export const CARDMARKET_LANGUAGES = { Deutsch: 3, Englisch: 1, Französisch: 2, Spanisch: 4, Italienisch: 5, Japanisch: 7 };
 export const CARDMARKET_MIN_CONDITION = 3; // Excellent

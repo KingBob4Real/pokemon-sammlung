@@ -23,13 +23,26 @@ export function toCard(c, setInfo) {
 
 // pokemontcg.io führt manche Sets unter anderem Namen
 const PTCGIO_SETS = { "sm7.5": "sm75", "swsh4.5sv": "swsh45sv", "swsh12.5gg": "swsh12pt5gg" };
+// Sets mit Bildern, die es nur bei Limitless TCG gibt (deren Kürzel) – neueste Promos. Weitere hier eintragen.
+const LIMITLESS_SETS = { svp: "SVP", mep: "MEP" };
+const ptcgio = (set, n, size) => `https://images.pokemontcg.io/${PTCGIO_SETS[set] || set}/${n}${size === "high" ? "_hires" : ""}.png`;
 
-// Bild lädt nicht → nächste Quelle: TCGdex deutsch → englisch → pokemontcg.io. Letzteres hat Bilder, die TCGdex
-// ganz fehlen (Shiny Vault, Trainer-Galerien, Galarian Gallery, Drachenwandel, Promos …). null = keine weitere Quelle.
-export function nextImage(src) {
+// Bild lädt nicht → nächste Quelle: TCGdex deutsch → englisch → pokemontcg.io (Shiny Vault, Trainer-Galerien, Galarian
+// Gallery, Drachenwandel …). Für die Promo-Sets oben vorher Limitless über imageProxy (GET /img des Backends, weil Limitless
+// keinen CORS-Header schickt) – pokemontcg.io antwortet bei fehlenden Karten mit einer Kartenrückseite statt einem Fehler,
+// danach ginge es nicht weiter. null = keine weitere Quelle.
+export function nextImage(src, imageProxy = null) {
   if (src.startsWith("https://assets.tcgdex.net/de/")) return src.replace("/de/", "/en/");
-  const m = src.match(/^https:\/\/assets\.tcgdex\.net\/en\/[^/]+\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
-  return m ? `https://images.pokemontcg.io/${PTCGIO_SETS[m[1]] || m[1]}/${m[2]}${m[3] === "high" ? "_hires" : ""}.png` : null;
+  const t = src.match(/^https:\/\/assets\.tcgdex\.net\/en\/[^/]+\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
+  if (t) {
+    const [, set, num, size] = t;
+    const n = num.replace(/^0+(?=\d)/, ""); // „085“ heißt dort „85“
+    return LIMITLESS_SETS[set] && imageProxy && /^\d+$/.test(n) ? `${imageProxy}?set=${LIMITLESS_SETS[set]}&n=${n}&size=${size === "high" ? "LG" : "SM"}` : ptcgio(set, n, size);
+  }
+  if (!imageProxy || !src.startsWith(`${imageProxy}?`)) return null;
+  const q = new URL(src).searchParams; // Limitless hatte es nicht → pokemontcg.io
+  const set = Object.keys(LIMITLESS_SETS).find((k) => LIMITLESS_SETS[k] === q.get("set"));
+  return set ? ptcgio(set, q.get("n"), q.get("size") === "LG" ? "high" : "low") : null;
 }
 
 // Gespeicherte Karte ohne Bild → mit englischem Bild (oder null, wenn nichts zu tun ist)

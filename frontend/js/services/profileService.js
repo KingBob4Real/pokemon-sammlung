@@ -91,7 +91,7 @@ export class ProfileService {
   // Anmeldung der aktiven Person auf diesem Gerät: { url, key }
   credentials() {
     const saved = this.storage.get(this.keysOf(this.slot).sync, null);
-    return { url: saved?.url || this.url, key: saved?.key || "" };
+    return { url: this.url, key: saved?.key || "" };
   }
 
   // Passwort festlegen, ändern oder entfernen (leer) – ändern und entfernen nur mit dem alten.

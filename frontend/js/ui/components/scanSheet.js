@@ -2,20 +2,20 @@ import { CONDITIONS, LANGUAGES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
 import { fmtPriceInput, parseEuro } from "../../core/format.js";
+import { centerRect } from "../../core/image.js";
 import { cardNumber } from "../../domain/card.js";
-import { cameraView } from "./camera.js";
+import { cameraView, cutCells, layoutOf } from "./camera.js";
+import { cardSearch, choiceGrid } from "./cardPicker.js";
 import { cardHead } from "./cardSheet.js";
-import { cardTile, tileCard, updateTile } from "./cardTile.js";
 import { progressBar } from "./progressBar.js";
+import { addShots, batchOf, batchReview, batchTray, LANGUAGE_NAMES, MAX_EMPTY_AUTO } from "./scanBatch.js";
 import { emptyState } from "./widgets.js";
 
-const SEARCH_RESULTS = 30;
 let picker = null; // unsichtbares Datei-Feld: Foto-App oder Mediathek, falls die Live-Kamera nicht geht
-const LANGUAGE_NAMES = { de: "Deutsch", en: "Englisch", ja: "Japanisch" };
 
 /**
- * Karten-Scanner: Kamera mit Rahmen → erkennen → bestätigen → in die Sammlung.
- * Läuft in der Kartenansicht (Dialog), Meldungen stehen deshalb dort statt unten als Hinweis.
+ * Karten-Scanner: Kamera mit Rahmen → erkennen → bestätigen → in die Sammlung. Einzeln (hier) oder als Serie bzw.
+ * ganze Ordnerseite (Liste in scanBatch.js). Läuft im Dialog, Meldungen stehen deshalb dort statt unten als Hinweis.
  * Jeder Fehler hat einen Ausweg: Nochmal, manuell suchen, schließen.
  *   listId – beim Scannen aus einer Liste ist diese Liste schon angehakt
  */
@@ -24,31 +24,60 @@ export function startScan(ctx, { listId = null } = {}) {
   if (!ctx.scanner.ready) {
     return ctx.notify("Zum Scannen bitte erst unter „Mehr“ den Sync-Schlüssel eintragen.", { type: "info", action: { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } });
   }
-  if (!navigator.mediaDevices?.getUserMedia) return pickPhoto(ctx, listId);
+  if (!navigator.mediaDevices?.getUserMedia) return pickPhoto((file) => singleFromFile(ctx, file, listId));
   ctx.openSheet((body, sheet) => cameraStep(body, sheet, listId));
 }
 
-// Foto über die Foto-App oder aus der Mediathek (muss direkt aus einem Antippen kommen).
-// chosen() läuft, sobald ein Foto gewählt ist (z. B. Live-Kamera freigeben).
-function pickPhoto(ctx, listId, chosen = () => {}) {
+// Foto über die Foto-App oder aus der Mediathek (muss direkt aus einem Antippen kommen). onFile(file) nur, wenn eins gewählt wurde.
+function pickPhoto(onFile) {
   picker ??= document.body.appendChild(h("input", { type: "file", accept: "image/*", hidden: true }));
   picker.onchange = () => {
     const file = picker.files[0];
     picker.value = ""; // dasselbe Foto später nochmal wählen können
-    if (!file) return; // abgebrochen: nichts tun
-    chosen();
-    ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId));
+    if (file) onFile(file);
   };
   picker.click();
 }
 
-// Live-Kamera im Dialog; nach dem Foto geht es mit dem Erkennen weiter
+const singleFromFile = (ctx, file, listId) => ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId));
+
+// Ganze Seite aus der Mediathek: volle Auflösung, Seite mittig im Foto (formatfüllend fotografieren)
+async function pageFromFile(ctx, file, layout) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const [cols, rows] = layoutOf(layout);
+    const blobs = await cutCells(bitmap, centerRect(bitmap.width, bitmap.height, (cols * 63) / (rows * 88)), layout, bitmap);
+    bitmap.close();
+    addShots(ctx, blobs, { page: true });
+  } catch {
+    batchOf(ctx).note = "Das Foto konnte nicht gelesen werden – bitte nochmal.";
+    batchOf(ctx).changed();
+  }
+}
+
+// Live-Kamera im Dialog. Einzeln: nach dem Foto geht es mit dem Erkennen weiter. Serie/Seite: Kamera bleibt an,
+// die Karten sammeln sich in der Liste darüber; „Fertig“ → prüfen und alle in die Sammlung.
 function cameraStep(body, ctx, listId) {
+  const batch = batchOf(ctx);
   let redraw = null;
+  const tray = batchTray(ctx, { onDone: () => review() });
+  const saved = ctx.prefs.get("scanMode");
   const camera = cameraView({
+    mode: batch.items.length && saved === "single" ? "series" : saved, // offene Liste → weiter sammeln
+    layout: ctx.prefs.get("scanLayout"),
+    tray: tray.el,
     onPhoto: (file) => (redraw = scanFlow(body, ctx, file, listId)),
+    onShot: (blob, { auto }) => addShots(ctx, [blob], { auto }),
+    onPage: (blobs) => addShots(ctx, blobs, { page: true }),
+    onMode: (mode, layout) => (ctx.prefs.set("scanMode", mode), ctx.prefs.set("scanLayout", layout)),
     onCancel: ctx.close,
-    onPick: () => pickPhoto(ctx, listId, () => camera.stop()),
+    onPick: (mode, layout) =>
+      pickPhoto((file) => {
+        if (mode === "series") return addShots(ctx, [file]);
+        if (mode === "page") return pageFromFile(ctx, file, layout);
+        camera.stop();
+        singleFromFile(ctx, file, listId);
+      }),
     onUnavailable: (e) => {
       if (!camera.el.isConnected) return;
       const denied = e?.name === "NotAllowedError";
@@ -59,16 +88,34 @@ function cameraStep(body, ctx, listId) {
           denied ? "Erlaube den Zugriff in den Einstellungen (Safari → Kamera) – oder nimm das Foto mit der Foto-App auf." : "Nimm das Foto stattdessen mit der Foto-App auf."
         ),
         h("div", { class: "buttons" }, [
-          h("button", { type: "button", class: "btn", onclick: () => pickPhoto(ctx, listId) }, "Foto aufnehmen"),
+          h("button", { type: "button", class: "btn", onclick: () => pickPhoto((file) => singleFromFile(ctx, file, listId)) }, "Foto aufnehmen"),
+          batch.items.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => review() }, "Scan-Liste ansehen") : null,
           h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Schließen"),
         ])
       );
     },
   });
+  const draw = () => {
+    if (batch.emptyAutos >= MAX_EMPTY_AUTO) {
+      batch.emptyAutos = 0;
+      camera.pauseAuto(); // nicht weiter Scans verbrauchen, wenn im Rahmen keine Karte zu erkennen ist
+      batch.note = "Automatik pausiert: mehrmals keine Karte erkannt. Karte in den Rahmen und antippen – oder „Auto“ wieder an.";
+    }
+    tray.draw();
+    camera.lockSingle(batch.items.length > 0); // Einzeln würde die Liste verlassen
+    camera.setRemaining(ctx.scanner.remaining);
+  };
+  function review() {
+    camera.stop();
+    redraw = batchReview(body, ctx, { listId, onScanMore: () => ctx.openSheet((b, sheet) => cameraStep(b, sheet, listId)) });
+  }
+  batch.changed = draw;
   body.replaceChildren(camera.el);
-  body.closest("dialog").addEventListener("close", camera.stop, { once: true });
+  body.closest("dialog").addEventListener("close", () => (camera.stop(), (batch.changed = () => {})), { once: true });
   camera.start();
-  return () => redraw?.();
+  draw();
+  ctx.scanner.usage().then(draw, () => {}); // „Noch 43 Scans heute“
+  return () => (redraw ? redraw() : draw());
 }
 
 // Knopf „📷 Scannen“ für Ansichten; offline ausgegraut mit Hinweis. refresh() bei online/offline aufrufen.
@@ -85,7 +132,7 @@ export function scanButton(ctx, options) {
 
 // Ablauf im Dialog. Gibt die Funktion zurück, die nach dem Laden von Preisen neu zeichnet.
 function scanFlow(body, ctx, file, listId) {
-  const { scanner, collection, lists, prices, catalog } = ctx;
+  const { scanner, collection, lists, prices } = ctx;
   const closeButton = h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close });
   let redraw = null;
   // Antwort kommt erst, nachdem der Dialog zu ist oder eine Karte geöffnet wurde? Dann nichts mehr zeigen.
@@ -156,23 +203,8 @@ function scanFlow(body, ctx, file, listId) {
     show(emptyState(text), h("div", { class: "buttons" }, actions.filter(Boolean)));
   }
 
-  // Kacheln zum Antippen; zeigt Anzahl in der Sammlung und Marktwert
-  function choiceGrid(cards, onPick) {
-    const grid = h("div", { class: "grid" }, cards.map((c) => cardTile(c, { mode: "view" })));
-    grid.addEventListener("click", (e) => {
-      const card = tileCard(e.target.closest(".tile"));
-      if (card) onPick(card);
-    });
-    const update = () => {
-      for (const el of grid.children) updateTile(el, { qty: collection.quantity(tileCard(el).id), value: prices.value(tileCard(el).id) });
-    };
-    update();
-    prices.request(cards.map((c) => c.id));
-    return { grid, update };
-  }
-
   function choose(cards, rec) {
-    const { grid, update } = choiceGrid(cards, (card) => confirm(card, rec, () => choose(cards, rec)));
+    const { grid, update } = choiceGrid(ctx, cards, (card) => confirm(card, rec, () => choose(cards, rec)));
     show(
       h("h2", {}, "Welche Karte ist es?"),
       h("p", { class: "muted" }, "Mehrere Karten passen – tippe die richtige an."),
@@ -184,54 +216,15 @@ function scanFlow(body, ctx, file, listId) {
 
   // Nichts (Passendes) gefunden: Suche, vorausgefüllt mit dem Gelesenen
   function search(rec, title) {
-    const input = h("input", {
-      type: "search",
-      class: "field",
-      placeholder: "Name oder Nummer, z. B. Glurak 199",
-      "aria-label": "Karte suchen",
-      autocomplete: "off",
-      autocapitalize: "off",
-      spellcheck: "false",
-      enterkeyhint: "search",
-      value: rec?.name || rec?.number || "",
-    });
-    const form = h("form", { class: "toolbar" }, [input, h("button", { type: "submit", class: "btn" }, "Suchen")]);
-    const bar = progressBar();
-    const results = h("div");
-    let seq = 0;
-    const run = async () => {
-      const query = input.value.trim();
-      const mine = ++seq;
-      if (!query) return results.replaceChildren();
-      bar.busy();
-      try {
-        const cards = await catalog.search(query);
-        if (mine !== seq || !live()) return;
-        const choice = choiceGrid(cards.slice(0, SEARCH_RESULTS), (card) => confirm(card, rec, () => search(rec, title)));
-        redraw = choice.update;
-        results.replaceChildren(cards.length ? choice.grid : emptyState(`Keine Karte gefunden für „${query}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer."));
-      } catch (e) {
-        if (mine !== seq) return;
-        const offline = describeError(e).kind === "offline";
-        results.replaceChildren(emptyState(offline ? "Du bist offline – die Suche braucht Internet." : "Die Kartensuche klappt gerade nicht."), h("div", { class: "buttons center" }, [button("Nochmal", run)]));
-      }
-      bar.done();
-    };
-    form.addEventListener("submit", (e) => {
-      e.preventDefault();
-      input.blur(); // Handy-Tastatur zuklappen
-      run();
-    });
     const read = [rec?.name, rec?.number && (rec.total ? `${rec.number}/${rec.total}` : rec.number), rec?.setCode].filter(Boolean).join(" · ");
+    const found = cardSearch(ctx, { query: rec?.name || rec?.number || "", onPick: (card) => confirm(card, rec, () => search(rec, title)), live });
     show(
       h("h2", {}, title),
       read ? h("p", { class: "muted" }, `Gelesen: ${read}`) : null,
-      form,
-      bar.el,
-      results,
+      ...found.elements,
       h("div", { class: "buttons" }, [ghost("Nochmal scannen", scanAgain), ghost("Schließen", ctx.close)])
     );
-    run();
+    redraw = found.update;
   }
 
   // Bestätigung: Karte mit Preisen, Angaben wählen, „In Sammlung“. back: zurück zur Auswahl

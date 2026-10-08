@@ -1,6 +1,6 @@
 // Test des Karten-Scanners (Zuordnung, Kamera-Ausschnitt): node frontend/test/scan.test.mjs
 import assert from "node:assert/strict";
-import { coverCrop } from "../js/core/image.js";
+import { AutoShutter, centerRect, coverCrop, gridCells } from "../js/core/image.js";
 import { rankMatches, scanQueries } from "../js/domain/scanMatch.js";
 
 const card = (id, name, num, set, total) => ({ id, name, num, set, setName: set, total, img: null });
@@ -53,5 +53,37 @@ assert.ok(near(crop.x + crop.width / 2, 540) && near(crop.y + crop.height / 2, 9
 assert.ok(near(crop.width, 292 / (812 / 1920)), "Größe umgerechnet in Video-Pixel");
 const edge = coverCrop(view, { ...frame, left: -100, top: -100 }, { width: 1080, height: 1920 }, 0.1);
 assert.ok(edge.x === 0 && edge.y === 0, "Ausschnitt bleibt im Video");
+
+// Seiten-Scan: 3 × 3-Raster über die Seite, Fach für Fach von oben links, mit Rand, aber nie aus dem Bild
+const page = { x: 100, y: 200, width: 900, height: 1200 };
+const cells = gridCells(page, 3, 3, 0, { width: 2000, height: 2000 });
+assert.equal(cells.length, 9);
+assert.deepEqual(cells[0], { x: 100, y: 200, width: 300, height: 400 }, "erstes Fach oben links");
+assert.deepEqual(cells[5], { x: 700, y: 600, width: 300, height: 400 }, "Zeile 2, Spalte 3");
+const round = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.round(v)]));
+const edged = gridCells({ x: 0, y: 0, width: 300, height: 400 }, 3, 4, 0.1, { width: 300, height: 400 });
+assert.equal(edged.length, 12, "3 Spalten × 4 Zeilen");
+assert.deepEqual(round(edged[0]), { x: 0, y: 0, width: 110, height: 110 }, "Rand oben links abgeschnitten");
+assert.deepEqual(round(edged[4]), { x: 90, y: 90, width: 120, height: 120 }, "Rand innen rundum");
+// Foto aus der Mediathek: Seite (3 × 3 Karten) mittig aus einem 4:3-Hochkantfoto
+assert.deepEqual(centerRect(3024, 4032, 2), { x: 0, y: 1260, width: 3024, height: 1512 }, "breiter als das Foto → volle Breite");
+assert.deepEqual(centerRect(4000, 1000, 1), { x: 1500, y: 0, width: 1000, height: 1000 }, "höher als das Foto → volle Höhe");
+
+// Serien-Scan: erst auslösen, wenn das Bild ~0,7 s ruhig ist, nicht leer, und anders als beim letzten Foto
+const img = (seed) => Uint8Array.from({ length: 24 * 32 }, (_, i) => ((Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453) % 1 + 1) * 100 + 20); // Zufallsmuster
+const wobble = (g, d) => g.map((v, i) => v + (i % 2 ? d : -d));
+const shutter = new AutoShutter();
+const card1 = img(1);
+const fired = (frames) => frames.map(([g, t]) => shutter.push(g, t));
+assert.deepEqual(fired([[card1, 0], [wobble(card1, 5), 300], [card1, 600]]), [false, false, false], "noch keine 0,7 s ruhig");
+assert.equal(shutter.push(card1, 900), true, "0,9 s ruhig → auslösen");
+assert.deepEqual(fired([[card1, 1200], [card1, 1500], [card1, 3000]]), [false, false, false], "dieselbe Karte nicht nochmal");
+const card2 = img(7);
+assert.deepEqual(fired([[card2, 3300], [card2, 3600], [card2, 3900], [card2, 4200]]), [false, false, false, true], "neue Karte, ruhig → auslösen");
+const flat = new Uint8Array(24 * 32).fill(90);
+assert.deepEqual(fired([[flat, 4500], [flat, 4800], [flat, 5100], [flat, 5400]]), [false, false, false, false], "leerer Tisch löst nicht aus");
+const tapped = new AutoShutter();
+tapped.shot(card1); // per Antippen fotografiert
+assert.deepEqual([card1, card1, card1, card1].map((g, i) => tapped.push(g, i * 300)), [false, false, false, false], "nach Antippen nicht gleich nochmal automatisch");
 
 console.log("Scanner ok");

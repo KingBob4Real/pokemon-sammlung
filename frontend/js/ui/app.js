@@ -1,3 +1,4 @@
+import { IMAGE_PROXY } from "../config.js";
 import { $, h } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
@@ -228,12 +229,12 @@ export class App {
     this.afterChange(false);
   }
 
-  // Bild fehlt → nächste Quelle (deutsch → englisch → pokemontcg.io), sonst Platzhalter
+  // Bild fehlt → nächste Quelle (deutsch → englisch → pokemontcg.io → Limitless), sonst Platzhalter
   #onImageError(e) {
     const img = e.target;
-    const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art");
+    const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art, .batch-art");
     if (!box) return;
-    const next = nextImage(img.src);
+    const next = nextImage(img.src, IMAGE_PROXY);
     if (next) img.src = next;
     else box.classList.add("no-img");
   }

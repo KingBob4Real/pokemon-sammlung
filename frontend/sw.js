@@ -1,6 +1,7 @@
 "use strict";
 
-// Offline-Betrieb: eigene Dateien „Netz zuerst“ (Updates kommen sofort an), Kartenbilder (TCGdex, pokemontcg.io) & Schriften „Speicher zuerst“.
+// Offline-Betrieb: eigene Dateien „Netz zuerst“ (Updates kommen sofort an), Kartenbilder (TCGdex, pokemontcg.io, Limitless über
+// GET /img des Backends) & Schriften „Speicher zuerst“.
 // Kartensuche/Preise (api.tcgdex.net) und das Sync-Backend laufen immer übers Netz.
 // ponytail: ein Cache ohne Aufräumen – alte ?v=-Stände bleiben liegen (wenige KB), CACHE umbenennen + löschen, falls das mal stört.
 const CACHE = "ps-v2"; // eigener Name: die alte Checkliste teilt sich den Speicher dieser Domain
@@ -41,8 +42,11 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin === location.origin || url.hostname === "fonts.googleapis.com") e.respondWith(networkFirst(req));
-  else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.gstatic.com"].includes(url.hostname)) e.respondWith(cacheFirst(req));
+  else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.gstatic.com"].includes(url.hostname) || isProxiedImage(url)) e.respondWith(cacheFirst(req));
 });
+
+// Kartenbild über den Durchreicher des Backends (Live und Dev)
+const isProxiedImage = (url) => url.hostname.endsWith(".pokemon-sammlung-backend.workers.dev") && url.pathname === "/img";
 
 async function cacheFirst(req) {
   const cache = await caches.open(CACHE);

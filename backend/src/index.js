@@ -4,8 +4,9 @@
 //   services/      Abgleich-Logik, Karten-Scanner, Anmelden
 //   repositories/  SQL pro Tabelle
 //   validation/    Prüfung eingehender Daten
-import { SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL } from "./config.js";
+import { LIMITLESS_IMAGES, SCAN_MAX_TOKENS, SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL } from "./config.js";
 import { AuthController } from "./controllers/authController.js";
+import { ImageController } from "./controllers/imageController.js";
 import { ScanController } from "./controllers/scanController.js";
 import { SyncController } from "./controllers/syncController.js";
 import { requireUser } from "./http/auth.js";
@@ -23,6 +24,9 @@ import { AuthService } from "./services/authService.js";
 import { ScanService } from "./services/scanService.js";
 import { SyncService } from "./services/syncService.js";
 
+// Zahl aus wrangler.toml ([vars]); fehlt sie oder ist sie ungültig, gilt der Wert aus config.js
+const count = (value, fallback) => (parseInt(value, 10) >= 0 ? parseInt(value, 10) : fallback);
+
 export function createApp(env) {
   const db = env.DB;
   const users = new UserRepository(db);
@@ -33,14 +37,23 @@ export function createApp(env) {
     new SectionRepository(db),
   ]);
   const syncController = new SyncController(syncService);
-  const scanService = new ScanService(env.AI, new ScanUsageRepository(db), { model: SCAN_MODEL, perUser: SCANS_PER_DAY, total: SCANS_PER_DAY_TOTAL });
+  const scanService = new ScanService(env.AI, new ScanUsageRepository(db), {
+    model: SCAN_MODEL,
+    maxTokens: SCAN_MAX_TOKENS,
+    perUser: count(env.SCANS_PER_DAY, SCANS_PER_DAY),
+    total: count(env.SCANS_PER_DAY_TOTAL, SCANS_PER_DAY_TOTAL),
+  });
   const scanController = new ScanController(scanService);
   const authController = new AuthController(new AuthService(users));
+  const imageController = new ImageController(LIMITLESS_IMAGES);
 
   return new Router()
     .get("/", () => json({ ok: true, app: "pokemon-sammlung" }))
     .post("/sync", requireUser(users, (request, user) => syncController.sync(request, user)))
     .post("/scan", requireUser(users, (request, user) => scanController.scan(request, user)))
+    .get("/scan/usage", requireUser(users, (request, user) => scanController.usage(user)))
+    // Kartenbilder, die es nur bei Limitless gibt (ohne Schlüssel – <img> schickt keinen mit)
+    .get("/img", (request) => imageController.limitless(request))
     // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden per Antippen oder mit Passwort
     .get("/people", () => authController.people())
     .post("/login", (request) => authController.login(request))

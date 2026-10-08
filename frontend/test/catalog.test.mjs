@@ -24,6 +24,8 @@ const tcgdex = {
   sets: async (lang) => (lang === "en" ? en : de),
   setSeries: async () => serieOf,
   searchByName: async (name, lang) => fixtures[lang][name] || [],
+  setsByCode: async (code) => (code === "BS" ? [{ id: "base1" }] : []),
+  set: async (id) => ({ id, name: "Grundset", cardCount: { official: 102 }, serie: { id: "base" }, cards: [{ id: "base1-10", localId: "10", name: "Mewtu" }, { id: "base1-11", localId: "11", name: "Nidoking" }] }),
 };
 const sets = new SetService(tcgdex, { get: () => null, set: () => true }, "k", 1000, "tcgp");
 await sets.ready;
@@ -37,6 +39,13 @@ assert.equal(charizard[0].setName, "Gym Heroes");
 const evoli = (await catalog.search("Evoli"))[0];
 assert.equal(evoli.img, "https://assets.tcgdex.net/en/sv/svp/174", "kein deutsches Bild → englisches");
 
+// Set-Kürzel + Nummer: „BS 11“, „bs 011“ → genau diese Karte
+for (const q of ["BS 11", "bs 011"]) {
+  const [nido] = await catalog.search(q);
+  assert.deepEqual([nido.id, nido.name, nido.total, nido.setName], ["base1-11", "Nidoking", 102, "Grundset"], `Kürzel-Suche „${q}“`);
+}
+assert.deepEqual(await catalog.search("XYZ 11"), [], "unbekanntes Kürzel → nichts");
+
 // Gespeicherte Karte ohne Bild nachträglich reparieren
 assert.equal(withEnglishImage({ ...evoli, img: null }, "sv").img, evoli.img);
 assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");
@@ -45,6 +54,14 @@ assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");
 assert.equal(nextImage("https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp"), "https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp");
 assert.equal(nextImage("https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp"), "https://images.pokemontcg.io/sm75/1.png");
 assert.equal(nextImage("https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/high.webp"), "https://images.pokemontcg.io/swsh9tg/TG01_hires.png");
-assert.equal(nextImage("https://images.pokemontcg.io/sm75/1.png"), null);
+assert.equal(nextImage("https://assets.tcgdex.net/en/sv/sve/017/low.webp"), "https://images.pokemontcg.io/sve/17.png", "pokemontcg.io ohne führende Null");
+assert.equal(nextImage("https://images.pokemontcg.io/sm75/1.png", "https://b/img"), null);
+// Promo-Sets: erst Limitless über den Durchreicher des Backends, dann pokemontcg.io, dann Platzhalter
+const proxy = "https://b/img";
+assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/175/low.webp", proxy), "https://b/img?set=SVP&n=175&size=SM");
+assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/085/high.webp", proxy), "https://b/img?set=SVP&n=85&size=LG");
+assert.equal(nextImage("https://b/img?set=SVP&n=85&size=LG", proxy), "https://images.pokemontcg.io/svp/85_hires.png", "Limitless hat es nicht → pokemontcg.io");
+assert.equal(nextImage("https://images.pokemontcg.io/svp/85.png", proxy), null);
+assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/175/low.webp"), "https://images.pokemontcg.io/svp/175.png", "ohne Durchreicher direkt pokemontcg.io");
 
 console.log("Katalog ok");

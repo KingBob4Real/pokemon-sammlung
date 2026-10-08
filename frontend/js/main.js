@@ -47,7 +47,7 @@ const legacyImport = new LegacyImportService({ store, collection, lists, fetchJs
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
-const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all" });
+const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all", scanMode: "single", scanLayout: "3x3" });
 
 const app = new App({ store, sets, prices, collection, lists, catalog, sync, scanner, profiles, legacyImport, backup, sorters, updates }, prefs);
 app.start();

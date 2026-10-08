@@ -30,6 +30,11 @@ export class TcgdexClient {
     return this.#get(`/${lang}/cards?localId=${encodeURIComponent(number)}`, 15000);
   }
 
+  // Sets mit diesem Kürzel, wie es auf der Karte steht („MEW“, „ASC“, „BS“) – genau, nicht „enthält“
+  setsByCode(code) {
+    return this.#get(`/en/sets?abbreviation.official=eq:${encodeURIComponent(code)}`);
+  }
+
   // Deutsch, sonst Englisch (Sets, die es nur auf Englisch gibt)
   async set(setId) {
     try {

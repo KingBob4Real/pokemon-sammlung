@@ -10,7 +10,6 @@ export function render(main, ctx) {
   ctx.setTitle("Mehr");
 
   // --- Sync ---
-  const url = h("input", { type: "url", class: "field", value: sync.config.url, placeholder: "https://pokemon-sammlung.….workers.dev", autocomplete: "off", autocapitalize: "off", spellcheck: "false" });
   const key = h("input", { type: "password", class: "field", value: sync.config.key, placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
   const status = h("p", { class: "muted" });
   const keyNote = h("p", { class: "field-note", role: "alert" });
@@ -27,7 +26,7 @@ Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch 
 Weiter?`)) return;
     }
     keyNote.textContent = "";
-    sync.configure(url.value, key.value).then((problem) => {
+    sync.configure(key.value).then((problem) => {
       if (problem) keyNote.textContent = problem;
       else key.value = sync.config.key;
     });
@@ -64,7 +63,6 @@ Weiter?`)) return;
     accountPanel(ctx),
     panel("Sync zwischen Geräten", [
       h("p", {}, "Anmelden geht oben unter „Wer sammelt?“ per Antippen. Hier nur, falls du lieber deinen Sync-Schlüssel nutzt – er gilt immer, auch wenn du dein Passwort vergessen hast."),
-      h("label", { class: "label" }, ["Backend-Adresse", url]),
       h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
       keyNote,
       h("div", { class: "buttons" }, [

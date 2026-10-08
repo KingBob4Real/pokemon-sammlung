@@ -14,6 +14,8 @@ So findest du die Sammlernummer: ganz unten auf der Karte im Format „Nummer/Ge
 bei neuen Karten unten links, bei alten Karten (1999–2003) unten rechts, oft neben einem Seltenheitssymbol (●, ◆, ★).
 Nicht verwechseln mit: Pokédex-Nummer („Nr. 034“, „NO. 34“), KP/HP, Schaden, Größe/Gewicht, Jahreszahlen im Copyright.
 Set-Kürzel (2–4 Großbuchstaben) gibt es nur auf neueren Karten; alte Karten haben keins → null. Nicht raten.
+Nur die Karte lesen, die das Bild (fast) ganz ausfüllt – angeschnittene Ränder von Nachbarkarten ignorieren.
+Ist keine ganze Karte zu sehen (z. B. leeres Fach im Sammelordner), alle Felder null.
 Regeln: Nichts erfinden. Unlesbares als null. Keine Angriffe, KP oder Beschreibungstexte ausgeben.
 Bei Spiegelungen/Holo-Effekten trotzdem die Nummer unten genau lesen.`;
 
@@ -38,36 +40,49 @@ export function toRecognized(answer) {
   };
 }
 
+// Wie viele Scans gehen heute noch? Kleinstes von „pro Person“ und „alle zusammen“.
+export const scansLeft = (used, limits) => Math.max(0, Math.min(limits.perUser - used.mine, limits.total - used.total));
+
+const today = () => new Date().toISOString().slice(0, 10); // Tag in UTC – wie der Gratis-Tarif von Workers AI
+
 export class ScanService {
-  constructor(ai, usage, { model, perUser, total }) {
+  constructor(ai, usage, { model, maxTokens = 100, perUser, total }) {
     this.ai = ai;
     this.usage = usage;
     this.model = model;
+    this.maxTokens = maxTokens;
     this.limits = { perUser, total };
   }
 
-  // → { recognized } | { limited: true } | { unavailable: true }
+  // → Scans, die diese Person heute noch hat
+  async remaining(user) {
+    return scansLeft(await this.usage.today(user.id, today()), this.limits);
+  }
+
+  // → { recognized, remaining } | { limited: true, remaining: 0 } | { unavailable: true, remaining }
   async scan(user, image) {
-    const day = new Date().toISOString().slice(0, 10);
-    const used = await this.usage.today(user.id, day);
-    if (used.mine >= this.limits.perUser || used.total >= this.limits.total) return { limited: true };
+    const day = today();
+    const left = scansLeft(await this.usage.today(user.id, day), this.limits);
+    if (!left) return { limited: true, remaining: 0 };
     await this.usage.add(user.id, day); // vorher zählen: auch ein fehlgeschlagener Versuch kostet Neurons
+    const remaining = left - 1;
     let result;
     try {
       result = await this.ai.run(this.model, {
         messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
-        max_tokens: 200,
+        max_tokens: this.maxTokens,
         temperature: 0,
         chat_template_kwargs: { enable_thinking: false }, // direkt antworten statt erst „nachdenken“ – schneller, günstiger
       });
     } catch (e) {
       console.error(e);
-      return { unavailable: true };
+      return { unavailable: true, remaining };
     }
     const answer = result?.response ?? result?.choices?.[0]?.message?.content;
     const recognized = toRecognized(answer);
-    console.log("scan", user.id, JSON.stringify(recognized)); // nur das Gelesene, nie das Foto – zum Nachsehen in den Workers Logs
+    // nur das Gelesene und der Verbrauch, nie das Foto – zum Nachsehen in den Workers Logs
+    console.log("scan", user.id, JSON.stringify(recognized), "neurons", result?.usage?.neurons ?? "?", "noch", remaining);
     // raw nur, wenn nichts lesbar war – hilft beim Nachsehen, was das Modell geantwortet hat
-    return recognized.name || recognized.number ? { recognized } : { recognized, raw: String(answer ?? "").slice(0, 500) };
+    return recognized.name || recognized.number ? { recognized, remaining } : { recognized, remaining, raw: String(answer ?? "").slice(0, 500) };
   }
 }

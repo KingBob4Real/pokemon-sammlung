@@ -19,7 +19,7 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
   const input = h("input", {
     type: "search",
     class: "field",
-    placeholder: "Karte, Nummer oder Set, z. B. Glurak 199",
+    placeholder: "Karte, Nummer oder Set, z. B. Glurak 199 oder MEW 199",
     "aria-label": "Alle Karten und Sets durchsuchen",
     autocomplete: "off",
     autocapitalize: "off",
@@ -98,7 +98,7 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
         h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn", onclick: () => ((session.results = null), run()) }, "Nochmal versuchen")])
       );
     }
-    if (!r.cards.length) return box.replaceChildren(...(setBlock.length ? setBlock : [emptyState(`Keine Karte gefunden für „${r.query}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer.")]));
+    if (!r.cards.length) return box.replaceChildren(...(setBlock.length ? setBlock : [emptyState(`Keine Karte gefunden für „${r.query}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer – oder Set-Kürzel und Nummer wie auf der Karte („MEW 199“, „BS 11“).")]));
     box.replaceChildren(
       ...setBlock,
       setBlock.length ? h("h2", { class: "section-title" }, "Karten") : "",

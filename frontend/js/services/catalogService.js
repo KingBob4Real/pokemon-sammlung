@@ -1,12 +1,14 @@
 import { numCmp } from "../core/format.js";
 import { setIdOf, toCard } from "../domain/card.js";
 
-// „glurak“, „199“, „199/165“, „#199“ oder „glurak 199“ → { words, number, total }
+// „glurak“, „199“, „199/165“, „#199“, „glurak 199“ oder „MEW 199“ → { words, number, total, code }
+// code: kurzes Wort neben der Nummer könnte ein Set-Kürzel sein („BS 11“, „ASC 017“) – „Mew 151“ ist beides
 export function parseQuery(query) {
   const tokens = String(query).trim().split(/\s+/).filter(Boolean);
   const numberToken = tokens.find((t) => /^#?\d+(\/\d+)?$/.test(t));
   const [number = null, total = null] = numberToken ? numberToken.replace("#", "").split("/").map(Number) : [];
-  return { words: tokens.filter((t) => t !== numberToken).join(" "), number, total };
+  const words = tokens.filter((t) => t !== numberToken).join(" ");
+  return { words, number, total, code: number != null && /^[a-z][a-z0-9]{1,4}$/i.test(words) ? words.toUpperCase() : null };
 }
 
 // Kartenkatalog: alle Karten auf Deutsch und Englisch durchsuchen oder ein Set anzeigen.
@@ -28,20 +30,34 @@ export class CatalogService {
   }
 
   async #search(query) {
-    const { words, number, total } = parseQuery(query);
+    const { words, number, total, code } = parseQuery(query);
     if (!words && number == null) return [];
+    const byCode = code ? this.#byCode(code, number).catch(() => []) : [];
     // Set-Liste und beide Sprachen gleichzeitig laden statt nacheinander
     const find = (lang) => (words ? this.tcgdex.searchByName(words, lang) : this.tcgdex.searchByNumber(number, lang));
     const [de, en] = await Promise.allSettled([find("de"), find("en"), this.sets.ready]);
     if (de.status === "rejected" && en.status === "rejected") throw de.reason;
     const byId = new Map();
     for (const c of [...(de.value || []), ...(en.value || [])]) if (c?.id && !byId.has(c.id)) byId.set(c.id, c);
-    return [...byId.values()]
+    const found = [...byId.values()]
       .filter((c) => c && c.id && c.localId != null && !this.sets.isPocket(setIdOf(c)))
       .filter((c) => number == null || parseInt(c.localId, 10) === number)
       .filter((c) => !total || this.sets.info(setIdOf(c))?.official === total)
       .map((c) => toCard(c, (id) => this.sets.info(id)))
       .sort((a, b) => this.sets.order(b.set) - this.sets.order(a.set) || numCmp(a.num, b.num));
+    // Treffer übers Set-Kürzel zuerst (genau diese Karte), dann die übers Wort als Name
+    const exact = await byCode;
+    return [...exact, ...found.filter((c) => !exact.some((e) => e.id === c.id))];
+  }
+
+  // Karte Nummer n in den Sets mit diesem Kürzel
+  async #byCode(code, number) {
+    const sets = await this.tcgdex.setsByCode(code);
+    const full = await Promise.all(sets.filter((s) => !this.sets.isPocket(s.id)).map((s) => this.tcgdex.set(s.id)));
+    return full.flatMap((data) => {
+      const set = { id: data.id, name: data.name, cardCount: data.cardCount, serie: data.serie };
+      return (data.cards || []).filter((c) => parseInt(c.localId, 10) === number).map((c) => toCard({ ...c, set }, (id) => this.sets.info(id)));
+    });
   }
 
   async setCards(setId) {

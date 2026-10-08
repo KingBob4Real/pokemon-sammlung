@@ -28,7 +28,7 @@ export class SyncService extends EventTarget {
     this.storageKey = storageKey;
     this.batchSize = batchSize;
     this.config = { url: "", key: "", user: "", at: 0, error: "", ...objOr(storage.get(storageKey, {})) };
-    if (!this.config.url) this.config.url = defaultUrl;
+    this.config.url = defaultUrl; // fest – die Adresse ist in der App nicht mehr einstellbar
   }
 
   get enabled() {
@@ -53,9 +53,8 @@ export class SyncService extends EventTarget {
   }
 
   // → null wenn übernommen, sonst der Grund (dann bleibt alles wie es war)
-  async configure(url, key) {
-    const next = { ...this.config, url: url.trim(), key: normalizeKey(key), error: "" };
-    if (!next.url) return "Bitte die Backend-Adresse eintragen.";
+  async configure(key) {
+    const next = { ...this.config, key: normalizeKey(key), error: "" };
     if (!next.key) return "Bitte den Sync-Schlüssel eintragen.";
     if (this.isOtherKey(key)) {
       // Erst prüfen, ob der neue Schlüssel gilt – ein Tippfehler darf das Gerät nicht leeren

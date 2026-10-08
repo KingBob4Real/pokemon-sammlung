@@ -3,7 +3,9 @@
 // in der App ist also nichts davon zu sehen. Mit zweitem Schlüssel wird geprüft, dass die andere Person
 // diese Daten nicht sieht (dabei wird für sie nichts geschrieben). Am Ende ein Scan (zählt 1× zum Tageslimit).
 import assert from "node:assert/strict";
-import { ScanService, toRecognized } from "../src/services/scanService.js";
+import fs from "node:fs";
+import { parseImageRequest } from "../src/validation/imageValidator.js";
+import { ScanService, scansLeft, toRecognized } from "../src/services/scanService.js";
 
 // Antwort des Bild-Modells prüfen (ohne Netz)
 assert.deepEqual(toRecognized('Hier: {"name":"Glurak-ex","number":"#199","total":165,"setCode":"mew","language":"de","confidence":0.9}'), {
@@ -16,8 +18,22 @@ assert.equal(toRecognized("kein JSON").name, null, "Unlesbares wird zu null");
 
 // Tageslimit: pro Person und für alle zusammen – ohne Aufruf der KI
 const limited = (mine, total) => new ScanService({ run: () => assert.fail("KI darf nicht laufen") }, { today: async () => ({ mine, total }) }, { perUser: 2, total: 5 }).scan({ id: "x" }, "");
-assert.deepEqual(await limited(2, 2), { limited: true }, "Limit pro Person greift");
-assert.deepEqual(await limited(0, 5), { limited: true }, "Limit für alle zusammen greift");
+assert.deepEqual(await limited(2, 2), { limited: true, remaining: 0 }, "Limit pro Person greift");
+assert.deepEqual(await limited(0, 5), { limited: true, remaining: 0 }, "Limit für alle zusammen greift");
+assert.equal(scansLeft({ mine: 10, total: 100 }, { perUser: 360, total: 900 }), 350, "übrig: pro Person");
+assert.equal(scansLeft({ mine: 10, total: 895 }, { perUser: 360, total: 900 }), 5, "übrig: Gesamtlimit ist knapper");
+assert.equal(scansLeft({ mine: 400, total: 400 }, { perUser: 360, total: 900 }), 0, "nie negativ");
+// Gratis-Tarif: Live + Dev zusammen bleiben auch im schlimmsten Fall (825 Tokens rein, 100 raus) unter 10.000 Neurons
+const toml = fs.readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
+const totals = [...toml.matchAll(/^SCANS_PER_DAY_TOTAL = "(\d+)"/gm)].map((m) => Number(m[1]));
+const worst = (825 * 9091 + 100 * 27273) / 1e6;
+assert.equal(totals.length, 2, "Gesamtlimit für Live und Dev in wrangler.toml");
+assert.ok((totals[0] + totals[1] + 5) * worst < 10000, `Limits passen in den Gratis-Tarif (${Math.round((totals[0] + totals[1]) * worst)} Neurons)`);
+// Bild-Durchreicher: nur Kürzel, Nummer, Größe
+assert.deepEqual(parseImageRequest("https://x/img?set=SVP&n=175&size=SM"), { set: "SVP", n: "175", size: "SM" });
+assert.equal(parseImageRequest("https://x/img?set=SVP&n=175&size=XL"), null, "unbekannte Größe");
+assert.equal(parseImageRequest("https://x/img?set=../..&n=1&size=SM"), null, "kein Pfad im Kürzel");
+assert.equal(parseImageRequest("https://x/img?set=SVP&n=007&size=SM"), null, "Nummer ohne führende Null");
 
 const [baseArg, key, otherKey] = process.argv.slice(2);
 if (!baseArg || !key) {
@@ -131,11 +147,19 @@ assert.equal((await scan("data:image/jpeg;base64,AAAA", "FALSCH-FALSCH")).status
 assert.equal((await scan(`data:image/jpeg;base64,${"A".repeat(1.6 * 1024 * 1024)}`)).status, 413, "zu großes Foto wird abgewiesen");
 assert.equal((await scan("data:image/gif;base64,AAAA")).status, 400, "falsches Format wird abgewiesen");
 const photo = Buffer.from(await (await fetch("https://assets.tcgdex.net/de/sv/sv03.5/199/low.jpg")).arrayBuffer()).toString("base64");
+const usage = await (await fetch(`${base}/scan/usage`, { headers: { Authorization: `Bearer ${key}` } })).json();
+assert.ok(Number.isInteger(usage.remaining), "GET /scan/usage nennt die übrigen Scans");
 const scanned = await scan(`data:image/jpeg;base64,${photo}`);
 if (scanned.status === 429) console.log("Scan: Tageslimit erreicht – Erkennung nicht geprüft");
 else {
   assert.equal(scanned.status, 200, `Scan klappt (${JSON.stringify(scanned.body)})`);
   assert.equal(scanned.body.recognized.number, "199", "Kartennummer erkannt");
+  assert.equal(scanned.body.remaining, usage.remaining - 1, "Scan zählt einen herunter");
 }
+// Kartenbild über den Durchreicher: mit CORS, fehlendes Bild = 404
+const img = await fetch(`${base}/img?set=SVP&n=175&size=SM`);
+assert.equal(img.status, 200, "SVP 175 kommt über /img");
+assert.equal(img.headers.get("Access-Control-Allow-Origin"), "*", "mit CORS-Header");
+assert.equal((await fetch(`${base}/img?set=SVP&n=9999&size=SM`)).status, 404, "fehlendes Bild → 404");
 
 console.log(`Backend ok: ${base} (Person: ${start.body.user}${otherKey ? ", Trennung zu zweiter Person geprüft" : ""}${scanned.status === 200 ? `, Scan: ${scanned.body.recognized.name} ${scanned.body.recognized.number}/${scanned.body.recognized.total}` : ""})`);

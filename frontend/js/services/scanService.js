@@ -21,10 +21,26 @@ export class ScanService {
     return this.sync.enabled;
   }
 
+  // Wie viele Scans heute noch gehen (null = noch unbekannt). Jeder Scan bringt den neuen Stand mit.
+  remaining = null;
+
+  async usage() {
+    this.remaining = (await this.api.usage(this.sync.config)).remaining;
+    return this.remaining;
+  }
+
   // Foto → { name, number, total, setCode, language, confidence }. Unlesbares Foto: Fehler mit .photo
   async recognize(file) {
     const image = await this.shrinkPhoto(file).catch((e) => Promise.reject(Object.assign(new Error("Foto nicht lesbar"), { photo: true, cause: e })));
-    return (await this.api.scan(this.sync.config, image)).recognized;
+    try {
+      const result = await this.api.scan(this.sync.config, image);
+      // Antworten paralleler Scans kommen durcheinander an → nur nach unten zählen (usage() setzt neu)
+      if (Number.isInteger(result.remaining)) this.remaining = Math.min(this.remaining ?? Infinity, result.remaining);
+      return result.recognized;
+    } catch (e) {
+      if (Number.isInteger(e.body?.remaining)) this.remaining = e.body.remaining; // 429: 0
+      throw e;
+    }
   }
 
   // Erkanntes → { cards: beste zuerst (höchstens 6), sure }.
