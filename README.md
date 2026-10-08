@@ -44,8 +44,10 @@ Erweitern: neue Ansicht → Datei in `ui/views/` und in `ui/app.js` eintragen. N
 
 | Branch | App | Backend + Datenbank |
 | --- | --- | --- |
-| `main` – nur Fertiges, Getestetes | <https://kingbob4real.github.io/pokemon-sammlung/> | `pokemon-sammlung` |
-| `develop` – in Arbeit, zum Testen | <https://kingbob4real.github.io/pokemon-sammlung/dev/> (grauer Kopf, „· DEV“) | `pokemon-sammlung-dev` |
+| `main` – nur Fertiges, Getestetes | <https://pokekiste.app/> | `pokemon-sammlung` |
+| `develop` – in Arbeit, zum Testen | <https://pokekiste.app/dev/> (grauer Kopf, „· DEV“) | `pokemon-sammlung-dev` |
+
+Domain `pokekiste.app` (bei Cloudflare gekauft): DNS bei Cloudflare – `CNAME @` und `CNAME www` → `kingbob4real.github.io`, **nur DNS** (graue Wolke, sonst bekommt GitHub kein Zertifikat); in GitHub unter Settings → Pages als Custom domain eingetragen. Die alte github.io-Adresse leitet automatisch weiter.
 
 Ablauf: auf `develop` arbeiten und pushen → in der Dev-App testen → fertig: `develop` in `main` mergen und pushen → live.
 
