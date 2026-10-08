@@ -6,7 +6,7 @@ import { setPicked, tileCard } from "./cardTile.js";
 /**
  * Mehrfach-Auswahl in Sammlung, Liste und Suche: „Auswählen“ → Karten antippen → Leiste unten mit
  * Anzahl, „Alle“, einem Menü „Hinzufügen …“ (Sammlung, jede Liste, neue Liste – plus eigene Gruppen der Ansicht,
- * z. B. Abteilungen) und eigenen Knöpfen (z. B. „Entfernen“).
+ * z. B. Ordner) und eigenen Knöpfen (z. B. „Entfernen“).
  * Gemerkt in ctx.session.selection = { where, cards: Map(id → Karte) } – in der Suche auch über neue Suchen hinweg.
  *   where – welche Ansicht gerade auswählt („sammlung“, „suche“, „liste:<id>“); woanders hin = Auswahl vorbei
  */

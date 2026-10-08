@@ -182,7 +182,7 @@ export function batchTray(ctx, { onDone }) {
 }
 
 /**
- * Prüfen und speichern: unsichere Karten klären, Zustand/Sprache/Abteilung/Liste für alle, „12 Karten in die Sammlung“.
+ * Prüfen und speichern: unsichere Karten klären, Zustand/Sprache/Ordner/Liste für alle, „12 Karten in die Sammlung“.
  * Gibt die Funktion zum Neuzeichnen zurück (Preise, Fortschritt).
  */
 export function batchReview(body, ctx, { listId, onScanMore }) {
@@ -194,7 +194,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
   // Auswahl bleibt beim Neuzeichnen erhalten (einmal gebaut)
   const cond = h("select", { class: "field" }, CONDITIONS.map((c) => option(c, c, c === "Near Mint")));
   const lang = h("select", { class: "field" }, [option("", "Wie erkannt"), ...LANGUAGES.map((l) => option(l, l))]);
-  const section = h("select", { class: "field" }, [option("", "Keine"), ...collection.sections().map((s) => option(s.id, s.name))]);
+  const section = h("select", { class: "field" }, [option("", "Kein Ordner"), ...collection.sections().map((s) => option(s.id, s.name))]);
   const list = h("select", { class: "field" }, [option("", "Keine"), ...lists.all().map((l) => option(l.id, l.name, l.id === listId))]);
   const title = h("h2");
   const note = h("p", { class: "muted", "aria-live": "polite" });
@@ -225,7 +225,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
         h("h3", {}, "Für alle Karten"),
         h("label", { class: "label" }, ["Zustand", cond]),
         h("label", { class: "label" }, ["Sprache", lang]),
-        h("label", { class: "label" }, ["Abteilung", section]),
+        h("label", { class: "label" }, ["Ordner", section]),
         h("label", { class: "label" }, ["Liste", list]),
         h("p", { class: "muted batch-hint" }, "Zustand und Sprache gelten für Karten, die neu in die Sammlung kommen – bei vorhandenen erhöht sich nur die Anzahl."),
       ]),

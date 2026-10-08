@@ -1,13 +1,14 @@
 // Karten-Scanner: Foto → Workers AI liest Name, Nummer und Set-Kürzel. Das Foto wird nicht gespeichert.
 
-const PROMPT = `Du siehst das Foto einer Pokémon-Sammelkarte (deutsch oder englisch, manchmal japanisch; neue Karten oder alte ab 1999).
-Lies nur, was wirklich auf der Karte steht, und antworte ausschließlich mit diesem JSON, ohne weiteren Text:
+const PROMPT = `Foto einer Pokémon-Sammelkarte (deutsch, englisch oder japanisch; neu oder alt ab 1999).
+Lies nur, was auf der Karte steht, und antworte nur mit diesem JSON:
 {
   "name": "Name des Pokémon oder der Trainerkarte genau wie oben auf der Karte gedruckt, z. B. \\"Glurak-ex\\", \\"Mega-Glurak X-ex\\" oder \\"Nidoking\\"",
   "number": "Sammlernummer VOR dem Schrägstrich, z. B. \\"199\\", \\"023\\", \\"11\\" oder \\"TG05\\"",
   "total": "Zahl NACH dem Schrägstrich, z. B. \\"165\\" oder \\"102\\"; null, wenn es keinen Schrägstrich gibt (Promo)",
   "setCode": "Set-Kürzel direkt neben der Sammlernummer, z. B. \\"MEW\\", \\"PAL\\", \\"SVP\\"; null, wenn keins gedruckt ist",
   "language": "\\"de\\", \\"en\\", \\"ja\\" oder null",
+  "stamp": 25 oder 30, wenn ein rundes Logo „25“/„30“ mit Pikachu zu sehen ist, sonst null,
   "confidence": Zahl von 0 bis 1, wie sicher du dir bei Name UND Sammlernummer bist
 }
 So findest du die Sammlernummer: ganz unten auf der Karte im Format „Nummer/Gesamtzahl“ (z. B. „11/102“) –
@@ -16,7 +17,7 @@ Nicht verwechseln mit: Pokédex-Nummer („Nr. 034“, „NO. 34“), KP/HP, Sch
 Set-Kürzel (2–4 Großbuchstaben) gibt es nur auf neueren Karten; alte Karten haben keins → null. Nicht raten.
 Nur die Karte lesen, die das Bild (fast) ganz ausfüllt – angeschnittene Ränder von Nachbarkarten ignorieren.
 Ist keine ganze Karte zu sehen (z. B. leeres Fach im Sammelordner), alle Felder null.
-Regeln: Nichts erfinden. Unlesbares als null. Keine Angriffe, KP oder Beschreibungstexte ausgeben.
+Nichts erfinden, Unlesbares als null. Keine Angriffe, KP oder Texte ausgeben.
 Bei Spiegelungen/Holo-Effekten trotzdem die Nummer unten genau lesen.`;
 
 const text = (v, re) => (typeof v === "string" && re.test(v.trim()) ? v.trim() : null);
@@ -34,8 +35,9 @@ export function toRecognized(answer) {
     name: text(d?.name, /^[^{}<>]{1,80}$/),
     number: num(d?.number),
     total: text(typeof d?.total === "number" ? String(d.total) : d?.total, /^\d{1,4}$/),
-    setCode: text(d?.setCode, /^[A-Za-z0-9]{2,6}$/)?.toUpperCase() ?? null,
+    setCode: text(typeof d?.setCode === "string" ? d.setCode.replace(/\s+(DE|EN)$/i, "") : null, /^[A-Za-z0-9]{2,6}$/)?.toUpperCase() ?? null, // „MEP DE“ → „MEP“
     language: ["de", "en", "ja"].includes(d?.language) ? d.language : null,
+    stamp: [25, 30].includes(Number(d?.stamp)) ? Number(d.stamp) : null, // Jubiläums-Logo: Nachdruck mit der Nummer des Originals
     confidence: typeof d?.confidence === "number" && d.confidence >= 0 && d.confidence <= 1 ? d.confidence : 0,
   };
 }

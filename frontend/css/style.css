@@ -428,10 +428,10 @@ select.field { padding-right: 8px; }
 
 .prices { margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .prices p { margin: 4px 0; font-size: 13px; }
-.price-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.price-grid div { display: flex; flex-direction: column; }
-.price-grid span { font-size: 11.5px; font-weight: 800; color: var(--muted); }
-.price-grid b { font-family: var(--font-head); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* Wert der Karte: „ab 312,00 €“ und wofür er gilt */
+.price-main { display: flex; flex-direction: column; gap: 2px; }
+.price-main b { font-family: var(--font-head); font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.price-main span { font-size: 12.5px; font-weight: 800; color: var(--muted); }
 .btn.cm { width: 100%; margin-top: 8px; font-size: 14px; background: var(--red); color: #fff; }
 
 .sheet-part { margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
@@ -462,8 +462,6 @@ select.field { padding-right: 8px; }
   font-weight: 600;
 }
 .group-title small { flex: none; font-family: var(--font-body); font-size: 13px; font-weight: 800; color: var(--muted); }
-/* „⋯“ am Kopf einer Abteilung: eingebautes Auswahlmenü (Umbenennen, Löschen) */
-.section-menu { flex: none; width: 40px; height: 36px; padding: 0; border: 0; border-radius: 99px; -webkit-appearance: none; appearance: none; text-align: center; text-align-last: center; font: inherit; font-weight: 800; color: var(--text); background: var(--surface); box-shadow: var(--shadow); cursor: pointer; }
 .buttons + .toolbar, .stats + .buttons { margin-top: 0; }
 .stats + .buttons { margin-bottom: 14px; }
 
@@ -513,13 +511,13 @@ select.field { padding-right: 8px; }
   border: 1px solid rgba(255, 255, 255, 0.14);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
-.action-bar span { flex: 1 1 140px; padding-left: 6px; font-size: 14px; font-weight: 800; }
+.action-bar span { flex: 1 1 100px; padding-left: 6px; font-size: 14px; font-weight: 800; }
 .action-bar .btn { flex: 1 0 auto; min-height: 42px; padding: 8px 14px; font-size: 14px; color: var(--ink); background: #fff; }
 .action-bar .btn.danger { color: #d6336c; }
 /* „Hinzufügen …“ ist ein eingebautes Auswahlmenü, sieht aber aus wie die Knöpfe daneben */
-.action-bar select.btn { -webkit-appearance: none; appearance: none; width: auto; text-align: center; text-align-last: center; }
+.action-bar select.btn { -webkit-appearance: none; appearance: none; flex: 1 1 120px; width: 120px; min-width: 0; text-align: center; text-align-last: center; }
 .action-bar .btn-ghost { color: #fff; background: transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
-main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area-inset-bottom, 0px)); }
+main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 200px + env(safe-area-inset-bottom, 0px)); } /* Leiste im Ordner: bis zu 3 Zeilen */
 
 /* ===== Umsortieren (gedrückt halten und ziehen) ===== */
 /* iPhone: kein Kontextmenü, keine Textauswahl, kein Bild-Ziehen beim langen Drücken */

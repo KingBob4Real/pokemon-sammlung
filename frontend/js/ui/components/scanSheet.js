@@ -241,7 +241,7 @@ function scanFlow(body, ctx, file, listId) {
     head.elements[0].classList.add("small"); // Bild kleiner, damit Angaben und Preise gleich zu sehen sind
     const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
     const paidNote = h("p", { class: "field-note", role: "alert" });
-    const trend = h("button", { type: "button", class: "btn btn-ghost", onclick: () => (paid.value = fmtPriceInput(prices.get(card.id)?.trend)) }, "Trend übernehmen");
+    const takePrice = h("button", { type: "button", class: "btn btn-ghost", onclick: () => (paid.value = fmtPriceInput(prices.value(card.id))) }, "Preis übernehmen"); // Cardmarket „ab“
     const checks = lists.all().map((list) => [list, h("input", { type: "checkbox", checked: list.id === listId || lists.contains(list.id, card.id) })]);
     const add = button("", () => save(), "btn btn-big");
     const label = () => (add.textContent = owned ? `Anzahl erhöhen (${owned} → ${owned + qty})` : qty > 1 ? `${qty}× in die Sammlung` : "In Sammlung");
@@ -250,7 +250,7 @@ function scanFlow(body, ctx, file, listId) {
       qtyOut.textContent = String(qty);
       label();
     };
-    const drawTrend = () => (trend.disabled = !prices.get(card.id)?.trend);
+    const drawTakePrice = () => (takePrice.disabled = prices.value(card.id) == null);
 
     const save = () => {
       const price = parseEuro(paid.value);
@@ -285,7 +285,7 @@ function scanFlow(body, ctx, file, listId) {
         ]),
         h("label", { class: "label" }, ["Zustand", cond]),
         h("label", { class: "label" }, ["Sprache", lang]),
-        h("label", { class: "label" }, ["Kaufpreis pro Stück", h("div", { class: "toolbar tight" }, [paid, trend])]),
+        h("label", { class: "label" }, ["Kaufpreis pro Stück", h("div", { class: "toolbar tight" }, [paid, takePrice])]),
         paidNote,
       ]),
       checks.length ? h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), h("div", { class: "checks" }, checks.map(([list, box]) => h("label", { class: "check-row" }, [box, h("span", {}, list.name)])))]) : null,
@@ -293,8 +293,8 @@ function scanFlow(body, ctx, file, listId) {
       h("div", { class: "scan-bar" }, [add])
     );
     label();
-    drawTrend();
-    redraw = () => (head.drawPrices(), drawTrend());
+    drawTakePrice();
+    redraw = () => (head.drawPrices(), drawTakePrice());
   }
 
   function done(card, total) {

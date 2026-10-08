@@ -1,7 +1,7 @@
 // Test des Karten-Scanners (Zuordnung, Kamera-Ausschnitt): node frontend/test/scan.test.mjs
 import assert from "node:assert/strict";
 import { AutoShutter, centerRect, coverCrop, gridCells } from "../js/core/image.js";
-import { rankMatches, scanQueries } from "../js/domain/scanMatch.js";
+import { matchScore, rankMatches, scanQueries } from "../js/domain/scanMatch.js";
 
 const card = (id, name, num, set, total) => ({ id, name, num, set, setName: set, total, img: null });
 const rec = (r) => ({ name: null, number: null, total: null, setCode: null, language: "de", confidence: 0.9, ...r });
@@ -11,11 +11,45 @@ assert.deepEqual(scanQueries(rec({ name: "Glurak-ex", number: "199", total: "165
 assert.deepEqual(scanQueries(rec({ name: "Simsala-ex", number: "050" })), ["Simsala-ex 50", "50", "Simsala-ex"], "Promo ohne Setgröße, führende Null weg");
 assert.deepEqual(scanQueries(rec({ name: "Glurak", number: "TG05" })), ["Glurak"], "Nummer mit Buchstaben → nur Name");
 assert.deepEqual(scanQueries(rec({})), [], "nichts gelesen → keine Suche");
+assert.deepEqual(scanQueries(rec({ name: "Mega-Dragoran-ex", number: "091", setCode: "MEP" })), ["MEP 91", "Mega-Dragoran-ex 91", "91", "Mega-Dragoran-ex"], "Kürzel + Nummer zuerst: genau die Karte im Set");
+assert.deepEqual(scanQueries(rec({ name: "Palkia LV.X", number: "106", total: "106", setCode: "30C" }))[0], "30C 106/106", "Klassische Sammlung: Kürzel + Nummer des Originals");
+assert.deepEqual(scanQueries(rec({ name: "Palkia", number: "CC12" })), ["Palkia CC12", "CC12", "Palkia"], "„CC12“ zählt als Nummer");
+
+// MEP 091 gibt es bei TCGdex nur auf Englisch – der Katalog zeigt sie mit deutschem Namen
+const dragoran = card("mep-091", "Mega-Dragoran-ex", "091", "mep", null);
+let r = rankMatches([dragoran], rec({ name: "Mega-Dragoran-ex", number: "091", setCode: "MEP" }), () => "MEP");
+assert.deepEqual([r.cards[0], r.sure], [dragoran, true], "Mega-Dragoran-ex MEP 091 direkt");
+
+// Klassische Sammlung: Palkia trägt die Nummer des Originals (106/106) und das Logo „30“ (stamp).
+// Nicht die Palkia aus „30 Jahre“ (30th-020), nicht das Original von 2008 (dp4-106).
+const classic = card("30th-c-022", "Palkia", "022", "30th-c", 30);
+const anniversary = card("30th-020", "Palkia", "020", "30th", 128);
+const original = card("dp4-106", "Palkia LV.X", "106", "dp4", 106);
+const codes = (id) => ({ "30th-c": "30C", "30th": "30C", dp4: "GE" })[id];
+r = rankMatches([anniversary, original, classic], rec({ name: "Palkia LV.X", number: "106", total: "106", stamp: 30 }), codes);
+assert.deepEqual([r.cards[0].id, r.sure], ["30th-c-022", true], "30-Logo + Nummer des Originals → Klassische Sammlung");
+r = rankMatches([original, classic], rec({ name: "Palkia LV.X", number: "106", total: "106" }), codes);
+assert.equal(r.sure, false, "älteres Backend (kein stamp): Original oder Nachdruck → Auswahl statt raten");
+r = rankMatches([classic, original], rec({ name: "Palkia LV.X", number: "106", total: "106", stamp: null }), codes);
+assert.deepEqual([r.cards[0].id, r.sure], ["dp4-106", true], "kein Logo → das Original");
+const glurakBase = card("base1-4", "Glurak", "4", "base1", 102);
+const reprints = [card("30th-c-001", "Glurak", "001", "30th-c", 30), card("cel25cc-CC002", "Glurak", "CC002", "cel25cc", 25)];
+r = rankMatches([...reprints, glurakBase], rec({ name: "Glurak", number: "4", total: "102", stamp: null }));
+assert.deepEqual([r.cards[0].id, r.sure], ["base1-4", true], "Grundset-Glurak bleibt direkt erkannt");
+r = rankMatches([glurakBase, ...reprints], rec({ name: "Glurak", number: "4", total: "102", stamp: 25 }));
+assert.deepEqual([r.cards[0].id, r.sure], ["cel25cc-CC002", true], "Logo „25“ → Celebrations-Nachdruck");
+r = rankMatches([anniversary, classic], rec({ name: "Palkia", number: "CC12", setCode: "30C" }), codes);
+assert.deepEqual([r.cards[0].id, r.sure], ["30th-c-022", true], "„CC12“ (Limitless) → 30th-c-022");
+
+// Zusätze tolerieren, ohne dass „Pikachu“ plötzlich „Pikachu & Zekrom GX“ gleichwertig trifft
+assert.equal(matchScore(card("x-1", "Palkia", "1", "x", null), rec({ name: "Palkia LV.X" })), 4, "„Palkia LV.X“ = „Palkia“");
+assert.equal(matchScore(card("x-2", "Darkrai & Cresselia-LEGENDE", "2", "x", null), rec({ name: "Darkrai & Cresselia" })), 4, "LEGENDE");
+assert.equal(matchScore(card("x-3", "Pikachu & Zekrom GX", "3", "x", null), rec({ name: "Pikachu" })), 2, "Tag-Team nur teilweise");
 
 // Ranking: Nummer + Set-Kürzel entscheiden
 const glurak = card("sv03.5-199", "Glurak-ex", "199", "sv03.5", 165);
 const other = card("sv04-199", "Glurak-ex", "199", "sv04", 182);
-let r = rankMatches([other, glurak], rec({ name: "Glurak-ex", number: "199", total: "165", setCode: "MEW" }), (id) => ({ "sv03.5": "MEW", sv04: "PAR" })[id]);
+r = rankMatches([other, glurak], rec({ name: "Glurak-ex", number: "199", total: "165", setCode: "MEW" }), (id) => ({ "sv03.5": "MEW", sv04: "PAR" })[id]);
 assert.equal(r.cards[0], glurak, "passende Setgröße und Kürzel gewinnen");
 assert.equal(r.sure, true, "eindeutig → direkt bestätigen");
 

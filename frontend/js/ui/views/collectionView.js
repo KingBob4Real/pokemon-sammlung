@@ -6,48 +6,78 @@ import { cardTile, tileCard } from "../components/cardTile.js";
 import { enableReorder } from "../components/reorder.js";
 import { scanButton } from "../components/scanSheet.js";
 import { useSelection } from "../components/selection.js";
-import { emptyState, sortSelect, stat } from "../components/widgets.js";
+import { backLink, emptyState, sortSelect, stat } from "../components/widgets.js";
 
 const SORT_KEYS = ["newest", "order", "set", "pokedex", "value", "name"];
 const GROUPS = [
   ["none", "Ohne Gruppen"],
-  ["section", "Nach Abteilung"],
+  ["section", "Nach Ordner"],
   ["set", "Nach Set"],
   ["list", "Nach Liste"],
 ];
+const NO_FOLDER = "ohne"; // #ordner/ohne = Karten ohne Ordner
+const CONFIRM_FROM = 10; // ab so vielen Karten vor dem Löschen nachfragen
+const NEW_FOLDER = "Name des neuen Ordners, z. B. „Ordner 1“ oder „Tauschkarten“:";
 
-// Ansicht „Sammlung“: Kennzahlen, Karten hinzufügen, filtern, sortieren (auch eigene Reihenfolge per Ziehen),
-// gruppieren nach eigenen Abteilungen, Set oder Liste. „Auswählen“ markiert mehrere Karten zum Einsortieren
-// (Abteilung, Liste) oder Entfernen.
-export function render(main, ctx) {
+// Ansicht „Sammlung“ oder ein Ordner (#ordner/<id>): oben Suchen + „Auswählen“ (wie in der Suche), Kennzahlen; in der
+// Sammlung Karten hinzufügen/scannen und die Ordner-Übersicht. Dann sortieren (auch eigene Reihenfolge per Ziehen),
+// gruppieren (Ordner, Set, Liste). „Auswählen“ → in einen Ordner (auch neu) oder eine Liste, aus dem Ordner nehmen, löschen.
+// Ordner sind Daten der Art „section“ (hießen früher Abteilungen).
+export function render(main, ctx, folderId = "") {
   const { collection, lists, prices, sets, sorters, prefs, session } = ctx;
-  const selection = useSelection(ctx, COLLECTION_TARGET);
-  ctx.setTitle("Sammlung");
-  const sort = sorters[prefs.get("collectionSort")] || sorters.newest;
-  const entries = collection.entries().sort(sort.compare);
+  const folders = collection.sections();
+  const folder = folders.find((f) => f.id === folderId) || null;
+  const inFolder = Boolean(folderId);
+  if (inFolder && !folder && folderId !== NO_FOLDER) {
+    ctx.setTitle("Ordner");
+    main.append(emptyState("Diesen Ordner gibt es nicht mehr."), h("a", { class: "btn", href: "#sammlung" }, "Zur Sammlung"));
+    return {};
+  }
+  const known = new Set(folders.map((f) => f.id));
+  const inThis = (e) => !inFolder || (folder ? e.section === folder.id : !known.has(e.section));
+  const selection = useSelection(ctx, inFolder ? `ordner:${folderId}` : COLLECTION_TARGET);
+  ctx.setTitle(folder ? folder.name : inFolder ? "Ohne Ordner" : "Sammlung");
+  const valueOf = (id) => prices.value(id);
+  const sortKey = sorters[prefs.get("collectionSort")] ? prefs.get("collectionSort") : "newest";
+  const all = collection.entries();
+  const entries = all.filter(inThis).sort(sorters[sortKey].compare);
   const stats = h("div", { class: "stats" });
-  const scan = scanButton(ctx);
-  main.append(stats, h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
+  const scan = inFolder ? null : scanButton(ctx);
+  const filter = h("input", { type: "search", class: "field", placeholder: inFolder ? "Im Ordner suchen …" : "In der Sammlung suchen …", "aria-label": "Karten filtern", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
+
+  if (inFolder) main.append(folderHead(ctx, folder));
+  // „Auswählen“ ganz oben, ohne Scrollen zu sehen – wie in der Suche
+  if (entries.length) main.append(h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]));
+  main.append(stats);
+  if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
+  const overview = inFolder || !all.length ? null : folderOverview(ctx, folders, all, valueOf);
+  if (overview) main.append(...overview.elements);
 
   // Pokédex-Sortierung braucht die Kartendetails – sind sie nachgeladen, einmal neu sortieren
-  let waitingForDex = prefs.get("collectionSort") === "pokedex" && entries.some((e) => !prices.get(e.card.id));
+  let waitingForDex = sortKey === "pokedex" && entries.some((e) => !prices.get(e.card.id));
   const refresh = () => {
-    scan.refresh();
+    scan?.refresh();
+    overview?.refresh();
     if (waitingForDex && entries.every((e) => prices.get(e.card.id))) {
       waitingForDex = false;
       return ctx.render();
     }
-    const s = collection.summary((id) => prices.value(id));
+    const s = collection.summary(valueOf, entries);
+    const notes = [s.unknown && `${s.unknown} ohne Preis`, s.estimated && `${s.estimated} geschätzt`].filter(Boolean);
     stats.replaceChildren(
       stat("Karten", String(s.count), `${s.distinct} verschiedene`),
-      stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket-Trend"),
+      stat("Marktwert", fmtEur(s.worth), notes.length ? `Cardmarket ab · ${notes.join(" · ")}` : "Cardmarket ab · DE/EN · ab EX"),
       stat("Bezahlt", s.paid ? fmtEur(s.paid) : "–", "deine Kaufpreise"),
       stat("Gewinn/Verlust", s.diffCount ? fmtSigned(s.diff) : "–", s.diffCount ? `bei ${plural(s.diffCount, "Karte", "Karten")} mit Kaufpreis` : "Kaufpreise eintragen")
     );
   };
 
   if (!entries.length) {
-    main.append(emptyState("Noch keine Karten in der Sammlung.", "Tippe auf „+ Karten hinzufügen“, such deine Karten oder öffne ein Set und tippe sie an."));
+    main.append(
+      inFolder
+        ? emptyState("Noch keine Karten in diesem Ordner.", "In der Sammlung „Auswählen“ tippen, Karten antippen und „In Ordner …“ wählen.")
+        : emptyState("Noch keine Karten in der Sammlung.", "Tippe auf „+ Karten hinzufügen“, such deine Karten oder öffne ein Set und tippe sie an.")
+    );
     return { refresh };
   }
 
@@ -55,37 +85,28 @@ export function render(main, ctx) {
     prefs.set(name, value);
     ctx.render();
   };
+  const groups = GROUPS.filter(([k]) => !(inFolder && k === "section")); // im Ordner nicht nach Ordner gruppieren
+  const group = groups.some(([k]) => k === prefs.get("collectionGroup")) ? prefs.get("collectionGroup") : "none";
   const groupSelect = h(
     "select",
     { class: "field", "aria-label": "Gruppieren" },
-    GROUPS.map(([k, label]) => h("option", { value: k, selected: k === prefs.get("collectionGroup") }, label))
+    groups.map(([k, label]) => h("option", { value: k, selected: k === group }, label))
   );
   groupSelect.addEventListener("change", () => setPref("collectionGroup")(groupSelect.value));
-  const filter = h("input", { type: "search", class: "field", placeholder: "In der Sammlung suchen …", "aria-label": "In der Sammlung suchen", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
-  const sortKey = sorters[prefs.get("collectionSort")] ? prefs.get("collectionSort") : "newest";
-  const group = prefs.get("collectionGroup");
   const canReorder = sortKey === "order" && !selection.active;
-  main.append(
-    h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]),
-    h("div", { class: "toolbar pair" }, [sortSelect(sorters, SORT_KEYS, sortKey, setPref("collectionSort")), groupSelect])
-  );
-  const newSection = () => {
-    if (collection.createSection(prompt("Name der neuen Abteilung, z. B. „Ordner 1“:") || "")) ctx.render();
-  };
-  if (group === "section") main.append(h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: newSection }, "+ Neue Abteilung")]));
+  main.append(h("div", { class: "toolbar pair" }, [sortSelect(sorters, SORT_KEYS, sortKey, setPref("collectionSort")), groupSelect]));
   if (canReorder) main.append(h("p", { class: "muted pad" }, "Karte gedrückt halten und ziehen zum Verschieben."));
 
-  // Abschnitte bauen: [{ title, hint, entries, section? }]
-  const sections = groupEntries(entries, group, { sets, lists, sections: collection.sections(), valueOf: (id) => prices.value(id) });
+  // Abschnitte bauen: [{ title, hint, entries }]
+  const sections = groupEntries(entries, group, { sets, lists, folders, valueOf });
   const blocks = sections.map((sec) => {
     const grid = h(
       "div",
       { class: "grid" },
       sec.entries.map((e) => selection.mark(cardTile(e.card, { mode: selection.active ? "pick" : "view" }), e.card))
     );
-    const head = sec.title ? h("h2", { class: "group-title" }, [h("span", {}, sec.title), h("small", {}, sec.hint), sec.section ? sectionMenu(ctx, sec.section) : null]) : null;
+    const head = sec.title ? h("h2", { class: "group-title" }, [h("span", {}, sec.title), h("small", {}, sec.hint)]) : null;
     main.append(...[head, grid].filter(Boolean));
-    if (sec.section && !sec.entries.length) main.append(h("p", { class: "muted pad" }, "Noch leer – „Auswählen“, Karten antippen, „Einsortieren …“."));
     return { head, grid, entries: sec.entries };
   });
 
@@ -115,7 +136,7 @@ export function render(main, ctx) {
         b.grid.children[i].hidden = !show;
         any ||= show;
       });
-      if (b.head) b.head.hidden = terms.length > 0 && !any; // leere Abteilungen ohne Suche trotzdem zeigen
+      if (b.head) b.head.hidden = terms.length > 0 && !any;
     }
   };
   filter.addEventListener("input", applyFilter);
@@ -123,66 +144,114 @@ export function render(main, ctx) {
   prices.request(entries.map((e) => e.card.id));
   if (!selection.active) return { refresh, dispose };
 
-  // Auswahl: „Einsortieren …“ (Abteilung oder Liste) und „Entfernen“ (mit „Rückgängig“)
+  // Auswahl: „In Ordner …“ (Ordner, neuer Ordner, Liste), im Ordner „Aus dem Ordner nehmen“, „Löschen“ (mit „Rückgängig“)
   const remove = (chosen, stop) => {
     const cards = chosen();
-    if (!cards.length) return;
+    if (!cards.length) return ctx.notify("Erst Karten antippen.", { type: "info" });
+    if (cards.length >= CONFIRM_FROM && !confirm(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung löschen? Mit „Rückgängig“ holst du sie zurück.`)) return;
     const undo = collection.removeAll(cards);
     stop();
-    ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung entfernt.`, {
+    ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung gelöscht.`, {
       type: "success",
       force: true,
       duration: 8000,
       action: { label: "Rückgängig", run: () => (undo(), ctx.render()) },
     });
   };
-  const inSection = (id, name) => (cards) => (collection.setSection(cards, id), { message: id ? `in „${name}“` : "ohne Abteilung" });
+  const inFolderTo = (id, name) => (cards) => (collection.setSection(cards, id), { message: id ? `in „${name}“` : "ohne Ordner", href: id ? links.folder(id) : null });
   const createAndPut = (cards) => {
-    const name = prompt("Name der neuen Abteilung, z. B. „Ordner 1“:") || "";
+    const name = prompt(NEW_FOLDER) || "";
     const id = collection.createSection(name);
-    return id ? inSection(id, name.trim())(cards) : null;
+    return id ? inFolderTo(id, name.trim())(cards) : null;
   };
+  const takeOut = (chosen, stop) => {
+    const cards = chosen();
+    if (!cards.length) return ctx.notify("Erst Karten antippen.", { type: "info" });
+    collection.setSection(cards, null);
+    stop();
+    ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus dem Ordner genommen – ${cards.length === 1 ? "sie bleibt" : "sie bleiben"} in der Sammlung.`, { type: "success" });
+  };
+  const button = (text, onclick, cls = "btn") => h("button", { type: "button", class: cls, onclick }, text);
   const onPick = selection.bar(main, {
     except: COLLECTION_TARGET,
-    menu: "Einsortieren …",
+    menu: "In Ordner …",
     groups: [
       {
-        label: "Abteilung",
-        items: [...collection.sections().map((s) => [`In „${s.name}“`, inSection(s.id, s.name)]), ["Neue Abteilung …", createAndPut], ["Aus der Abteilung nehmen", inSection(null)]],
+        label: "Ordner",
+        items: [
+          ...folders.filter((f) => f.id !== folderId).map((f) => [`In „${f.name}“`, inFolderTo(f.id, f.name)]),
+          ["+ Neuer Ordner …", createAndPut],
+          ...(inFolder ? [] : [["Aus dem Ordner nehmen", inFolderTo(null)]]),
+        ],
       },
     ],
-    buttons: (chosen, stop) => [h("button", { type: "button", class: "btn danger", onclick: () => remove(chosen, stop) }, "Entfernen")],
+    buttons: (chosen, stop) =>
+      folder
+        ? [button("Aus dem Ordner nehmen", () => takeOut(chosen, stop)), button("Aus der Sammlung löschen", () => remove(chosen, stop), "btn danger")]
+        : [button("Entfernen", () => remove(chosen, stop), "btn danger")],
   });
-  return { refresh, onPick };
+  return { refresh, onPick, dispose };
 }
 
-// Kopf einer Abteilung: kleines Menü „⋯“ mit Umbenennen und Löschen
-function sectionMenu(ctx, section) {
+// Kopf eines Ordners: zurück zur Sammlung, Umbenennen, Löschen (die Karten bleiben in der Sammlung, nur ohne Ordner)
+function folderHead(ctx, folder) {
   const { collection } = ctx;
-  const select = h("select", { class: "section-menu", "aria-label": `Abteilung „${section.name}“ bearbeiten` }, [
-    h("option", { value: "" }, "⋯"),
-    h("option", { value: "rename" }, "Umbenennen"),
-    h("option", { value: "remove" }, "Löschen"),
+  const rename = () => {
+    const name = prompt("Neuer Name des Ordners:", folder.name);
+    if (!name || !name.trim()) return;
+    collection.renameSection(folder.id, name);
+    ctx.render();
+  };
+  const remove = () => {
+    if (!confirm(`Ordner „${folder.name}“ löschen? Die Karten bleiben in der Sammlung, nur ohne Ordner.`)) return;
+    collection.removeSection(folder.id);
+    location.hash = "#sammlung";
+  };
+  return h("div", { class: "list-head" }, [
+    backLink("#sammlung", "Sammlung"),
+    folder
+      ? h("div", { class: "actions" }, [
+          h("button", { type: "button", class: "btn btn-ghost", onclick: rename }, "Umbenennen"),
+          h("button", { type: "button", class: "btn btn-ghost danger", onclick: remove }, "Löschen"),
+        ])
+      : "",
   ]);
-  select.addEventListener("change", () => {
-    const action = select.value;
-    select.value = "";
-    if (action === "rename") {
-      const name = prompt("Neuer Name der Abteilung:", section.name);
-      if (name && name.trim()) collection.renameSection(section.id, name);
-    }
-    if (action === "remove" && confirm(`Abteilung „${section.name}“ löschen? Die Karten bleiben in der Sammlung, nur ohne Abteilung.`)) collection.removeSection(section.id);
-    if (action) ctx.render();
-  });
-  return select;
 }
 
-function groupEntries(entries, group, { sets, lists, sections, valueOf }) {
-  const hint = (list) => {
-    const count = list.reduce((n, e) => n + e.qty, 0);
-    const worth = list.reduce((sum, e) => sum + (valueOf(e.card.id) ?? 0) * e.qty, 0);
-    return `${plural(count, "Karte", "Karten")}${worth ? ` · ${fmtEur(worth)}` : ""}`;
+// Übersicht der Ordner in der Sammlung: Name, Kartenzahl, Wert; „Ohne Ordner“; „+ Neuer Ordner“. → { elements, refresh }
+function folderOverview(ctx, folders, all, valueOf) {
+  const { collection } = ctx;
+  const known = new Set(folders.map((f) => f.id));
+  const rows = [
+    ...folders.map((f) => [links.folder(f.id), f.name, all.filter((e) => e.section === f.id)]),
+    ...(folders.length ? [[links.folder(NO_FOLDER), "Ohne Ordner", all.filter((e) => !known.has(e.section))]] : []),
+  ].map(([href, name, own]) => {
+    const hint = h("small");
+    return { own, hint, el: h("a", { class: "row set-row", href }, [h("b", {}, name), hint]) };
+  });
+  const create = () => {
+    const id = collection.createSection(prompt(NEW_FOLDER) || "");
+    if (id) location.hash = links.folder(id);
   };
+  return {
+    elements: [
+      h("h2", { class: "section-title" }, "Ordner"),
+      rows.length ? h("div", { class: "rows" }, rows.map((r) => r.el)) : h("p", { class: "muted pad" }, "Sortiere Karten in Ordner, z. B. „Ordner 1“ oder „Tauschkarten“."),
+      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: create }, "+ Neuer Ordner")]),
+    ],
+    refresh: () => rows.forEach((r) => (r.hint.textContent = r.own.length ? groupHint(r.own, valueOf) : "leer")),
+  };
+}
+
+// „12 Karten · 34,50 €“
+function groupHint(list, valueOf) {
+  const count = list.reduce((n, e) => n + e.qty, 0);
+  const worth = list.reduce((sum, e) => sum + (valueOf(e.card.id) ?? 0) * e.qty, 0);
+  return `${plural(count, "Karte", "Karten")}${worth ? ` · ${fmtEur(worth)}` : ""}`;
+}
+
+function groupEntries(entries, group, { sets, lists, folders, valueOf }) {
+  const hint = (list) => groupHint(list, valueOf);
   if (group === "set") {
     const bySet = new Map();
     for (const e of entries) {
@@ -194,15 +263,12 @@ function groupEntries(entries, group, { sets, lists, sections, valueOf }) {
       .map(([, list]) => ({ title: list[0].card.setName, hint: hint(list), entries: list }));
   }
   if (group === "section") {
-    // Alle Abteilungen (auch leere), dann was in keiner liegt
-    const known = new Set(sections.map((s) => s.id));
-    const out = sections.map((s) => {
-      const own = entries.filter((e) => e.section === s.id);
-      return { title: s.name, hint: own.length ? hint(own) : "leer", entries: own, section: s };
-    });
+    // Ordner mit Karten, dann was in keinem liegt
+    const known = new Set(folders.map((f) => f.id));
+    const out = folders.map((f) => ({ title: f.name, entries: entries.filter((e) => e.section === f.id) })).filter((s) => s.entries.length);
     const rest = entries.filter((e) => !known.has(e.section));
-    if (rest.length) out.push({ title: "Ohne Abteilung", hint: hint(rest), entries: rest });
-    return out;
+    if (rest.length) out.push({ title: "Ohne Ordner", entries: rest });
+    return out.map((s) => ({ ...s, hint: hint(s.entries) }));
   }
   if (group === "list") {
     const sections = [];

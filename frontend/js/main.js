@@ -36,7 +36,7 @@ const profiles = new ProfileService(storage, PROFILES_KEY, storageKeys, new Acco
 const STORAGE_KEYS = storageKeys(profiles.slot);
 const store = new EntityStore(storage, STORAGE_KEYS);
 const sets = new SetService(tcgdex, storage, STORAGE_KEYS.sets, SETS_TTL_MS, POCKET_SERIES);
-const prices = new PriceService(tcgdex, storage, STORAGE_KEYS.prices, PRICE_TTL_MS);
+const prices = new PriceService(tcgdex, storage, STORAGE_KEYS.prices, PRICE_TTL_MS, (id) => collection.cmLow(id)); // selbst eingetragenes „ab“
 const collection = new CollectionService(store);
 const lists = new ListService(store);
 const catalog = new CatalogService(tcgdex, sets);

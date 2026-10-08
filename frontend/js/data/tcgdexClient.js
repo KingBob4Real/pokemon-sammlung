@@ -30,13 +30,19 @@ export class TcgdexClient {
     return this.#get(`/${lang}/cards?localId=${encodeURIComponent(number)}`, 15000);
   }
 
+  // Alle Karten eines Pokémon (Pokédex-Nummer) – Brücke vom deutschen Namen zu Karten, die es nur auf Englisch gibt
+  searchByDex(dexId, lang) {
+    return this.#get(`/${lang}/cards?dexId=eq:${encodeURIComponent(dexId)}`, 15000);
+  }
+
   // Sets mit diesem Kürzel, wie es auf der Karte steht („MEW“, „ASC“, „BS“) – genau, nicht „enthält“
   setsByCode(code) {
     return this.#get(`/en/sets?abbreviation.official=eq:${encodeURIComponent(code)}`);
   }
 
-  // Deutsch, sonst Englisch (Sets, die es nur auf Englisch gibt)
-  async set(setId) {
+  // Deutsch, sonst Englisch (Sets, die es nur auf Englisch gibt); mit lang genau diese Sprache
+  async set(setId, lang = null) {
+    if (lang) return this.#get(`/${lang}/sets/${encodeURIComponent(setId)}`, 15000);
     try {
       return await this.#get(`/de/sets/${encodeURIComponent(setId)}`, 15000);
     } catch {
@@ -44,8 +50,9 @@ export class TcgdexClient {
     }
   }
 
-  // Deutsche Daten, sonst englische (manche Karten gibt es auf Deutsch nicht vollständig)
-  async card(cardId) {
+  // Deutsche Daten, sonst englische (manche Karten gibt es auf Deutsch nicht vollständig); mit lang genau diese Sprache
+  async card(cardId, lang = null) {
+    if (lang) return this.#get(`/${lang}/cards/${encodeURIComponent(cardId)}`);
     try {
       return await this.#get(`/de/cards/${encodeURIComponent(cardId)}`);
     } catch {

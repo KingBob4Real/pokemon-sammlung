@@ -21,7 +21,7 @@ const isCard = (c) =>
 
 const DATA_RULES = {
   collection: (d, id) =>
-    int(d.qty) && d.qty >= 0 && d.qty <= 9999 && optStr(d.cond, 40) && optStr(d.lang, 40) && optAmount(d.paid) && int(d.added) && optStr(d.section, 100) && optPosition(d.position) && isCard(d.card) && d.card.id === id,
+    int(d.qty) && d.qty >= 0 && d.qty <= 9999 && optStr(d.cond, 40) && optStr(d.lang, 40) && optAmount(d.paid) && int(d.added) && optStr(d.section, 100) && optPosition(d.position) && optAmount(d.cmLow) && (d.cmLowAt == null || int(d.cmLowAt)) && isCard(d.card) && d.card.id === id,
   list: (d) => str(d.name, 80) && d.name.trim() !== "" && int(d.created) && optPosition(d.position),
   section: (d) => str(d.name, 80) && d.name.trim() !== "" && int(d.created) && optPosition(d.position),
   listItem: (d, id) => str(d.list, 100) && isCard(d.card) && int(d.added) && optPosition(d.position) && id === `${d.list}:${d.card.id}`,

@@ -45,19 +45,21 @@ export class ScanService {
 
   // Erkanntes → { cards: beste zuerst (höchstens 6), sure }.
   // Sucht weiter, bis ein Treffer eindeutig ist – eine falsch gelesene Nummer findet sonst nur fremde Karten.
+  // Kürzel + Nummer kommt zuerst (genau die Karte im Set) – dafür die Kürzel der besten Treffer schon nach jeder Suche laden.
   async match(rec) {
     const byId = new Map();
-    for (const query of scanQueries(rec)) {
-      for (const card of await this.catalog.search(query)) byId.set(card.id, card);
-      if (rankMatches([...byId.values()], rec).sure) break;
-    }
-    const found = [...byId.values()];
     const codes = new Map();
-    if (rec.setCode && found.length > 1) {
-      const setIds = [...new Set(rankMatches(found, rec).cards.map((c) => c.set))].slice(0, CODE_LOOKUPS);
-      await Promise.all(setIds.map(async (id) => codes.set(id, await this.sets.abbreviation(id))));
+    let result = { cards: [], sure: false };
+    for (const query of scanQueries(rec)) {
+      for (const card of await this.catalog.search(query)) if (!byId.has(card.id)) byId.set(card.id, card);
+      const found = [...byId.values()];
+      if (rec.setCode) {
+        const setIds = [...new Set(rankMatches(found, rec).cards.map((c) => c.set))].slice(0, CODE_LOOKUPS).filter((id) => !codes.has(id));
+        await Promise.all(setIds.map(async (id) => codes.set(id, await this.sets.abbreviation(id))));
+      }
+      result = rankMatches(found, rec, (id) => codes.get(id));
+      if (result.sure) break;
     }
-    const { cards, sure } = rankMatches(found, rec, (id) => codes.get(id));
-    return { cards: cards.slice(0, MAX_CHOICES), sure };
+    return { cards: result.cards.slice(0, MAX_CHOICES), sure: result.sure };
   }
 }

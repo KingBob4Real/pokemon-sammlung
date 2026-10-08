@@ -19,7 +19,7 @@ import * as searchView from "./views/searchView.js";
 import * as setView from "./views/setView.js";
 
 // Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
-const VIEWS = { sammlung: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
+const VIEWS = { sammlung: collectionView, ordner: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", offline: "Offline", busy: "Sync …", error: "Sync-Problem", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
 const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
@@ -201,7 +201,7 @@ export class App {
   afterChange(structural) {
     this.refresh();
     const { view } = currentRoute();
-    const filtered = view === "sammlung" || (view === "liste" && this.ctx.prefs.get("listFilter") !== "all");
+    const filtered = view === "sammlung" || view === "ordner" || (view === "liste" && this.ctx.prefs.get("listFilter") !== "all");
     if (filtered || (structural && (view === "liste" || view === "listen"))) {
       clearTimeout(this.#rerenderTimer);
       this.#rerenderTimer = setTimeout(() => this.render(), RERENDER_DELAY_MS);

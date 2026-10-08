@@ -1,4 +1,4 @@
-// Test „aus der Sammlung entfernen“ mit „Rückgängig“: node frontend/test/collection.test.mjs
+// Test der Sammlung (entfernen mit „Rückgängig“, Ordner, eigener Preis, Reihenfolge): node frontend/test/collection.test.mjs
 import assert from "node:assert/strict";
 
 globalThis.location ??= { pathname: "/" }; // config.js schaut auf die Adresse (Live oder Dev)
@@ -24,17 +24,40 @@ undo();
 assert.deepEqual(collection.entry("a"), before, "Rückgängig: genau wie vorher – Anzahl, Zustand, Kaufpreis, hinzugefügt am");
 assert.equal(collection.entries().length, 3);
 
-// Abteilungen: anlegen, Karten hineinlegen, löschen → Karten bleiben, nur ohne Abteilung
+// Ordner (Art „section“): anlegen, Karten hineinlegen und herausnehmen, löschen → Karten bleiben, nur ohne Ordner
 const ordner = collection.createSection("  Ordner 1 ");
 assert.deepEqual(collection.sections().map((x) => x.name), ["Ordner 1"], "Name ohne Leerzeichen drumherum");
-assert.equal(collection.createSection("   "), null, "leerer Name → keine Abteilung");
-collection.setSection([a, b], ordner);
-assert.deepEqual(collection.entries().filter((e) => e.section === ordner).map((e) => e.card.id), ["a", "b"]);
+assert.equal(collection.createSection("   "), null, "leerer Name → kein Ordner");
+collection.setSection([a, b, c], ordner);
+const inOrdner = () => collection.entries().filter((e) => e.section === ordner).map((e) => e.card.id);
+assert.deepEqual(inOrdner(), ["a", "b", "c"]);
+collection.setSection([c], null);
+assert.deepEqual([inOrdner(), collection.has("c")], [["a", "b"], true], "aus dem Ordner genommen – bleibt in der Sammlung");
 collection.setQuantity(a, 3);
-assert.equal(collection.entry("a").section, ordner, "Anzahl ändern lässt die Abteilung in Ruhe");
+assert.equal(collection.entry("a").section, ordner, "Anzahl ändern lässt den Ordner in Ruhe");
+
+// Mehrere aus einem Ordner löschen und rückgängig machen: Ordner-Zuordnung kommt mit zurück
+const undoFolder = collection.removeAll([a, b]);
+assert.deepEqual(inOrdner(), [], "gelöscht");
+undoFolder();
+assert.deepEqual(inOrdner(), ["a", "b"], "Rückgängig: wieder im Ordner");
+const tausch = collection.createSection("Tauschkarten");
+collection.setSection([b], tausch);
+assert.deepEqual([inOrdner(), collection.entry("b").section], [["a"], tausch], "in einen anderen Ordner verschoben");
 collection.removeSection(ordner);
-assert.equal(collection.sections().length, 0);
-assert.deepEqual([collection.entry("a").section, collection.entries().length], [null, 3], "Karten bleiben, nur ohne Abteilung");
+assert.deepEqual(collection.sections().map((x) => x.name), ["Tauschkarten"]);
+assert.deepEqual([collection.entry("a").section, collection.entries().length], [null, 3], "Ordner gelöscht: Karten bleiben, nur ohne Ordner");
+collection.removeSection(tausch);
+
+// Selbst eingetragener Cardmarket-Preis „ab“: zählt statt der Näherung, auch für Karten außerhalb der Sammlung
+const d = card("d");
+collection.setCmLow(a, 39);
+collection.setCmLow(d, 5); // nur in einer Liste, nicht in der Sammlung
+assert.deepEqual([collection.cmLow("a").value, collection.cmLow("d").value, collection.has("d")], [39, 5, false], "Preis gemerkt, d bleibt außerhalb der Sammlung");
+const s = collection.summary((id) => ({ a: 39, b: 2 })[id] ?? null);
+assert.deepEqual([s.worth, s.unknown, s.estimated], [39 * 3 + 2, 1, 1], "Gesamtwert, c ohne Preis, b nur geschätzt");
+collection.setCmLow(a, null);
+assert.equal(collection.cmLow("a"), null, "leer = wieder die Näherung");
 
 // Eigene Reihenfolge: verschieben und neu durchnummerieren
 const { orderOf } = await import("../js/domain/sorting.js");

@@ -4,10 +4,12 @@ import { orderOf } from "../domain/sorting.js";
 const cleanName = (name) => String(name ?? "").trim().slice(0, 80);
 
 /**
- * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis, dazu Abteilung und eigene Position.
+ * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis, dazu Ordner, eigene Position und selbst eingetragener
+ * Cardmarket-Preis „ab“ (cmLow, cmLowAt).
  * Anzahl 0 = nicht vorhanden. Zustand & Kaufpreis bleiben dabei erhalten,
  * versehentlich entfernt ist also nichts verloren.
- * Abteilungen (Art „section“) sind eigene Fächer in der Sammlung, z. B. „Ordner 1“ – eine Karte liegt in höchstens einer.
+ * Ordner (Art „section“ – hießen früher Abteilungen, Daten unverändert) sind eigene Fächer der Sammlung, z. B. „Ordner 1“,
+ * „Tauschkarten“ – eine Karte liegt in höchstens einem.
  */
 export class CollectionService {
   constructor(store) {
@@ -86,7 +88,21 @@ export class CollectionService {
     this.store.batch(() => orderedCardIds.forEach((id, i) => this.move(id, (i + 1) * 1000)));
   }
 
-  // --- Abteilungen ---
+  // Selbst eingetragener Cardmarket-Preis „ab“ (DE/EN, ab EX) → { value, at } oder null
+  cmLow(cardId) {
+    const e = this.entry(cardId);
+    return positive(e?.cmLow) ? { value: e.cmLow, at: e.cmLowAt } : null;
+  }
+
+  // null = wieder die Näherung. Geht auch für Karten, die (noch) nicht in der Sammlung sind (Anzahl 0, z. B. aus Listen)
+  setCmLow(card, value) {
+    this.store.batch(() => {
+      if (!this.entry(card.id)) this.setQuantity(card, 0);
+      this.update(card.id, { cmLow: positive(value), cmLowAt: positive(value) ? Date.now() : null });
+    });
+  }
+
+  // --- Ordner (Art „section“) ---
   sections() {
     return this.store
       .all("section")
@@ -108,7 +124,7 @@ export class CollectionService {
     if (section && n) this.store.put("section", id, { ...section, name: n });
   }
 
-  // Abteilung löschen: die Karten bleiben in der Sammlung, nur ohne Abteilung
+  // Ordner löschen: die Karten bleiben in der Sammlung, nur ohne Ordner
   removeSection(id) {
     this.store.batch(() => {
       for (const { id: cardId, data } of this.store.all("collection")) if (data.section === id) this.store.put("collection", cardId, { ...data, section: null });
@@ -116,7 +132,7 @@ export class CollectionService {
     });
   }
 
-  // Karten in eine Abteilung legen (null = aus der Abteilung nehmen)
+  // Karten in einen Ordner legen (null = aus dem Ordner nehmen)
   setSection(cards, sectionId) {
     this.store.batch(() => {
       for (const card of cards) {
@@ -126,16 +142,18 @@ export class CollectionService {
     });
   }
 
-  // Kennzahlen für die Übersicht; valueOf(cardId) → Marktwert oder null
-  summary(valueOf) {
-    const s = { count: 0, distinct: 0, worth: 0, unknown: 0, paid: 0, diff: 0, diffCount: 0 };
-    for (const e of this.entries()) {
+  // Kennzahlen für die Übersicht (oder einen Ordner); valueOf(cardId) → Marktwert oder null.
+  // estimated: Karten, deren Wert nur die Näherung ist (kein selbst eingetragenes „ab“)
+  summary(valueOf, entries = this.entries()) {
+    const s = { count: 0, distinct: 0, worth: 0, unknown: 0, estimated: 0, paid: 0, diff: 0, diffCount: 0 };
+    for (const e of entries) {
       const value = valueOf(e.card.id);
       const paid = positive(e.paid);
       s.count += e.qty;
       s.distinct++;
       if (value == null) s.unknown++;
       else s.worth += value * e.qty;
+      if (value != null && !positive(e.cmLow)) s.estimated++;
       if (paid != null) {
         s.paid += paid * e.qty;
         if (value != null) {

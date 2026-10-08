@@ -46,6 +46,77 @@ for (const q of ["BS 11", "bs 011"]) {
 }
 assert.deepEqual(await catalog.search("XYZ 11"), [], "unbekanntes Kürzel → nichts");
 
+// Karten, die TCGdex nur auf Englisch hat (MEP 091), und Nachdrucke der Klassischen Sammlung (Nummer des Originals)
+{
+  const set = (id, name, official, serie) => ({ id, name, cardCount: { total: official, official } , serie: { id: serie } });
+  const enSets = [set("base1", "Base Set", 102, "base"), set("dp4", "Great Encounters", 106, "dp"), set("30th", "30th Celebration", 128, "me"), set("30th-c", "30th Classic Collection", 30, "me"), set("mep", "MEP Black Star Promos", 0, "me")];
+  const deSets = [set("base1", "Grundset", 102, "base"), set("30th", "30 Jahre", 128, "me"), set("30th-c", "30 Jahre: Klassische Sammlung", 30, "me"), set("mep", "MEP Black Star Promos", 0, "me")];
+  const c = (id, name) => ({ id, localId: id.slice(id.lastIndexOf("-") + 1), name });
+  const setData = {
+    de: {
+      mep: [c("mep-090", "Wingull")], // 091 fehlt auf Deutsch
+      "30th-c": [c("30th-c-001", "Glurak"), c("30th-c-022", "Palkia")],
+      "30th": [c("30th-020", "Palkia"), c("30th-106", "Endivie")],
+    },
+    en: {
+      mep: [c("mep-090", "Wingull"), c("mep-091", "Mega Dragonite ex"), c("mep-097", "Articuno")],
+      "30th-c": [c("30th-c-001", "Charizard"), c("30th-c-022", "Palkia")],
+      "30th": [c("30th-020", "Palkia"), c("30th-106", "Chikorita")],
+    },
+  };
+  const byName = {
+    de: { Dragoran: [c("sv03.5-149", "Dragoran"), c("sv03.5-201", "Dragoran-ex")], Palkia: [c("30th-c-022", "Palkia"), c("30th-020", "Palkia")] },
+    en: { "Palkia LV.X": [c("dp4-106", "Palkia LV.X")] },
+  };
+  const dex = { de: { 149: [c("sv03.5-149", "Dragoran"), c("sv03.5-201", "Dragoran-ex")], 144: [c("base1-2", "Arktos")] }, en: { 149: [c("sv03.5-149", "Dragonite"), c("mep-091", "Mega Dragonite ex")], 144: [c("mep-097", "Articuno")] } };
+  const dexOf = { "sv03.5-149": [149], "mep-091": [149], "mep-097": [144] };
+  const calls = [];
+  const api = {
+    sets: async (lang) => (lang === "en" ? enSets : deSets),
+    setSeries: async () => ({ base1: "base", dp4: "dp", "30th": "me", "30th-c": "me", mep: "me" }),
+    searchByName: async (name, lang) => byName[lang][name] || [],
+    searchByNumber: async (n, lang) => (lang === "en" ? [c("dp4-106", "Palkia LV.X"), c("30th-106", "Chikorita")] : []).filter((x) => x.localId.includes(n)),
+    searchByDex: async (d, lang) => (calls.push(`dex ${lang} ${d}`), dex[lang][d] || []),
+    setsByCode: async (code) => ({ MEP: [{ id: "mep" }], "30C": [{ id: "30th-c" }, { id: "30th" }] })[code] || [],
+    set: async (id, lang) => {
+      const data = setData[lang ?? "de"][id];
+      if (!data) throw Object.assign(new Error("404"), { status: 404 });
+      const info = (lang === "en" ? enSets : deSets).find((s) => s.id === id);
+      return { ...info, abbreviation: { official: { mep: "MEP", "30th-c": "30C", "30th": "30C" }[id] }, cards: data };
+    },
+    card: async (id, lang) => (calls.push(`card ${lang} ${id}`), { id, dexId: dexOf[id] }),
+  };
+  const sets = new SetService(api, { get: () => null, set: () => true }, "k", 1000, "tcgp");
+  await sets.ready;
+  const catalog = new CatalogService(api, sets);
+
+  const dragoran = await catalog.search("Dragoran");
+  const mega = dragoran.find((x) => x.id === "mep-091");
+  assert.equal(mega?.name, "Mega-Dragoran-ex", "„Dragoran“ findet die nur-englische MEP 091 – mit deutschem Namen");
+  assert.ok(dragoran.some((x) => x.id === "sv03.5-149" && x.name === "Dragoran"), "deutsche Karten bleiben deutsch");
+  const [mep91, ...restMep] = await catalog.search("MEP 91");
+  assert.deepEqual([mep91.id, mep91.name, mep91.setName, restMep.length], ["mep-091", "Mega-Dragoran-ex", "MEP Black Star Promos", 0], "„MEP 91“: genau die Karte, auch wenn TCGdex sie nur auf Englisch hat");
+  assert.deepEqual((await catalog.search("MEP 97")).map((x) => x.name), ["Arktos"], "Arktos (MEP 097) mit deutschem Namen");
+  for (const q of ["CC12", "30C CC12", "cc12"]) assert.deepEqual((await catalog.search(q)).map((x) => x.id), ["30th-c-022"], `„${q}“ → genau Palkia der Klassischen Sammlung`);
+  const [palkia] = await catalog.search("30C 106/106");
+  assert.deepEqual([palkia.id, (await catalog.search("30C 106/106")).length], ["30th-c-022", 1], "„30C 106/106“: Nummer des Originals, nicht 30th-106 (128er-Set)");
+  assert.ok((await catalog.search("106/106")).some((x) => x.id === "30th-c-022"), "Nummer des Originals findet den Nachdruck");
+  assert.ok((await catalog.search("Glurak 4/102")).some((x) => x.id === "30th-c-001"), "Name + Nummer des Originals");
+
+  // Scanner mit Katalog: direkt die richtige Karte
+  const { ScanService } = await import("../js/services/scanService.js");
+  const scanner = new ScanService(null, { enabled: true }, catalog, sets, null);
+  const scan = (r) => scanner.match({ name: null, number: null, total: null, setCode: null, language: "de", confidence: 0.95, ...r });
+  let m = await scan({ name: "Mega-Dragoran-ex", number: "091", setCode: "MEP" });
+  assert.deepEqual([m.cards[0].id, m.sure], ["mep-091", true], "Scan Mega-Dragoran-ex MEP 091 → direkt");
+  m = await scan({ name: "Mega Dragonite ex", number: "091", setCode: "MEP", language: "en" });
+  assert.deepEqual([m.cards[0].id, m.sure], ["mep-091", true], "englische Karte gescannt → dieselbe");
+  m = await scan({ name: "Palkia LV.X", number: "106", total: "106", stamp: 30, language: "en" });
+  assert.deepEqual([m.cards[0].id, m.sure], ["30th-c-022", true], "Scan Palkia (Klassische Sammlung, 30-Logo) → 30th-c-022");
+  m = await scan({ name: "Palkia LV.X", number: "106", total: "106", language: "en" });
+  assert.deepEqual([m.cards.slice(0, 2).map((x) => x.id).sort(), m.sure], [["30th-c-022", "dp4-106"], false], "ohne Logo: Auswahl Nachdruck/Original");
+}
+
 // Gespeicherte Karte ohne Bild nachträglich reparieren
 assert.equal(withEnglishImage({ ...evoli, img: null }, "sv").img, evoli.img);
 assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");

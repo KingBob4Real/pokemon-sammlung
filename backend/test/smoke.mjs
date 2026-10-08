@@ -9,11 +9,14 @@ import { ScanService, scansLeft, toRecognized } from "../src/services/scanServic
 
 // Antwort des Bild-Modells prüfen (ohne Netz)
 assert.deepEqual(toRecognized('Hier: {"name":"Glurak-ex","number":"#199","total":165,"setCode":"mew","language":"de","confidence":0.9}'), {
-  name: "Glurak-ex", number: "199", total: "165", setCode: "MEW", language: "de", confidence: 0.9,
+  name: "Glurak-ex", number: "199", total: "165", setCode: "MEW", language: "de", stamp: null, confidence: 0.9,
 });
 assert.deepEqual(toRecognized('{"name":"<b>","number":"199/165","total":null,"language":"fr","confidence":7}'), {
-  name: null, number: null, total: null, setCode: null, language: null, confidence: 0,
+  name: null, number: null, total: null, setCode: null, language: null, stamp: null, confidence: 0,
 });
+const palkia = toRecognized('{"name":"Palkia LV.X","number":"106","total":"106","setCode":null,"language":"en","stamp":30,"confidence":1}');
+assert.equal(palkia.stamp, 30, "30-Logo: Klassische Sammlung");
+assert.equal(toRecognized('{"name":"Arktos","number":"097","setCode":"MEP DE","confidence":1}').setCode, "MEP", "Sprachkürzel neben dem Set-Kürzel fällt weg");
 assert.equal(toRecognized("kein JSON").name, null, "Unlesbares wird zu null");
 
 // Tageslimit: pro Person und für alle zusammen – ohne Aufruf der KI
