@@ -21,29 +21,44 @@ export function toCard(c, setInfo) {
   };
 }
 
-// pokemontcg.io führt manche Sets unter anderem Namen
-const PTCGIO_SETS = { "sm7.5": "sm75", "swsh4.5sv": "swsh45sv", "swsh12.5gg": "swsh12pt5gg" };
-// Sets mit Bildern, die es nur bei Limitless TCG gibt (deren Kürzel) – neueste Promos. Weitere hier eintragen.
-const LIMITLESS_SETS = { svp: "SVP", mep: "MEP" };
-const ptcgio = (set, n, size) => `https://images.pokemontcg.io/${PTCGIO_SETS[set] || set}/${n}${size === "high" ? "_hires" : ""}.png`;
+// pokemontcg.io führt manche Sets unter anderem Namen (McDonald's, Best of Game, EX-Trainer-Kits, HGSS-Promos …)
+// ponytail: von Hand gepflegt – neue Lücken findet ein Abgleich aller Sets (siehe README „Suche“)
+const PTCGIO_SETS = {
+  "sm7.5": "sm75",
+  "swsh4.5sv": "swsh45sv",
+  "swsh12.5gg": "swsh12pt5gg",
+  ...Object.fromEntries(["2011bw", "2012bw", "2014xy", "2015xy", "2016xy", "2017sm", "2018sm", "2019sm", "2021swsh", "2022swsh"].map((id) => [id, `mcd${id.slice(2, 4)}`])),
+  bog: "bp",
+  "tk-ex-latia": "tk1a",
+  "tk-ex-latio": "tk1b",
+  "tk-ex-p": "tk2a",
+  "tk-ex-m": "tk2b",
+  hgssp: "hsp",
+};
+// Sets, für die Limitless TCG Bilder hat, die sonst fehlen (TCGdex-Set → Kürzel bei Limitless). Weitere hier eintragen.
+const LIMITLESS_SETS = { svp: "SVP", mep: "MEP", mee: "MEE", sve: "SVE", "30th-c": "30C" };
 
-// Bild lädt nicht → nächste Quelle: TCGdex deutsch → englisch → pokemontcg.io (Shiny Vault, Trainer-Galerien, Galarian
-// Gallery, Drachenwandel …). Für die Promo-Sets oben vorher Limitless über imageProxy (GET /img des Backends, weil Limitless
-// keinen CORS-Header schickt) – pokemontcg.io antwortet bei fehlenden Karten mit einer Kartenrückseite statt einem Fehler,
-// danach ginge es nicht weiter. null = keine weitere Quelle.
-export function nextImage(src, imageProxy = null) {
-  if (src.startsWith("https://assets.tcgdex.net/de/")) return src.replace("/de/", "/en/");
-  const t = src.match(/^https:\/\/assets\.tcgdex\.net\/en\/[^/]+\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
-  if (t) {
-    const [, set, num, size] = t;
-    const n = num.replace(/^0+(?=\d)/, ""); // „085“ heißt dort „85“
-    return LIMITLESS_SETS[set] && imageProxy && /^\d+$/.test(n) ? `${imageProxy}?set=${LIMITLESS_SETS[set]}&n=${n}&size=${size === "high" ? "LG" : "SM"}` : ptcgio(set, n, size);
-  }
-  if (!imageProxy || !src.startsWith(`${imageProxy}?`)) return null;
-  const q = new URL(src).searchParams; // Limitless hatte es nicht → pokemontcg.io
-  const set = Object.keys(LIMITLESS_SETS).find((k) => LIMITLESS_SETS[k] === q.get("set"));
-  return set ? ptcgio(set, q.get("n"), q.get("size") === "LG" ? "high" : "low") : null;
+// Alle Bildquellen einer Karte in der Reihenfolge, in der die App sie probiert – egal, ob die Kachel mit dem deutschen
+// oder englischen TCGdex-Bild startet (die API meldet nicht jedes vorhandene Bild):
+//   TCGdex deutsch → TCGdex englisch → Limitless (über imageProxy = GET /img des Backends, Limitless schickt keinen
+//   CORS-Header) → pokemontcg.io (Shiny Vault, Trainer-Galerien … – fehlt dort etwas, kommt eine Kartenrückseite, darum zuletzt)
+export function imageSources(src, imageProxy = null) {
+  const t = src.match(/^https:\/\/assets\.tcgdex\.net\/(?:de|en)\/([^/]+)\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
+  if (!t) return [src];
+  const [, serie, set, num, size] = t;
+  const n = num.replace(/^0+(?=\d)/, ""); // pokemontcg.io: „85“, Limitless: „085“
+  const code = imageProxy && /^\d+$/.test(n) && LIMITLESS_SETS[set];
+  return [
+    `https://assets.tcgdex.net/de/${serie}/${set}/${num}/${size}.webp`,
+    `https://assets.tcgdex.net/en/${serie}/${set}/${num}/${size}.webp`,
+    code && `${imageProxy}?set=${code}&n=${n.padStart(3, "0")}&size=${size === "high" ? "LG" : "SM"}`,
+    `https://images.pokemontcg.io/${PTCGIO_SETS[set] || set}/${n.replace(/^H0(?=\d)/, "H")}${size === "high" ? "_hires" : ""}.png`, // e-Card „H01“ → „H1“
+  ].filter(Boolean);
 }
+
+// Bild lädt nicht → nächste noch nicht probierte Quelle. first: Adresse, mit der das Bild gestartet ist; tried: alle bisher
+// probierten Adressen. null = keine weitere Quelle (Platzhalter).
+export const nextImage = (first, tried, imageProxy = null) => imageSources(first, imageProxy).find((u) => !tried.includes(u)) ?? null;
 
 // Gespeicherte Karte ohne Bild → mit englischem Bild (oder null, wenn nichts zu tun ist)
 export const withEnglishImage = (card, serie) => (card.img || !serie ? null : { ...card, img: englishImage(serie, card.set, card.num) });

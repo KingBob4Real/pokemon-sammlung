@@ -229,12 +229,16 @@ export class App {
     this.afterChange(false);
   }
 
-  // Bild fehlt → nächste Quelle (deutsch → englisch → pokemontcg.io → Limitless), sonst Platzhalter
+  // Bild fehlt → nächste Quelle (TCGdex deutsch → englisch → Limitless → pokemontcg.io, domain/card.js), sonst Platzhalter.
+  // Am Bild gemerkt: womit es gestartet ist und was schon probiert wurde.
   #onImageError(e) {
     const img = e.target;
     const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art, .batch-art");
     if (!box) return;
-    const next = nextImage(img.src, IMAGE_PROXY);
+    img.dataset.first ??= img.src;
+    const tried = `${img.dataset.tried ?? ""} ${img.src}`.trim();
+    img.dataset.tried = tried;
+    const next = nextImage(img.dataset.first, tried.split(" "), IMAGE_PROXY);
     if (next) img.src = next;
     else box.classList.add("no-img");
   }

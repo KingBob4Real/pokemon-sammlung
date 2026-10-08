@@ -1,6 +1,6 @@
 // Test des Katalogs (Sets und Suche auf Deutsch + Englisch, englische Ersatzbilder): node frontend/test/catalog.test.mjs
 import assert from "node:assert/strict";
-import { nextImage, withEnglishImage } from "../js/domain/card.js";
+import { imageSources, nextImage, withEnglishImage } from "../js/domain/card.js";
 import { CatalogService } from "../js/services/catalogService.js";
 import { mergeSets, SetService } from "../js/services/setService.js";
 
@@ -50,18 +50,32 @@ assert.deepEqual(await catalog.search("XYZ 11"), [], "unbekanntes Kürzel → ni
 assert.equal(withEnglishImage({ ...evoli, img: null }, "sv").img, evoli.img);
 assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");
 
-// Bild-Quellen nacheinander: deutsch → englisch → pokemontcg.io (mit dessen Set-Namen) → Platzhalter
-assert.equal(nextImage("https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp"), "https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp");
-assert.equal(nextImage("https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp"), "https://images.pokemontcg.io/sm75/1.png");
-assert.equal(nextImage("https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/high.webp"), "https://images.pokemontcg.io/swsh9tg/TG01_hires.png");
-assert.equal(nextImage("https://assets.tcgdex.net/en/sv/sve/017/low.webp"), "https://images.pokemontcg.io/sve/17.png", "pokemontcg.io ohne führende Null");
-assert.equal(nextImage("https://images.pokemontcg.io/sm75/1.png", "https://b/img"), null);
-// Promo-Sets: erst Limitless über den Durchreicher des Backends, dann pokemontcg.io, dann Platzhalter
+// Bildquellen der Reihe nach, egal ob die Kachel deutsch oder englisch startet: TCGdex de → en → Limitless → pokemontcg.io
 const proxy = "https://b/img";
-assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/175/low.webp", proxy), "https://b/img?set=SVP&n=175&size=SM");
-assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/085/high.webp", proxy), "https://b/img?set=SVP&n=85&size=LG");
-assert.equal(nextImage("https://b/img?set=SVP&n=85&size=LG", proxy), "https://images.pokemontcg.io/svp/85_hires.png", "Limitless hat es nicht → pokemontcg.io");
-assert.equal(nextImage("https://images.pokemontcg.io/svp/85.png", proxy), null);
-assert.equal(nextImage("https://assets.tcgdex.net/en/sv/svp/175/low.webp"), "https://images.pokemontcg.io/svp/175.png", "ohne Durchreicher direkt pokemontcg.io");
+const mep = "https://assets.tcgdex.net/en/me/mep/033/low.webp"; // API meldet kein Bild, die deutsche Datei gibt es aber
+assert.deepEqual(imageSources(mep, proxy), [
+  "https://assets.tcgdex.net/de/me/mep/033/low.webp",
+  mep,
+  "https://b/img?set=MEP&n=033&size=SM", // Limitless: dreistellig
+  "https://images.pokemontcg.io/mep/33.png", // pokemontcg.io: ohne führende Null, zuletzt (sonst Kartenrückseite)
+]);
+const walk = (first, p = proxy) => {
+  const tried = [first];
+  for (let next; (next = nextImage(first, tried, p)); ) tried.push(next);
+  return tried;
+};
+assert.deepEqual(walk(mep).slice(0, 2), ["https://assets.tcgdex.net/en/me/mep/033/low.webp", "https://assets.tcgdex.net/de/me/mep/033/low.webp"], "startet englisch → deutsch wird auch probiert");
+assert.equal(walk(mep).length, 4, "jede Quelle genau einmal, dann Platzhalter");
+assert.deepEqual(walk("https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp"), [
+  "https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp",
+  "https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp",
+  "https://images.pokemontcg.io/sm75/1.png",
+], "Set ohne Limitless: deutsch → englisch → pokemontcg.io (mit dessen Set-Namen)");
+assert.equal(imageSources("https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/high.webp", proxy).at(-1), "https://images.pokemontcg.io/swsh9tg/TG01_hires.png", "groß, Nummer mit Buchstaben");
+assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/high.webp", proxy)[2], "https://b/img?set=SVP&n=175&size=LG");
+assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/low.webp").length, 3, "ohne Durchreicher kein Limitless");
+assert.equal(imageSources("https://assets.tcgdex.net/en/mcd/2011bw/1/low.webp").at(-1), "https://images.pokemontcg.io/mcd11/1.png", "McDonald's heißt dort mcd11");
+assert.equal(imageSources("https://assets.tcgdex.net/en/ecard/ecard2/H01/low.webp").at(-1), "https://images.pokemontcg.io/ecard2/H1.png", "e-Card-Holo „H01“ → „H1“");
+assert.equal(imageSources("https://assets.tcgdex.net/en/sv/sve/017/low.webp", proxy)[2], "https://b/img?set=SVE&n=017&size=SM", "Energien bei Limitless");
 
 console.log("Katalog ok");

@@ -33,7 +33,8 @@ assert.ok((totals[0] + totals[1] + 5) * worst < 10000, `Limits passen in den Gra
 assert.deepEqual(parseImageRequest("https://x/img?set=SVP&n=175&size=SM"), { set: "SVP", n: "175", size: "SM" });
 assert.equal(parseImageRequest("https://x/img?set=SVP&n=175&size=XL"), null, "unbekannte Größe");
 assert.equal(parseImageRequest("https://x/img?set=../..&n=1&size=SM"), null, "kein Pfad im Kürzel");
-assert.equal(parseImageRequest("https://x/img?set=SVP&n=007&size=SM"), null, "Nummer ohne führende Null");
+assert.deepEqual(parseImageRequest("https://x/img?set=MEP&n=033&size=LG"), { set: "MEP", n: "033", size: "LG" }, "Nummer dreistellig wie bei Limitless");
+assert.equal(parseImageRequest("https://x/img?set=SVP&n=1a&size=SM"), null, "nur Ziffern");
 
 const [baseArg, key, otherKey] = process.argv.slice(2);
 if (!baseArg || !key) {
@@ -157,8 +158,8 @@ else {
   assert.equal(scanned.body.remaining, usage.remaining - 1, "Scan zählt einen herunter");
 }
 // Kartenbild über den Durchreicher: mit CORS, fehlendes Bild = 404
-const img = await fetch(`${base}/img?set=SVP&n=175&size=SM`);
-assert.equal(img.status, 200, "SVP 175 kommt über /img");
+const img = await fetch(`${base}/img?set=MEP&n=033&size=SM`);
+assert.equal(img.status, 200, "MEP 033 kommt über /img");
 assert.equal(img.headers.get("Access-Control-Allow-Origin"), "*", "mit CORS-Header");
 assert.equal((await fetch(`${base}/img?set=SVP&n=9999&size=SM`)).status, 404, "fehlendes Bild → 404");
 
