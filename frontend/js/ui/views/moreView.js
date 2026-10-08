@@ -98,7 +98,7 @@ Weiter?`)) return;
       h("p", { class: "muted small" }, `Version ${updates.currentVersion || "?"}`),
     ]),
     panel("Zu den Preisen", [
-      h("p", {}, "Der Marktwert ist der Cardmarket-Trend aus der TCGdex-API. Er mischt alle Sprachen und Zustände. Echte Preise für Karten in deiner Sprache ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),
+      h("p", {}, "Der Marktwert ist der Cardmarket-Durchschnitt der letzten 30 Tage aus der TCGdex-API (fehlt er: Trend). Er mischt alle Sprachen und Zustände. Echte Preise für Karten in deiner Sprache ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),
       h("p", { class: "muted small" }, ["Kartenbilder & Daten: ", h("a", { href: "https://tcgdex.dev", target: "_blank", rel: "noopener" }, "TCGdex"), ". Fan-Projekt ohne Verbindung zu Nintendo, Creatures, GAME FREAK, The Pokémon Company oder Cardmarket."]),
     ])
   );

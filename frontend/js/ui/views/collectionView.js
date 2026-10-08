@@ -65,7 +65,7 @@ export function render(main, ctx, folderId = "") {
     const s = collection.summary(valueOf, entries);
     stats.replaceChildren(
       stat("Karten", String(s.count), `${s.distinct} verschiedene`),
-      stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket-Trend"),
+      stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket Ø 30 Tage"),
       stat("Bezahlt", s.paid ? fmtEur(s.paid) : "–", "deine Kaufpreise"),
       stat("Gewinn/Verlust", s.diffCount ? fmtSigned(s.diff) : "–", s.diffCount ? `bei ${plural(s.diffCount, "Karte", "Karten")} mit Kaufpreis` : "Kaufpreise eintragen")
     );

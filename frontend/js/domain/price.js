@@ -18,8 +18,9 @@ export function toPrice(card) {
   };
 }
 
-// Marktwert = Trend, sonst 30-Tage-Schnitt, sonst „ab“
-export const marketValue = (price) => (price ? price.trend ?? price.avg30 ?? price.low : null);
+// Marktwert = Ø 30 Tage (bei neuen Sets ist der Trend oft unbrauchbar, z. B. Mew-ex 30th-158: Trend 19 €, Ø 30 Tage 80 €),
+// sonst Trend, sonst „ab“
+export const marketValue = (price) => (price ? price.avg30 ?? price.trend ?? price.low : null);
 
 // Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
 export function cardmarketUrl(card, price, language = "Deutsch") {
