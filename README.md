@@ -1,12 +1,12 @@
 # Pokémon-Sammlung
 
-Kartensammlung als iPhone-taugliche Web-App: alle deutschen Karten suchen, Sammlung pflegen, eigene Listen anlegen, Marktwerte sehen. Läuft offline und gleicht sich über ein kleines Cloudflare-Backend zwischen Geräten ab. Mehrere Personen, jede mit eigenem Schlüssel und eigener Sammlung.
+Kartensammlung als iPhone-taugliche Web-App: alle deutschen und englischen Karten suchen und scannen, Sammlung pflegen, eigene Listen anlegen, Marktwerte sehen. Läuft offline und gleicht sich über ein kleines Cloudflare-Backend zwischen Geräten ab. Mehrere Personen, jede mit eigenem Schlüssel und eigener Sammlung.
 
-- **Suche:** alle deutschen Karten über die [TCGdex-API](https://tcgdex.dev), nach Name (`Glurak`) und/oder Nummer (`199`, `199/165`), oder Set für Set. TCG-Pocket-Karten sind ausgeblendet. Fehlt das deutsche Bild (ältere Sets), kommt das englische.
+- **Suche:** alle Karten auf Deutsch und Englisch über die [TCGdex-API](https://tcgdex.dev), nach Name (`Glurak` oder `Charizard`) und/oder Nummer (`199`, `199/165`), oder Set für Set – Set-Namen findet die Suche auch (`Erhabene Helden`, `Evolving Skies`). Sets, die es nur auf Englisch gibt (z. B. Gym Heroes, McDonald's), sind dabei und als „nur Englisch“ markiert. Gibt es eine Karte in beiden Sprachen, gewinnt die deutsche. TCG-Pocket-Karten sind ausgeblendet. Fehlt das deutsche Bild (ältere Sets, manche Promos), kommt das englische – auch bei schon gespeicherten Karten (wird beim Start nachgetragen).
 - **Sammlung:** pro Karte Anzahl, Zustand, Sprache und Kaufpreis. Oben Gesamtwert, Bezahlt und Gewinn/Verlust. Sortieren und gruppieren nach Set oder Liste. „+ Karten hinzufügen“: suchen oder Set öffnen und Karten einfach antippen.
 - **Listen:** beliebig viele, umbenennen, löschen, sortieren (Dropdown) und per Gedrückt-halten-und-ziehen umordnen – die Listen selbst und die Karten darin. Karten sortieren auch nach Pokédex (hält Entwicklungsreihen zusammen), Set & Nummer, Name, Wert; filtern (fehlend/vorhanden). „+ Hinzufügen“ wie bei der Sammlung; „Auswählen“ markiert mehrere Karten für „Hab ich“ (in die Sammlung) oder „Entfernen“. Haken an einer Karte = in der Sammlung.
 - **Updates:** Die App prüft beim Öffnen und bei jeder Rückkehr, ob es eine neue Version gibt, und lädt dann neu – auch als iPhone-App vom Home-Bildschirm.
-- **Marktwert:** Cardmarket-Trend aus TCGdex (alle Sprachen & Zustände gemischt), 24 h zwischengespeichert. Der Cardmarket-Link in der Kartenansicht filtert auf deutsche Karten ab Excellent.
+- **Marktwert:** Cardmarket-Trend aus TCGdex (alle Sprachen & Zustände gemischt), 24 h zwischengespeichert. Der Cardmarket-Link in der Kartenansicht filtert auf die Sprache der Karte (Deutsch, Englisch …) ab Excellent.
 - **Alte Checkliste übernehmen:** unter „Mehr“. Jede Gruppe wird eine Liste, abgehakte Karten kommen mit „Mein Preis“ als Kaufpreis in die Sammlung.
 - **App & offline:** iPhone: Safari → Teilen → „Zum Home-Bildschirm“. Der Service Worker speichert App und alle einmal gesehenen Kartenbilder.
 - **Fehler:** verständliche Hinweise unten statt Pop-ups (`core/errors.js` übersetzt Fehler, `ui/components/toast.js` zeigt sie). Sync versucht es bei Netz-/Server-Problemen automatisch erneut (10 s → 5 min), zeigt „Offline“ an und hält einzelne abgelehnte Einträge zurück, statt alles zu blockieren. Ein falscher Schlüssel leert nie das Gerät. Kann das Gerät nicht speichern, bietet die App sofort einen Export an. Suche, Sets und Preise haben „Nochmal“.
@@ -24,7 +24,7 @@ frontend/                  App für GitHub Pages (ES-Module, kein Build-Schritt)
   js/domain/               reine Fachlogik: Karte, Preis, Sortierung, Scan-Zuordnung
   js/services/             Anwendungslogik: lokaler Speicher, Sammlung, Listen, Preise, Sets, Katalog, Sync, Scanner, Sicherung, Import
   js/ui/                   App-Hülle, Router, Komponenten, Ansichten
-  test/scanMatch.test.mjs  Test der Scan-Zuordnung: node frontend/test/scanMatch.test.mjs
+  test/                    Tests ohne Netz: node frontend/test/scan.test.mjs und catalog.test.mjs
 backend/                   Cloudflare Worker + D1-Datenbank
   src/index.js             Composition Root
   src/http/                Router, Antworten (CORS), Schlüssel-Prüfung
@@ -61,11 +61,12 @@ Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) –
 
 ## Scannen
 
-„📷 Scannen“ in der Sammlung und bei „+ Karten hinzufügen“ öffnet die Kamera. Foto machen → die App verkleinert es (1024 px, JPEG) und schickt es an `POST /scan` → das Backend lässt Name, Nummer, Setgröße und Set-Kürzel von Workers AI lesen (`@cf/google/gemma-4-26b-a4b-it`, ohne „Nachdenken“) → die App sucht die Karte im Katalog (`domain/scanMatch.js`). Eindeutig: Bestätigung mit Preis, Anzahl, Zustand, Sprache, Kaufpreis („Trend übernehmen“) und Listen, dann „In Sammlung“ bzw. „Anzahl erhöhen“ und direkt „Nächste Karte scannen“. Mehrere passen: Auswahl. Nichts erkannt: Suche, vorausgefüllt mit dem Gelesenen.
+„📷 Scannen“ in der Sammlung und bei „+ Karten hinzufügen“ öffnet die Kamera mit einem Rahmen in Kartenform (`ui/components/camera.js`). Aufgenommen wird nur der Bereich im Rahmen – die Karte ist groß im Bild, Name und Nummer gut lesbar. Ohne Kamerazugriff (oder per „Foto wählen“) geht es über die Foto-App / Mediathek. Die App verkleinert das Foto (1024 px, JPEG) und schickt es an `POST /scan` → das Backend lässt Name, Nummer, Setgröße und Set-Kürzel von Workers AI lesen (`@cf/google/gemma-4-26b-a4b-it`, ohne „Nachdenken“) → die App sucht die Karte im Katalog auf Deutsch und Englisch (`domain/scanMatch.js`); englische Karte erkannt → Sprache „Englisch“ vorausgewählt. Eindeutig: Bestätigung mit Preis, Anzahl, Zustand, Sprache, Kaufpreis („Trend übernehmen“) und Listen, dann „In Sammlung“ bzw. „Anzahl erhöhen“ und direkt „Nächste Karte scannen“. Mehrere passen: Auswahl. Nichts erkannt: Suche, vorausgefüllt mit dem Gelesenen.
 
 - **Tageslimit:** 50 Scans pro Person, 150 für alle zusammen (pro Datenbank, also Live und Dev getrennt), Zähler in `scan_usage`. Ein Scan kostet gemessen ~7 Neurons, der Gratis-Tarif hat 10.000 pro Tag für das ganze Cloudflare-Konto – beide Limits zusammen nutzen höchstens ein Fünftel davon. Werte in `backend/src/config.js`.
 - **Datenschutz:** Das Foto geht nur zur Erkennung an Cloudflare Workers AI und wird nirgends gespeichert – weder auf dem Gerät noch in der Datenbank.
 - Scannen braucht Internet und einen Sync-Schlüssel (das Backend zählt pro Person).
+- **Was wurde gelesen?** Jeder Scan schreibt das Erkannte (Name, Nummer, Kürzel – kein Foto) ins Log: Cloudflare-Dashboard → Workers → `pokemon-sammlung(-dev)` → Logs (3 Tage).
 
 ## Datenbank (Cloudflare D1, SQLite)
 

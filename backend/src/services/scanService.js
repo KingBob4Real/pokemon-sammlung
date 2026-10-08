@@ -62,6 +62,7 @@ export class ScanService {
     }
     const answer = result?.response ?? result?.choices?.[0]?.message?.content;
     const recognized = toRecognized(answer);
+    console.log("scan", user.id, JSON.stringify(recognized)); // nur das Gelesene, nie das Foto – zum Nachsehen in den Workers Logs
     // raw nur, wenn nichts lesbar war – hilft beim Nachsehen, was das Modell geantwortet hat
     return recognized.name || recognized.number ? { recognized } : { recognized, raw: String(answer ?? "").slice(0, 500) };
   }

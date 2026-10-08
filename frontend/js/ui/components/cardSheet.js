@@ -1,4 +1,4 @@
-import { CONDITIONS, LANGUAGES } from "../../config.js";
+import { CARDMARKET_LANGUAGES, CONDITIONS, LANGUAGES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
 import { cardImage, cardNumber } from "../../domain/card.js";
@@ -7,8 +7,9 @@ import { cardmarketUrl } from "../../domain/price.js";
 /**
  * Kopf der Kartenansicht: Bild, Name, Nummer & Set, Seltenheit, Cardmarket-Preise.
  * Auch für die Bestätigung beim Scannen. drawPrices() zeichnet die Preise neu, sobald sie geladen sind.
+ * language() → gewählte Sprache der Karte, für den Cardmarket-Link.
  */
-export function cardHead(card, prices) {
+export function cardHead(card, prices, language = () => "Deutsch") {
   const rarity = h("p", { class: "muted" });
   const priceBox = h("div", { class: "prices" });
   const drawPrices = () => {
@@ -26,7 +27,7 @@ export function cardHead(card, prices) {
               ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
               : h("p", { class: "muted" }, "Preis wird geladen …"),
       h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
-      h("a", { class: "btn cm", href: cardmarketUrl(card, p), target: "_blank", rel: "noopener" }, "Auf Cardmarket ansehen (Deutsch, ab Excellent)")
+      h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
     );
   };
   const image = cardImage(card, "high");
@@ -72,7 +73,10 @@ export function renderCardSheet(body, card, ctx) {
     ctx.afterChange(false);
   };
   cond.addEventListener("change", () => collection.update(card.id, { cond: cond.value }));
-  lang.addEventListener("change", () => collection.update(card.id, { lang: lang.value }));
+  lang.addEventListener("change", () => {
+    collection.update(card.id, { lang: lang.value });
+    head.drawPrices(); // Cardmarket-Link passend zur Sprache
+  });
   paid.addEventListener("input", () => {
     const n = parseEuro(paid.value);
     if (Number.isNaN(n)) return; // Tippfehler ignorieren
@@ -108,7 +112,7 @@ export function renderCardSheet(body, card, ctx) {
     );
   };
 
-  const head = cardHead(card, prices);
+  const head = cardHead(card, prices, () => collection.entry(card.id)?.lang || "Deutsch");
   body.replaceChildren(
     h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close }),
     ...head.elements,

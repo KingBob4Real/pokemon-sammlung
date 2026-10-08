@@ -6,7 +6,9 @@ export const IS_DEV = location.pathname.includes("/dev/");
 export const OLD_APP_URL = "https://kingbob4real.github.io/pokemon-karten-checkliste/";
 // Adresse des Cloudflare-Backends (unter „Mehr“ änderbar)
 export const DEFAULT_BACKEND_URL = `https://pokemon-sammlung${IS_DEV ? "-dev" : ""}.pokemon-sammlung-backend.workers.dev`;
-export const CARDMARKET_FILTER = "language=3&minCondition=3"; // nur deutsche Karten ab Excellent
+// Cardmarket-Link: Angebote in der Sprache der Karte ab Zustand Excellent (Cardmarkets Nummern der Sprachen)
+export const CARDMARKET_LANGUAGES = { Deutsch: 3, Englisch: 1, Französisch: 2, Spanisch: 4, Italienisch: 5, Japanisch: 7 };
+export const CARDMARKET_MIN_CONDITION = 3; // Excellent
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const PRICE_TTL_MS = DAY_MS;
@@ -22,7 +24,7 @@ export const STORAGE_KEYS = {
   rev: `${P}rev.v1`,
   sync: `${P}sync.v1`,
   prices: `${P}prices.v2`, // v2: mit Pokédex-Nummer
-  sets: `${P}sets.v2`, // v2: mit Serie für englische Ersatzbilder
+  sets: `${P}sets.v3`, // v3: deutsche + englische Sets, Serie für jedes Set (englische Ersatzbilder)
   prefs: `${P}prefs.v1`,
   // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
   legacyOwned: "pkc.owned.v1",

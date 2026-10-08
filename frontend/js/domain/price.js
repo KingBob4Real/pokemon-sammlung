@@ -1,4 +1,4 @@
-import { CARDMARKET_FILTER } from "../config.js";
+import { CARDMARKET_LANGUAGES, CARDMARKET_MIN_CONDITION } from "../config.js";
 import { positive } from "../core/format.js";
 
 // Cardmarket-Richtwerte aus einer TCGdex-Karte (mischen alle Sprachen und Zustände),
@@ -21,9 +21,11 @@ export function toPrice(card) {
 // Marktwert = Trend, sonst 30-Tage-Schnitt, sonst „ab“
 export const marketValue = (price) => (price ? price.trend ?? price.avg30 ?? price.low : null);
 
-// Link mit Filter „Deutsch, ab Excellent“ – zeigt den echten Preis für deutsche Karten
-export function cardmarketUrl(card, price) {
+// Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
+export function cardmarketUrl(card, price, language = "Deutsch") {
+  const lang = CARDMARKET_LANGUAGES[language];
+  const filter = `${lang ? `language=${lang}&` : ""}minCondition=${CARDMARKET_MIN_CONDITION}`;
   return price?.cardmarketId
-    ? `https://www.cardmarket.com/de/Pokemon/Products?idProduct=${encodeURIComponent(price.cardmarketId)}&${CARDMARKET_FILTER}`
-    : `https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&${CARDMARKET_FILTER}`;
+    ? `https://www.cardmarket.com/de/Pokemon/Products?idProduct=${encodeURIComponent(price.cardmarketId)}&${filter}`
+    : `https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&${filter}`;
 }

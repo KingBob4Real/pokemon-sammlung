@@ -11,6 +11,7 @@ import { storage } from "./core/storage.js";
 import { ScanApi } from "./data/scanApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
+import { withEnglishImage } from "./domain/card.js";
 import { createSorters } from "./domain/sorting.js";
 import { BackupService } from "./services/backupService.js";
 import { CatalogService } from "./services/catalogService.js";
@@ -41,7 +42,11 @@ const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
 const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all" });
 
-new App({ store, sets, prices, collection, lists, catalog, sync, scanner, legacyImport, backup, sorters, updates }, prefs).start();
+const app = new App({ store, sets, prices, collection, lists, catalog, sync, scanner, legacyImport, backup, sorters, updates }, prefs);
+app.start();
+
+// Karten ohne Bild (deutsches fehlt) bekommen das englische, sobald bekannt ist, zu welcher Serie ihr Set gehört
+sets.ready.then(() => store.fixCards((card) => withEnglishImage(card, sets.info(card.set)?.serie)) && app.render());
 
 // Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
 // Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates

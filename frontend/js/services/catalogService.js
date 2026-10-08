@@ -9,7 +9,8 @@ export function parseQuery(query) {
   return { words: tokens.filter((t) => t !== numberToken).join(" "), number, total };
 }
 
-// Kartenkatalog: alle deutschen Karten durchsuchen oder ein Set anzeigen.
+// Kartenkatalog: alle Karten auf Deutsch und Englisch durchsuchen oder ein Set anzeigen.
+// Gibt es eine Karte in beiden Sprachen, gewinnt die deutsche (Name, Bild); „Charizard“ findet die englischen.
 export class CatalogService {
   #recent = new Map(); // Suche → Ergebnis, damit Zurück-Tippen sofort geht
   constructor(tcgdex, sets) {
@@ -29,9 +30,13 @@ export class CatalogService {
   async #search(query) {
     const { words, number, total } = parseQuery(query);
     if (!words && number == null) return [];
-    // Set-Liste und Suche gleichzeitig laden statt nacheinander
-    const [found] = await Promise.all([words ? this.tcgdex.searchByName(words) : this.tcgdex.searchByNumber(number), this.sets.ready]);
-    return found
+    // Set-Liste und beide Sprachen gleichzeitig laden statt nacheinander
+    const find = (lang) => (words ? this.tcgdex.searchByName(words, lang) : this.tcgdex.searchByNumber(number, lang));
+    const [de, en] = await Promise.allSettled([find("de"), find("en"), this.sets.ready]);
+    if (de.status === "rejected" && en.status === "rejected") throw de.reason;
+    const byId = new Map();
+    for (const c of [...(de.value || []), ...(en.value || [])]) if (c?.id && !byId.has(c.id)) byId.set(c.id, c);
+    return [...byId.values()]
       .filter((c) => c && c.id && c.localId != null && !this.sets.isPocket(setIdOf(c)))
       .filter((c) => number == null || parseInt(c.localId, 10) === number)
       .filter((c) => !total || this.sets.info(setIdOf(c))?.official === total)

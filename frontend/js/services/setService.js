@@ -1,11 +1,9 @@
-import { isObj } from "../core/format.js";
-
-// Die Serie steht in der Adresse von Symbol/Logo: …/univ/<serie>/<set>/symbol oder …/de/<serie>/<set>/logo
-const serieOf = (set) => (set.symbol || set.logo || "").match(/\/(?:univ|[a-z]{2})\/([^/]+)\/[^/]+\/(?:symbol|logo)$/)?.[1] || null;
+import { isObj, norm } from "../core/format.js";
 
 /**
- * Alle deutschen Sets (eine Woche zwischengespeichert), ohne TCG Pocket.
- * Reihenfolge = Erscheinen (TCGdex liefert die ältesten zuerst).
+ * Alle Sets auf Deutsch und Englisch (eine Woche zwischengespeichert), ohne TCG Pocket.
+ * Grundlage ist die englische Liste (vollständig, älteste zuerst); deutsche Namen haben Vorrang.
+ * Set: { id, name, alt (englischer Name, falls anders), en (nur auf Englisch), serie, total, official }
  */
 export class SetService {
   #data = null;
@@ -36,6 +34,13 @@ export class SetService {
     return this.info(setId)?.order ?? -1;
   }
 
+  // Sets, deren Name (deutsch oder englisch) alle Wörter enthält: „erhabene helden“, „evolving skies“
+  search(query) {
+    const words = norm(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return [];
+    return this.all().filter((s) => words.every((w) => norm(`${s.name} ${s.alt || ""}`).includes(w)));
+  }
+
   isPocket(setId) {
     return this.#data?.pocket.has(setId) || false;
   }
@@ -51,11 +56,8 @@ export class SetService {
     if (isObj(cached) && Array.isArray(cached.list)) this.#use(cached);
     if (this.loaded && Date.now() - cached.at < this.ttlMs) return;
     try {
-      const [all, pocket] = await Promise.all([this.tcgdex.sets(), this.tcgdex.serieSetIds(this.pocketSerie)]);
-      const list = all
-        .filter((s) => !pocket.includes(s.id))
-        .map((s) => ({ id: s.id, name: s.name, serie: serieOf(s), total: s.cardCount?.total ?? null, official: s.cardCount?.official ?? null }));
-      const data = { at: Date.now(), list, pocket };
+      const [en, de, serieOf] = await Promise.all([this.tcgdex.sets("en"), this.tcgdex.sets("de"), this.tcgdex.setSeries()]);
+      const data = { at: Date.now(), ...mergeSets(en, de, serieOf, this.pocketSerie) };
       this.storage.set(this.storageKey, data);
       this.#use(data);
     } catch {
@@ -70,4 +72,21 @@ export class SetService {
       index: new Map(data.list.map((s, i) => [s.id, { ...s, order: i }])),
     };
   }
+}
+
+// Englische und deutsche Set-Liste zusammenführen → { list, pocket }
+export function mergeSets(en, de, serieOf, pocketSerie) {
+  const german = new Map(de.map((s) => [s.id, s]));
+  const list = [];
+  const pocket = [];
+  for (const s of [...en, ...de.filter((d) => !en.some((e) => e.id === d.id))]) {
+    if (serieOf[s.id] === pocketSerie) {
+      pocket.push(s.id);
+      continue;
+    }
+    const d = german.get(s.id);
+    const count = (d || s).cardCount;
+    list.push({ id: s.id, name: d?.name || s.name, alt: d && d.name !== s.name ? s.name : null, en: !d, serie: serieOf[s.id] || null, total: count?.total ?? null, official: count?.official ?? null });
+  }
+  return { list, pocket };
 }

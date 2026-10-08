@@ -9,6 +9,10 @@ database_name = "pokemon-sammlung"
 database_id = "a8fae683-d5c4-4469-8087-dcea378a8ea1"
 migrations_dir = "migrations"
 
+# Logs im Cloudflare-Dashboard (Workers → Logs), z. B. was der Scanner gelesen hat. Gratis: 3 Tage.
+[observability]
+enabled = true
+
 # Workers AI für den Karten-Scanner
 [ai]
 binding = "AI"

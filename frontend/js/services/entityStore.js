@@ -54,6 +54,20 @@ export class EntityStore extends EventTarget {
     else this.#commit();
   }
 
+  // Kartendaten in Sammlung und Listen nachbessern: fix(card) → geänderte Karte oder null. → Anzahl geändert
+  fixCards(fix) {
+    let count = 0;
+    this.batch(() => {
+      for (const e of [...this.#items.values()]) {
+        const fixed = !e.deleted && e.data?.card && fix(e.data.card);
+        if (!fixed) continue;
+        this.put(e.type, e.id, { ...e.data, card: fixed });
+        count++;
+      }
+    });
+    return count;
+  }
+
   // Viele Änderungen auf einmal: nur einmal speichern und melden
   batch(fn) {
     this.#batchDepth++;

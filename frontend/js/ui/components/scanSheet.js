@@ -3,16 +3,18 @@ import { h, ICONS } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
 import { fmtPriceInput, parseEuro } from "../../core/format.js";
 import { cardNumber } from "../../domain/card.js";
+import { cameraView } from "./camera.js";
 import { cardHead } from "./cardSheet.js";
 import { cardTile, tileCard, updateTile } from "./cardTile.js";
 import { progressBar } from "./progressBar.js";
 import { emptyState } from "./widgets.js";
 
 const SEARCH_RESULTS = 30;
-let picker = null; // ein unsichtbares Datei-Feld für alle Scans; „capture“ öffnet am Handy die Rückkamera
+let picker = null; // unsichtbares Datei-Feld: Foto-App oder Mediathek, falls die Live-Kamera nicht geht
+const LANGUAGE_NAMES = { de: "Deutsch", en: "Englisch", ja: "Japanisch" };
 
 /**
- * Karten-Scanner: Foto aufnehmen → erkennen → bestätigen → in die Sammlung.
+ * Karten-Scanner: Kamera mit Rahmen → erkennen → bestätigen → in die Sammlung.
  * Läuft in der Kartenansicht (Dialog), Meldungen stehen deshalb dort statt unten als Hinweis.
  * Jeder Fehler hat einen Ausweg: Nochmal, manuell suchen, schließen.
  *   listId – beim Scannen aus einer Liste ist diese Liste schon angehakt
@@ -22,13 +24,51 @@ export function startScan(ctx, { listId = null } = {}) {
   if (!ctx.scanner.ready) {
     return ctx.notify("Zum Scannen bitte erst unter „Mehr“ den Sync-Schlüssel eintragen.", { type: "info", action: { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } });
   }
-  picker ??= document.body.appendChild(h("input", { type: "file", accept: "image/*", capture: "environment", hidden: true }));
+  if (!navigator.mediaDevices?.getUserMedia) return pickPhoto(ctx, listId);
+  ctx.openSheet((body, sheet) => cameraStep(body, sheet, listId));
+}
+
+// Foto über die Foto-App oder aus der Mediathek (muss direkt aus einem Antippen kommen).
+// chosen() läuft, sobald ein Foto gewählt ist (z. B. Live-Kamera freigeben).
+function pickPhoto(ctx, listId, chosen = () => {}) {
+  picker ??= document.body.appendChild(h("input", { type: "file", accept: "image/*", hidden: true }));
   picker.onchange = () => {
     const file = picker.files[0];
     picker.value = ""; // dasselbe Foto später nochmal wählen können
-    if (file) ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId)); // abgebrochen: nichts tun
+    if (!file) return; // abgebrochen: nichts tun
+    chosen();
+    ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId));
   };
   picker.click();
+}
+
+// Live-Kamera im Dialog; nach dem Foto geht es mit dem Erkennen weiter
+function cameraStep(body, ctx, listId) {
+  let redraw = null;
+  const camera = cameraView({
+    onPhoto: (file) => (redraw = scanFlow(body, ctx, file, listId)),
+    onCancel: ctx.close,
+    onPick: () => pickPhoto(ctx, listId, () => camera.stop()),
+    onUnavailable: (e) => {
+      if (!camera.el.isConnected) return;
+      const denied = e?.name === "NotAllowedError";
+      body.replaceChildren(
+        h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close }),
+        emptyState(
+          denied ? "Kein Zugriff auf die Kamera." : "Kamera nicht verfügbar.",
+          denied ? "Erlaube den Zugriff in den Einstellungen (Safari → Kamera) – oder nimm das Foto mit der Foto-App auf." : "Nimm das Foto stattdessen mit der Foto-App auf."
+        ),
+        h("div", { class: "buttons" }, [
+          h("button", { type: "button", class: "btn", onclick: () => pickPhoto(ctx, listId) }, "Foto aufnehmen"),
+          h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Schließen"),
+        ])
+      );
+    },
+  });
+  body.replaceChildren(camera.el);
+  body.closest("dialog").addEventListener("close", camera.stop, { once: true });
+  camera.start();
+  return () => redraw?.();
 }
 
 // Knopf „📷 Scannen“ für Ansichten; offline ausgegraut mit Hinweis. refresh() bei online/offline aufrufen.
@@ -169,7 +209,7 @@ function scanFlow(body, ctx, file, listId) {
         if (mine !== seq || !live()) return;
         const choice = choiceGrid(cards.slice(0, SEARCH_RESULTS), (card) => confirm(card, rec, () => search(rec, title)));
         redraw = choice.update;
-        results.replaceChildren(cards.length ? choice.grid : emptyState(`Keine Karte gefunden für „${query}“.`, "Tipp: deutschen Namen verwenden, z. B. „Glurak“ statt „Charizard“."));
+        results.replaceChildren(cards.length ? choice.grid : emptyState(`Keine Karte gefunden für „${query}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer."));
       } catch (e) {
         if (mine !== seq) return;
         const offline = describeError(e).kind === "offline";
@@ -198,12 +238,14 @@ function scanFlow(body, ctx, file, listId) {
   function confirm(card, rec, back) {
     const entry = collection.entry(card.id);
     const owned = collection.quantity(card.id);
-    const head = cardHead(card, prices);
-    head.elements[0].classList.add("small"); // Bild kleiner, damit Angaben und Preise gleich zu sehen sind
     let qty = 1;
     const qtyOut = h("output", { "aria-live": "polite" }, "1");
     const cond = h("select", { class: "field" }, CONDITIONS.map((c) => h("option", { selected: (entry?.cond || "Near Mint") === c }, c)));
-    const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: (entry?.lang || "Deutsch") === l }, l)));
+    const language = entry?.lang || LANGUAGE_NAMES[rec?.language] || "Deutsch"; // englische Karte gescannt → „Englisch“
+    const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: language === l }, l)));
+    lang.addEventListener("change", () => head.drawPrices()); // Cardmarket-Link passend zur Sprache
+    const head = cardHead(card, prices, () => lang.value);
+    head.elements[0].classList.add("small"); // Bild kleiner, damit Angaben und Preise gleich zu sehen sind
     const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
     const paidNote = h("p", { class: "field-note", role: "alert" });
     const trend = h("button", { type: "button", class: "btn btn-ghost", onclick: () => (paid.value = fmtPriceInput(prices.get(card.id)?.trend)) }, "Trend übernehmen");
