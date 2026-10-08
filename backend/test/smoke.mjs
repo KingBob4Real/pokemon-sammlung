@@ -35,6 +35,7 @@ assert.equal(parseImageRequest("https://x/img?set=SVP&n=175&size=XL"), null, "un
 assert.equal(parseImageRequest("https://x/img?set=../..&n=1&size=SM"), null, "kein Pfad im Kürzel");
 assert.deepEqual(parseImageRequest("https://x/img?set=MEP&n=033&size=LG"), { set: "MEP", n: "033", size: "LG" }, "Nummer dreistellig wie bei Limitless");
 assert.equal(parseImageRequest("https://x/img?set=SVP&n=1a&size=SM"), null, "nur Ziffern");
+assert.equal(parseImageRequest("https://x/img?set=30C&n=CC12&size=SM")?.n, "CC12", "Klassische Sammlung");
 
 const [baseArg, key, otherKey] = process.argv.slice(2);
 if (!baseArg || !key) {

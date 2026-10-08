@@ -37,6 +37,9 @@ const PTCGIO_SETS = {
 };
 // Sets, für die Limitless TCG Bilder hat, die sonst fehlen (TCGdex-Set → Kürzel bei Limitless). Weitere hier eintragen.
 const LIMITLESS_SETS = { svp: "SVP", mep: "MEP", mee: "MEE", sve: "SVE", "30th-c": "30C" };
+// „30 Jahre: Klassische Sammlung“ steht bei Limitless im Set 30C als CC1–CC30 in anderer Reihenfolge (CC1 = Pikachu),
+// zugeordnet über die Namen. Stelle = TCGdex-Nummer − 1.
+const LIMITLESS_30C = "CC2 CC8 CC11 CC20 CC3 CC9 CC5 CC25 CC22 CC13 CC14 CC27 CC24 CC1 CC4 CC19 CC23 CC15 CC16 CC17 CC18 CC12 CC21 CC6 CC10 CC28 CC29 CC26 CC7 CC30".split(" ");
 
 // Alle Bildquellen einer Karte in der Reihenfolge, in der die App sie probiert – egal, ob die Kachel mit dem deutschen
 // oder englischen TCGdex-Bild startet (die API meldet nicht jedes vorhandene Bild):
@@ -51,7 +54,7 @@ export function imageSources(src, imageProxy = null) {
   return [
     `https://assets.tcgdex.net/de/${serie}/${set}/${num}/${size}.webp`,
     `https://assets.tcgdex.net/en/${serie}/${set}/${num}/${size}.webp`,
-    code && `${imageProxy}?set=${code}&n=${n.padStart(3, "0")}&size=${size === "high" ? "LG" : "SM"}`,
+    code && `${imageProxy}?set=${code}&n=${set === "30th-c" ? LIMITLESS_30C[n - 1] : n.padStart(3, "0")}&size=${size === "high" ? "LG" : "SM"}`,
     `https://images.pokemontcg.io/${PTCGIO_SETS[set] || set}/${n.replace(/^H0(?=\d)/, "H")}${size === "high" ? "_hires" : ""}.png`, // e-Card „H01“ → „H1“
   ].filter(Boolean);
 }

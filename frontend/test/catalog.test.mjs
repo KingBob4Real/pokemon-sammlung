@@ -77,5 +77,7 @@ assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/low.webp").le
 assert.equal(imageSources("https://assets.tcgdex.net/en/mcd/2011bw/1/low.webp").at(-1), "https://images.pokemontcg.io/mcd11/1.png", "McDonald's heißt dort mcd11");
 assert.equal(imageSources("https://assets.tcgdex.net/en/ecard/ecard2/H01/low.webp").at(-1), "https://images.pokemontcg.io/ecard2/H1.png", "e-Card-Holo „H01“ → „H1“");
 assert.equal(imageSources("https://assets.tcgdex.net/en/sv/sve/017/low.webp", proxy)[2], "https://b/img?set=SVE&n=017&size=SM", "Energien bei Limitless");
+assert.equal(imageSources("https://assets.tcgdex.net/en/me/30th-c/014/low.webp", proxy)[2], "https://b/img?set=30C&n=CC1&size=SM", "Klassische Sammlung: TCGdex 014 Pikachu = Limitless CC1");
+assert.equal(imageSources("https://assets.tcgdex.net/en/me/30th-c/001/high.webp", proxy)[2], "https://b/img?set=30C&n=CC2&size=LG", "TCGdex 001 Glurak = Limitless CC2");
 
 console.log("Katalog ok");
