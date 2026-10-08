@@ -10,7 +10,7 @@ Kartensammlung als iPhone-taugliche Web-App: alle deutschen Karten suchen, Samml
 - **Alte Checkliste übernehmen:** unter „Mehr“. Jede Gruppe wird eine Liste, abgehakte Karten kommen mit „Mein Preis“ als Kaufpreis in die Sammlung.
 - **App & offline:** iPhone: Safari → Teilen → „Zum Home-Bildschirm“. Der Service Worker speichert App und alle einmal gesehenen Kartenbilder.
 - **Fehler:** verständliche Hinweise unten statt Pop-ups (`core/errors.js` übersetzt Fehler, `ui/components/toast.js` zeigt sie). Sync versucht es bei Netz-/Server-Problemen automatisch erneut (10 s → 5 min), zeigt „Offline“ an und hält einzelne abgelehnte Einträge zurück, statt alles zu blockieren. Ein falscher Schlüssel leert nie das Gerät. Kann das Gerät nicht speichern, bietet die App sofort einen Export an. Suche, Sets und Preise haben „Nochmal“.
-- **Geplant:** Karten-Scanner per Kamera – fertiger Bau-Prompt in [`docs/PROMPT-kartenscanner.md`](docs/PROMPT-kartenscanner.md).
+- **Scannen:** Karte fotografieren, die App erkennt sie und zeigt sie mit Cardmarket-Preis – ein Tipp, und sie ist in der Sammlung (siehe [Scannen](#scannen)).
 
 ## Aufbau
 
@@ -21,19 +21,20 @@ frontend/                  App für GitHub Pages (ES-Module, kein Build-Schritt)
   js/config.js             feste Einstellungen
   js/core/                 Werkzeuge: DOM, Formatieren, Speicher, HTTP, Dateien
   js/data/                 Zugriff auf externe APIs: TCGdex, eigenes Backend
-  js/domain/               reine Fachlogik: Karte, Preis, Sortierung
-  js/services/             Anwendungslogik: lokaler Speicher, Sammlung, Listen, Preise, Sets, Katalog, Sync, Sicherung, Import
+  js/domain/               reine Fachlogik: Karte, Preis, Sortierung, Scan-Zuordnung
+  js/services/             Anwendungslogik: lokaler Speicher, Sammlung, Listen, Preise, Sets, Katalog, Sync, Scanner, Sicherung, Import
   js/ui/                   App-Hülle, Router, Komponenten, Ansichten
+  test/scanMatch.test.mjs  Test der Scan-Zuordnung: node frontend/test/scanMatch.test.mjs
 backend/                   Cloudflare Worker + D1-Datenbank
   src/index.js             Composition Root
   src/http/                Router, Antworten (CORS), Schlüssel-Prüfung
   src/controllers/         HTTP ↔ Service
-  src/services/            Abgleich-Logik
+  src/services/            Abgleich-Logik, Karten-Scanner (Workers AI)
   src/repositories/        SQL pro Tabelle
   src/validation/          Prüfung eingehender Daten
   migrations/              Datenbank-Schema
   scripts/                 Personen anlegen, Listen der alten Checkliste übernehmen
-  test/smoke.mjs           Test gegen ein laufendes Backend (inkl. Trennung zwischen Personen)
+  test/smoke.mjs           Test gegen ein laufendes Backend (inkl. Trennung zwischen Personen und Scan)
 .github/workflows/pages.yml    veröffentlicht frontend/ von main und develop auf GitHub Pages
 .github/workflows/backend.yml  veröffentlicht backend/ von main bzw. develop bei Cloudflare (Migrationen + Worker)
 ```
@@ -58,6 +59,14 @@ git switch main && git merge develop && git push && git switch develop   # Relea
 
 Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) – Testen dort berührt die echte Sammlung nie. Echte Daten zum Testen: in der Live-App unter „Mehr“ exportieren, in der Dev-App importieren. Personen für Dev: `npm run user:add -- "<Name>" --id <id> --key-file ../.keys/<id>.txt --env dev` (gleicher Schlüssel wie live). Alle anderen Befehle mit `--env dev` bzw. `npm run … -- --env dev`.
 
+## Scannen
+
+„📷 Scannen“ in der Sammlung und bei „+ Karten hinzufügen“ öffnet die Kamera. Foto machen → die App verkleinert es (1024 px, JPEG) und schickt es an `POST /scan` → das Backend lässt Name, Nummer, Setgröße und Set-Kürzel von Workers AI lesen (`@cf/google/gemma-4-26b-a4b-it`, ohne „Nachdenken“) → die App sucht die Karte im Katalog (`domain/scanMatch.js`). Eindeutig: Bestätigung mit Preis, Anzahl, Zustand, Sprache, Kaufpreis („Trend übernehmen“) und Listen, dann „In Sammlung“ bzw. „Anzahl erhöhen“ und direkt „Nächste Karte scannen“. Mehrere passen: Auswahl. Nichts erkannt: Suche, vorausgefüllt mit dem Gelesenen.
+
+- **Tageslimit:** 50 Scans pro Person, 150 für alle zusammen (pro Datenbank, also Live und Dev getrennt), Zähler in `scan_usage`. Ein Scan kostet gemessen ~7 Neurons, der Gratis-Tarif hat 10.000 pro Tag für das ganze Cloudflare-Konto – beide Limits zusammen nutzen höchstens ein Fünftel davon. Werte in `backend/src/config.js`.
+- **Datenschutz:** Das Foto geht nur zur Erkennung an Cloudflare Workers AI und wird nirgends gespeichert – weder auf dem Gerät noch in der Datenbank.
+- Scannen braucht Internet und einen Sync-Schlüssel (das Backend zählt pro Person).
+
 ## Datenbank (Cloudflare D1, SQLite)
 
 | Tabelle | Inhalt |
@@ -66,8 +75,8 @@ Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) –
 | `collection` | meine Sammlung: Anzahl, Zustand, Sprache, Kaufpreis |
 | `lists` | eigene Listen |
 | `list_items` | welche Karte in welcher Liste |
-
 | `users` | Personen: Name und SHA-256-Hash ihres Schlüssels |
+| `scan_usage` | Scans pro Person und Tag (fürs Tageslimit) |
 
 Sammlung, Listen und Listeneinträge gehören je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen, seinem letzten Stand und dem Schlüssel der Person und bekommt alles Neue dieser Person zurück. Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstellung (Time Travel).
 

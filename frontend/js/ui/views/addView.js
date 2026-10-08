@@ -2,6 +2,7 @@ import { h } from "../../core/dom.js";
 import { plural } from "../../core/format.js";
 import { COLLECTION_TARGET, links } from "../router.js";
 import { cardTile, setPicked } from "../components/cardTile.js";
+import { scanButton } from "../components/scanSheet.js";
 import { searchPanel } from "../components/searchPanel.js";
 import { setCardsPanel } from "../components/setCardsPanel.js";
 import { backLink, emptyState } from "../components/widgets.js";
@@ -52,6 +53,7 @@ export function render(main, ctx, arg) {
   const updateCount = () => (count.textContent = target.count());
 
   let refreshPanel = null;
+  const scan = scanButton(ctx, { listId: targetId === COLLECTION_TARGET ? null : targetId });
   const hint = h("p", { class: "muted pad" }, "Karte antippen = hinzufügen, nochmal antippen = wieder raus.");
   if (setId) {
     const panel = setCardsPanel(ctx, setId, { tile: pickTile });
@@ -59,7 +61,8 @@ export function render(main, ctx, arg) {
     main.append(h("div", { class: "list-head" }, [backLink(links.addTo(targetId), "Sets & Suche")]), hint, panel.element);
   } else {
     main.append(
-      h("div", { class: "list-head" }, [backLink(target.backHref, target.name)]),
+      h("div", { class: "list-head" }, [backLink(target.backHref, target.name), scan.button]),
+      scan.note,
       hint,
       searchPanel(ctx, { session: ctx.session.add, tile: pickTile, setHref: (id) => links.addTo(targetId, id) })
     );
@@ -77,6 +80,7 @@ export function render(main, ctx, arg) {
   };
   return {
     refresh: () => {
+      scan.refresh();
       updateCount();
       refreshPanel?.();
     },

@@ -5,14 +5,53 @@ import { cardImage, cardNumber } from "../../domain/card.js";
 import { cardmarketUrl } from "../../domain/price.js";
 
 /**
- * Kartenansicht: großes Bild, Preise, Sammlung (Anzahl, Zustand, Sprache, Kaufpreis) und Listen.
+ * Kopf der Kartenansicht: Bild, Name, Nummer & Set, Seltenheit, Cardmarket-Preise.
+ * Auch für die Bestätigung beim Scannen. drawPrices() zeichnet die Preise neu, sobald sie geladen sind.
+ */
+export function cardHead(card, prices) {
+  const rarity = h("p", { class: "muted" });
+  const priceBox = h("div", { class: "prices" });
+  const drawPrices = () => {
+    const p = prices.get(card.id);
+    rarity.textContent = p?.rarity || "";
+    const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, fmtEur(value))]);
+    priceBox.replaceChildren(
+      p && (p.trend || p.low || p.avg30)
+        ? h("div", { class: "price-grid" }, [cell("Trend", p.trend), cell("ab", p.low), cell("Ø 30 Tage", p.avg30)])
+        : p
+          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
+          : !navigator.onLine
+            ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
+            : prices.hasFailed(card.id)
+              ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
+              : h("p", { class: "muted" }, "Preis wird geladen …"),
+      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
+      h("a", { class: "btn cm", href: cardmarketUrl(card, p), target: "_blank", rel: "noopener" }, "Auf Cardmarket ansehen (Deutsch, ab Excellent)")
+    );
+  };
+  const image = cardImage(card, "high");
+  const elements = [
+    h("div", { class: image ? "sheet-art" : "sheet-art no-img" }, [
+      image ? h("img", { src: image, alt: `${card.name} ${cardNumber(card)}`, crossorigin: "anonymous" }) : null,
+      h("span", { class: "tile-ph" }, [card.name, h("br"), cardNumber(card)]),
+    ]),
+    h("h2", {}, card.name),
+    h("p", { class: "muted" }, `${cardNumber(card)} · ${card.setName}`),
+    rarity,
+    priceBox,
+  ];
+  drawPrices();
+  prices.request([card.id]);
+  return { elements, drawPrices };
+}
+
+/**
+ * Kartenansicht: Kopf (Bild, Preise), Sammlung (Anzahl, Zustand, Sprache, Kaufpreis) und Listen.
  * Gibt eine Funktion zurück, die die Preise neu zeichnet, sobald sie geladen sind.
  */
 export function renderCardSheet(body, card, ctx) {
   const { collection, lists, prices } = ctx;
   const entry = collection.entry(card.id);
-  const rarity = h("p", { class: "muted" });
-  const priceBox = h("div", { class: "prices" });
 
   // --- Sammlung ---
   const qtyOut = h("output", {}, String(entry?.qty || 0));
@@ -69,37 +108,10 @@ export function renderCardSheet(body, card, ctx) {
     );
   };
 
-  // --- Preise ---
-  const drawPrices = () => {
-    const p = prices.get(card.id);
-    rarity.textContent = p?.rarity || "";
-    const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, fmtEur(value))]);
-    priceBox.replaceChildren(
-      p && (p.trend || p.low || p.avg30)
-        ? h("div", { class: "price-grid" }, [cell("Trend", p.trend), cell("ab", p.low), cell("Ø 30 Tage", p.avg30)])
-        : p
-          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
-          : !navigator.onLine
-            ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
-            : prices.hasFailed(card.id)
-              ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
-              : h("p", { class: "muted" }, "Preis wird geladen …"),
-      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
-      h("a", { class: "btn cm", href: cardmarketUrl(card, p), target: "_blank", rel: "noopener" }, "Auf Cardmarket ansehen (Deutsch, ab Excellent)")
-    );
-  };
-
-  const image = cardImage(card, "high");
+  const head = cardHead(card, prices);
   body.replaceChildren(
     h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close }),
-    h("div", { class: image ? "sheet-art" : "sheet-art no-img" }, [
-      image ? h("img", { src: image, alt: `${card.name} ${cardNumber(card)}`, crossorigin: "anonymous" }) : null,
-      h("span", { class: "tile-ph" }, [card.name, h("br"), cardNumber(card)]),
-    ]),
-    h("h2", {}, card.name),
-    h("p", { class: "muted" }, `${cardNumber(card)} · ${card.setName}`),
-    rarity,
-    priceBox,
+    ...head.elements,
     h("section", { class: "sheet-part" }, [
       h("h3", {}, "In meiner Sammlung"),
       h("div", { class: "stepper" }, [
@@ -115,7 +127,5 @@ export function renderCardSheet(body, card, ctx) {
   );
   syncFields();
   drawLists();
-  drawPrices();
-  prices.request([card.id]);
-  return drawPrices;
+  return head.drawPrices;
 }

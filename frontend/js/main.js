@@ -6,7 +6,9 @@
 //   ui/        Ansichten und Komponenten
 import { DEFAULT_BACKEND_URL, IS_DEV, OLD_APP_URL, POCKET_SERIES, PRICE_TTL_MS, SETS_TTL_MS, STORAGE_KEYS, SYNC_BATCH, TCGDEX_API } from "./config.js";
 import { fetchJson } from "./core/http.js";
+import { shrinkPhoto } from "./core/image.js";
 import { storage } from "./core/storage.js";
+import { ScanApi } from "./data/scanApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
 import { createSorters } from "./domain/sorting.js";
@@ -17,6 +19,7 @@ import { EntityStore } from "./services/entityStore.js";
 import { LegacyImportService } from "./services/legacyImportService.js";
 import { ListService } from "./services/listService.js";
 import { PriceService } from "./services/priceService.js";
+import { ScanService } from "./services/scanService.js";
 import { SetService } from "./services/setService.js";
 import { SyncService } from "./services/syncService.js";
 import { UpdateService } from "./services/updateService.js";
@@ -31,13 +34,14 @@ const collection = new CollectionService(store);
 const lists = new ListService(store);
 const catalog = new CatalogService(tcgdex, sets);
 const sync = new SyncService(store, new SyncApi(fetchJson), storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH);
+const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto);
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
 const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all" });
 
-new App({ store, sets, prices, collection, lists, catalog, sync, legacyImport, backup, sorters, updates }, prefs).start();
+new App({ store, sets, prices, collection, lists, catalog, sync, scanner, legacyImport, backup, sorters, updates }, prefs).start();
 
 // Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
 // Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates

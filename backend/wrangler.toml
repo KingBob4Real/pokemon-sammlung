@@ -9,6 +9,10 @@ database_name = "pokemon-sammlung"
 database_id = "a8fae683-d5c4-4469-8087-dcea378a8ea1"
 migrations_dir = "migrations"
 
+# Workers AI für den Karten-Scanner
+[ai]
+binding = "AI"
+
 # Dev-Stufe (Branch develop): eigener Worker + eigene Datenbank. Aufruf mit --env dev.
 [env.dev]
 name = "pokemon-sammlung-dev"
@@ -18,3 +22,6 @@ binding = "DB"
 database_name = "pokemon-sammlung-dev"
 database_id = "2de88fcf-125f-4480-9aee-37252ce298ba"
 migrations_dir = "migrations"
+
+[env.dev.ai]
+binding = "AI"

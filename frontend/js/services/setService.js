@@ -9,6 +9,7 @@ const serieOf = (set) => (set.symbol || set.logo || "").match(/\/(?:univ|[a-z]{2
  */
 export class SetService {
   #data = null;
+  #codes = new Map(); // Set → Promise des Kürzels
 
   constructor(tcgdex, storage, storageKey, ttlMs, pocketSerie) {
     this.tcgdex = tcgdex;
@@ -37,6 +38,12 @@ export class SetService {
 
   isPocket(setId) {
     return this.#data?.pocket.has(setId) || false;
+  }
+
+  // Offizielles Kürzel wie auf der Karte (z. B. „MEW“). Steht nur in den vollen Set-Daten → bei Bedarf laden.
+  abbreviation(setId) {
+    if (!this.#codes.has(setId)) this.#codes.set(setId, this.tcgdex.set(setId).then((s) => s.abbreviation?.official || null, () => (this.#codes.delete(setId), null)));
+    return this.#codes.get(setId);
   }
 
   async #load() {

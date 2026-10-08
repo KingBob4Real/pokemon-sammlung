@@ -2,6 +2,7 @@ import { h } from "../../core/dom.js";
 import { fmtEur, fmtSigned, norm, plural } from "../../core/format.js";
 import { COLLECTION_TARGET, links } from "../router.js";
 import { cardTile } from "../components/cardTile.js";
+import { scanButton } from "../components/scanSheet.js";
 import { emptyState, sortSelect, stat } from "../components/widgets.js";
 
 const SORT_KEYS = ["newest", "pokedex", "value", "name", "set"];
@@ -18,11 +19,13 @@ export function render(main, ctx) {
   const sort = sorters[prefs.get("collectionSort")] || sorters.newest;
   const entries = collection.entries().sort(sort.compare);
   const stats = h("div", { class: "stats" });
-  main.append(stats, h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen")]));
+  const scan = scanButton(ctx);
+  main.append(stats, h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
 
   // Pokédex-Sortierung braucht die Kartendetails – sind sie nachgeladen, einmal neu sortieren
   let waitingForDex = prefs.get("collectionSort") === "pokedex" && entries.some((e) => !prices.get(e.card.id));
   const refresh = () => {
+    scan.refresh();
     if (waitingForDex && entries.every((e) => prices.get(e.card.id))) {
       waitingForDex = false;
       return ctx.render();

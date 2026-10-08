@@ -537,6 +537,29 @@ main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 150px + env(safe-area
 .progress-bar i { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: inherit; background: var(--red); transition: width 0.25s ease; }
 .progress-bar.indeterminate i { width: 35%; animation: progress-slide 1s ease-in-out infinite; }
 @keyframes progress-slide { from { left: -35%; } to { left: 100%; } }
+/* ===== Karten-Scanner (im Dialog) ===== */
+.btn-big { min-height: 54px; font-size: 17px; }
+.sheet-art.small { width: min(62%, 240px); }
+/* großer Knopf bleibt unten in Daumen-Reichweite stehen */
+.scan-bar {
+  position: sticky;
+  bottom: calc(-24px - env(safe-area-inset-bottom, 0px));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px -16px calc(-24px - env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg);
+  box-shadow: 0 -1px 0 var(--line);
+}
+button.back { padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: var(--muted); cursor: pointer; }
+.scan-done { padding: 48px 8px 8px; text-align: center; }
+.scan-done h2 { margin-top: 12px; }
+.scan-done-icon { display: inline-grid; place-items: center; width: 72px; height: 72px; border-radius: 50%; color: #fff; background: var(--accent); }
+.scan-done-icon svg { width: 40px; height: 40px; }
+.list-head .btn { min-height: 40px; padding: 8px 14px; font-size: 14px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
 
 /* ===== Hinweise & Fehler ===== */
 .toast {
@@ -596,6 +619,7 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 /* Kartenansicht fährt von unten herein und wieder hinaus */
 .sheet[open] { animation: sheet-in 0.28s var(--ease-out); }
 .sheet[open]::backdrop { animation: fade-in 0.25s ease; }
+.scan-done-icon { animation: pop 0.4s var(--ease-out); }
 .sheet.closing { animation: sheet-out 0.18s ease-in forwards; }
 .sheet.closing::backdrop { animation: fade-out 0.18s ease-in forwards; }
 /* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */

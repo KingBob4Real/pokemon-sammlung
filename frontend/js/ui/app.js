@@ -66,6 +66,8 @@ export class App {
         this.toast.show(`${prefix}${describeError(error).message}`, { type: "error", action: retry ? { label: "Nochmal", run: retry } : null }),
       refresh: () => this.refresh(),
       openCard: (card) => this.openCard(card),
+      // Eigenen Inhalt im Dialog zeigen: render(body, ctx mit close) → optional Funktion zum Neuzeichnen
+      openSheet: (render) => this.openSheet(render),
       afterChange: (structural) => this.afterChange(structural),
     };
   }
@@ -165,8 +167,12 @@ export class App {
   }
 
   openCard(card) {
+    this.openSheet((body, ctx) => renderCardSheet(body, card, ctx));
+  }
+
+  openSheet(render) {
     const body = $("#sheetBody");
-    this.#sheetRefresh = renderCardSheet(body, card, { ...this.ctx, close: () => this.closeSheet() });
+    this.#sheetRefresh = render(body, { ...this.ctx, close: () => this.closeSheet() }) || null;
     this.dialog.classList.remove("closing");
     if (!this.dialog.open) this.dialog.showModal();
     body.scrollTop = 0;
