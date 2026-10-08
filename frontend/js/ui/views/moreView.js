@@ -60,7 +60,13 @@ Weiter?`)) return;
     ctx.render();
   };
 
+  const me = ctx.profiles.list.find((p) => p.id === ctx.profiles.active);
   main.append(
+    panel("Wer sammelt?", [
+      h("p", {}, me ? `Auf diesem Gerät gerade: ${me.name}.` : "Noch niemand angemeldet – Sammlung und Listen liegen nur auf diesem Gerät."),
+      h("p", { class: "muted" }, "Mehrere Personen können dasselbe Gerät nutzen, jede mit eigener Sammlung. Den Sync-Schlüssel gibt jede Person hier nur einmal ein, danach reicht Antippen."),
+      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: ctx.openProfiles }, "Person wechseln oder hinzufügen")]),
+    ]),
     panel("Sync zwischen Geräten", [
       h("p", {}, "Jede Person hat einen eigenen Schlüssel und damit eine eigene Sammlung. Trag deinen Schlüssel auf jedem deiner Geräte einmal ein, dann sind Sammlung und Listen überall gleich."),
       h("label", { class: "label" }, ["Backend-Adresse", url]),

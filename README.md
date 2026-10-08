@@ -3,7 +3,8 @@
 Kartensammlung als iPhone-taugliche Web-App: alle deutschen und englischen Karten suchen und scannen, Sammlung pflegen, eigene Listen anlegen, Marktwerte sehen. Läuft offline und gleicht sich über ein kleines Cloudflare-Backend zwischen Geräten ab. Mehrere Personen, jede mit eigenem Schlüssel und eigener Sammlung.
 
 - **Suche:** alle Karten auf Deutsch und Englisch über die [TCGdex-API](https://tcgdex.dev), nach Name (`Glurak` oder `Charizard`) und/oder Nummer (`199`, `199/165`), oder Set für Set – Set-Namen findet die Suche auch (`Erhabene Helden`, `Evolving Skies`). Sets, die es nur auf Englisch gibt (z. B. Gym Heroes, McDonald's), sind dabei und als „nur Englisch“ markiert. Gibt es eine Karte in beiden Sprachen, gewinnt die deutsche. TCG-Pocket-Karten sind ausgeblendet. Fehlt das deutsche Bild (ältere Sets, manche Promos), kommt das englische – auch bei schon gespeicherten Karten (wird beim Start nachgetragen); hat TCGdex gar keins (Shiny Vault, Trainer-Galerien, Galarian Gallery, Drachenwandel …), kommt es von [pokemontcg.io](https://pokemontcg.io) (`nextImage` in `domain/card.js`).
-- **Sammlung:** pro Karte Anzahl, Zustand, Sprache und Kaufpreis. Oben Gesamtwert, Bezahlt und Gewinn/Verlust. Sortieren und gruppieren nach Set oder Liste. „+ Karten hinzufügen“: suchen oder Set öffnen und Karten einfach antippen.
+- **Wer sammelt?** Mehrere Personen auf einem Gerät, wie Profile bei Netflix: jede gibt ihren Sync-Schlüssel pro Gerät einmal ein (Startbild oder „Mehr“), danach reicht Antippen. Jede Person hat auf dem Gerät eigene Sammlung, Listen und Einstellungen; Wechsel über das Rund-Symbol oben rechts. Bei mehreren Personen fragt die App beim Start, wer sammelt. Kein Passwort zwischen den Personen – wer das Gerät hat, kann wechseln.
+- **Sammlung:** pro Karte Anzahl, Zustand, Sprache und Kaufpreis; „Aus der Sammlung entfernen“ in der Kartenansicht (mit „Rückgängig“). Oben Gesamtwert, Bezahlt und Gewinn/Verlust. Sortieren und gruppieren nach Set oder Liste. „+ Karten hinzufügen“: suchen oder Set öffnen und Karten einfach antippen.
 - **Listen:** beliebig viele, umbenennen, löschen, sortieren (Dropdown) und per Gedrückt-halten-und-ziehen umordnen – die Listen selbst und die Karten darin. Karten sortieren auch nach Pokédex (hält Entwicklungsreihen zusammen), Set & Nummer, Name, Wert; filtern (fehlend/vorhanden). „+ Hinzufügen“ wie bei der Sammlung; „Auswählen“ markiert mehrere Karten für „Hab ich“ (in die Sammlung) oder „Entfernen“. Haken an einer Karte = in der Sammlung.
 - **Updates:** Die App prüft beim Öffnen und bei jeder Rückkehr, ob es eine neue Version gibt, und lädt dann neu – auch als iPhone-App vom Home-Bildschirm.
 - **Marktwert:** Cardmarket-Trend aus TCGdex (alle Sprachen & Zustände gemischt), 24 h zwischengespeichert. Der Cardmarket-Link in der Kartenansicht filtert auf die Sprache der Karte (Deutsch, Englisch …) ab Excellent.
@@ -24,7 +25,7 @@ frontend/                  App für GitHub Pages (ES-Module, kein Build-Schritt)
   js/domain/               reine Fachlogik: Karte, Preis, Sortierung, Scan-Zuordnung
   js/services/             Anwendungslogik: lokaler Speicher, Sammlung, Listen, Preise, Sets, Katalog, Sync, Scanner, Sicherung, Import
   js/ui/                   App-Hülle, Router, Komponenten, Ansichten
-  test/                    Tests ohne Netz: node frontend/test/scan.test.mjs und catalog.test.mjs
+  test/                    Tests ohne Netz: node frontend/test/<scan|catalog|profiles>.test.mjs
 backend/                   Cloudflare Worker + D1-Datenbank
   src/index.js             Composition Root
   src/http/                Router, Antworten (CORS), Schlüssel-Prüfung

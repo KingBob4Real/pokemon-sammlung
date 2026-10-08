@@ -3,6 +3,7 @@ import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
 import { nextImage } from "../domain/card.js";
 import { renderCardSheet } from "./components/cardSheet.js";
+import { avatarColor, chosenThisSession, initial, showProfiles } from "./components/profilePicker.js";
 import { tileCard, updateTile } from "./components/cardTile.js";
 import { isDragging } from "./components/reorder.js";
 import { Toaster } from "./components/toast.js";
@@ -69,6 +70,7 @@ export class App {
       openCard: (card) => this.openCard(card),
       // Eigenen Inhalt im Dialog zeigen: render(body, ctx mit close) → optional Funktion zum Neuzeichnen
       openSheet: (render) => this.openSheet(render),
+      openProfiles: () => showProfiles(this.ctx),
       afterChange: (structural) => this.afterChange(structural),
     };
   }
@@ -114,6 +116,10 @@ export class App {
     });
     this.#showSyncState();
     this.render();
+    $("#who").addEventListener("click", () => showProfiles(this.ctx));
+    // Mehrere Personen auf dem Gerät: einmal pro Sitzung fragen, wer sammelt. Neues Gerät: zum Einrichten.
+    const firstRun = !sync.enabled && store.isEmpty && !this.services.profiles.list.length;
+    if ((this.services.profiles.list.length > 1 || firstRun) && !chosenThisSession()) showProfiles(this.ctx, { start: true });
   }
 
   render() {
@@ -278,6 +284,15 @@ export class App {
   }
 
   #showSyncState() {
+    const { profiles } = this.services;
+    const index = profiles.list.findIndex((p) => p.id === profiles.active);
+    const who = $("#who");
+    who.hidden = index < 0; // erst, wenn die Person bekannt ist (nach dem ersten Sync)
+    if (index >= 0) {
+      who.textContent = initial(profiles.list[index].name);
+      who.style.background = avatarColor(index);
+      who.setAttribute("aria-label", `${profiles.list[index].name} – Person wechseln`);
+    }
     const state = this.services.sync.state;
     $("#syncDot").dataset.state = state;
     $("#syncLabel").textContent = SYNC_LABELS[state];

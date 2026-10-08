@@ -18,18 +18,25 @@ export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
-export const STORAGE_KEYS = {
-  entities: `${P}entities.v1`,
-  dirty: `${P}dirty.v1`,
-  rev: `${P}rev.v1`,
-  sync: `${P}sync.v1`,
-  prices: `${P}prices.v2`, // v2: mit Pokédex-Nummer
-  sets: `${P}sets.v3`, // v3: deutsche + englische Sets, Serie für jedes Set (englische Ersatzbilder)
-  prefs: `${P}prefs.v1`,
-  // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
-  legacyOwned: "pkc.owned.v1",
-  legacyPrices: "pkc.ownPrices.v1",
-};
+export const PROFILES_KEY = `${P}profiles.v1`; // Personen auf diesem Gerät (services/profileService.js)
+
+// Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel und Einstellungen gehören ihr allein,
+// Preise und Sets teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
+export function storageKeys(profile = "") {
+  const own = profile ? `${P}${profile}.` : P;
+  return {
+    entities: `${own}entities.v1`,
+    dirty: `${own}dirty.v1`,
+    rev: `${own}rev.v1`,
+    sync: `${own}sync.v1`,
+    prefs: `${own}prefs.v1`,
+    prices: `${P}prices.v2`, // v2: mit Pokédex-Nummer
+    sets: `${P}sets.v3`, // v3: deutsche + englische Sets, Serie für jedes Set (englische Ersatzbilder)
+    // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
+    legacyOwned: "pkc.owned.v1",
+    legacyPrices: "pkc.ownPrices.v1",
+  };
+}
 
 export const ENTITY_TYPES = ["collection", "list", "listItem"];
 export const CONDITIONS = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"];

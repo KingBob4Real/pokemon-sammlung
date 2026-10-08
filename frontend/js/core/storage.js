@@ -9,6 +9,13 @@ export const storage = {
       return fallback;
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* gesperrt: dann bleibt es eben liegen */
+    }
+  },
   set(key, value) {
     try {
       localStorage.setItem(key, JSON.stringify(value));

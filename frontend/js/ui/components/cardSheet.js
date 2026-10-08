@@ -60,10 +60,24 @@ export function renderCardSheet(body, card, ctx) {
   const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: (entry?.lang || "Deutsch") === l }, l)));
   const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
   const fields = [cond, lang, paid];
+  // Ganz raus aus der Sammlung – mit „Rückgängig“ (Zustand & Kaufpreis bleiben ohnehin gespeichert)
+  const removeAll = () => {
+    const before = collection.quantity(card.id);
+    collection.setQuantity(card, 0);
+    ctx.afterChange(false);
+    ctx.close();
+    ctx.notify(`${card.name} ${cardNumber(card)} aus der Sammlung entfernt.`, {
+      type: "success",
+      force: true,
+      action: { label: "Rückgängig", run: () => (collection.setQuantity(card, before), ctx.afterChange(false)) },
+    });
+  };
+  const remove = h("button", { type: "button", class: "btn btn-ghost danger", onclick: removeAll }, "Aus der Sammlung entfernen");
   const syncFields = () => {
     const qty = collection.quantity(card.id);
     qtyOut.textContent = String(qty);
     for (const f of fields) f.disabled = qty === 0;
+    remove.hidden = qty === 0;
   };
   const step = (delta) => {
     const next = collection.quantity(card.id) + delta;
@@ -126,6 +140,7 @@ export function renderCardSheet(body, card, ctx) {
       h("label", { class: "label" }, ["Zustand", cond]),
       h("label", { class: "label" }, ["Sprache", lang]),
       h("label", { class: "label" }, ["Kaufpreis pro Stück", paid]),
+      h("div", { class: "buttons" }, [remove]),
     ]),
     h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), listBox])
   );

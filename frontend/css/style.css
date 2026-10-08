@@ -592,6 +592,69 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
 .list-head .btn { min-height: 40px; padding: 8px 14px; font-size: 14px; }
 .btn:disabled { opacity: 0.45; cursor: default; }
 
+/* ===== Wer sammelt? (Personen auf dem Gerät, wie Profile bei Netflix) ===== */
+.top h1 { margin-right: auto; }
+.who {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.profiles {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+.profiles::backdrop { background: var(--bg); }
+.profiles-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  min-height: 100%;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+.profiles h1 { font-size: 30px; font-weight: 600; }
+.profiles-grid { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px 18px; max-width: 520px; }
+.profile { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 104px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.profile-avatar {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 24px;
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 44px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+  transition: transform 0.12s ease;
+}
+.profile:active .profile-avatar { transform: scale(0.94); }
+.profile.is-current .profile-avatar { box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--text); }
+.profile.is-removable .profile-avatar { opacity: 0.75; }
+.profile-avatar svg { width: 40px; height: 40px; }
+.profile-plus { color: var(--muted); background: var(--surface); box-shadow: inset 0 0 0 2px var(--line); }
+.profile-name { font-weight: 800; font-size: 15px; text-align: center; overflow-wrap: anywhere; }
+.profiles-add { width: 100%; max-width: 420px; }
+.profiles-add .toolbar .field { font-weight: 800; letter-spacing: 0.04em; }
+
 /* ===== Hinweise & Fehler ===== */
 .toast {
   position: fixed;
