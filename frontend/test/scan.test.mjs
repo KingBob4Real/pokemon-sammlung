@@ -32,6 +32,14 @@ r = rankMatches([hgss, base], rec({ name: "Charizard", number: "4", total: "102"
 assert.equal(r.sure, false, "zwei gleich gute Treffer → Auswahl");
 assert.equal(r.cards.length, 2);
 
+// Nummer falsch gelesen (Pokédex-Nummer 34 statt 11), Name und Setgröße stimmen → trotzdem die richtige Karte
+const nidoking = card("base1-11", "Nidoking", "11", "base1", 102);
+const farfetchd = card("base1-27", "Porenta", "27", "base1", 102);
+const modern = card("sv03.5-034", "Nidoking", "034", "sv03.5", 165);
+r = rankMatches([farfetchd, modern, nidoking], rec({ name: "Nidoking", number: "34", total: "102" }));
+assert.equal(r.cards[0], nidoking, "Name + Setgröße schlagen eine falsche Nummer");
+assert.equal(rankMatches([card("x-1", "Glurak-ex", "1", "x", 9)], rec({ name: "Glurak ex", number: "1", total: "9" })).sure, true, "„Glurak ex“ = „Glurak-ex“");
+
 // Unsicher erkannt → nie direkt bestätigen
 r = rankMatches([glurak], rec({ name: "Glurak-ex", number: "199", total: "165", confidence: 0.3 }));
 assert.equal(r.sure, false, "confidence < 0,5 → Auswahl");

@@ -1,15 +1,19 @@
 // Karten-Scanner: Foto → Workers AI liest Name, Nummer und Set-Kürzel. Das Foto wird nicht gespeichert.
 
-const PROMPT = `Du siehst das Foto einer Pokémon-Sammelkarte (meist deutsch, manchmal englisch oder japanisch).
+const PROMPT = `Du siehst das Foto einer Pokémon-Sammelkarte (deutsch oder englisch, manchmal japanisch; neue Karten oder alte ab 1999).
 Lies nur, was wirklich auf der Karte steht, und antworte ausschließlich mit diesem JSON, ohne weiteren Text:
 {
-  "name": "Name des Pokémon oder der Trainerkarte genau wie gedruckt, z. B. \\"Glurak-ex\\" oder \\"Mega-Glurak X-ex\\"",
-  "number": "Kartennummer unten links/rechts VOR dem Schrägstrich, z. B. \\"199\\" oder \\"023\\" oder \\"TG05\\"",
-  "total": "Zahl NACH dem Schrägstrich, z. B. \\"165\\"; null, wenn es keinen Schrägstrich gibt (Promo)",
-  "setCode": "Set-Kürzel neben der Nummer, z. B. \\"MEW\\", \\"PAL\\", \\"SVP\\"; null, wenn nicht lesbar",
+  "name": "Name des Pokémon oder der Trainerkarte genau wie oben auf der Karte gedruckt, z. B. \\"Glurak-ex\\", \\"Mega-Glurak X-ex\\" oder \\"Nidoking\\"",
+  "number": "Sammlernummer VOR dem Schrägstrich, z. B. \\"199\\", \\"023\\", \\"11\\" oder \\"TG05\\"",
+  "total": "Zahl NACH dem Schrägstrich, z. B. \\"165\\" oder \\"102\\"; null, wenn es keinen Schrägstrich gibt (Promo)",
+  "setCode": "Set-Kürzel direkt neben der Sammlernummer, z. B. \\"MEW\\", \\"PAL\\", \\"SVP\\"; null, wenn keins gedruckt ist",
   "language": "\\"de\\", \\"en\\", \\"ja\\" oder null",
-  "confidence": Zahl von 0 bis 1, wie sicher du dir bei Name UND Nummer bist
+  "confidence": Zahl von 0 bis 1, wie sicher du dir bei Name UND Sammlernummer bist
 }
+So findest du die Sammlernummer: ganz unten auf der Karte im Format „Nummer/Gesamtzahl“ (z. B. „11/102“) –
+bei neuen Karten unten links, bei alten Karten (1999–2003) unten rechts, oft neben einem Seltenheitssymbol (●, ◆, ★).
+Nicht verwechseln mit: Pokédex-Nummer („Nr. 034“, „NO. 34“), KP/HP, Schaden, Größe/Gewicht, Jahreszahlen im Copyright.
+Set-Kürzel (2–4 Großbuchstaben) gibt es nur auf neueren Karten; alte Karten haben keins → null. Nicht raten.
 Regeln: Nichts erfinden. Unlesbares als null. Keine Angriffe, KP oder Beschreibungstexte ausgeben.
 Bei Spiegelungen/Holo-Effekten trotzdem die Nummer unten genau lesen.`;
 

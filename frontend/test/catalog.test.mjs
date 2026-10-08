@@ -1,6 +1,6 @@
 // Test des Katalogs (Sets und Suche auf Deutsch + Englisch, englische Ersatzbilder): node frontend/test/catalog.test.mjs
 import assert from "node:assert/strict";
-import { withEnglishImage } from "../js/domain/card.js";
+import { nextImage, withEnglishImage } from "../js/domain/card.js";
 import { CatalogService } from "../js/services/catalogService.js";
 import { mergeSets, SetService } from "../js/services/setService.js";
 
@@ -40,5 +40,11 @@ assert.equal(evoli.img, "https://assets.tcgdex.net/en/sv/svp/174", "kein deutsch
 // Gespeicherte Karte ohne Bild nachträglich reparieren
 assert.equal(withEnglishImage({ ...evoli, img: null }, "sv").img, evoli.img);
 assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");
+
+// Bild-Quellen nacheinander: deutsch → englisch → pokemontcg.io (mit dessen Set-Namen) → Platzhalter
+assert.equal(nextImage("https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp"), "https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp");
+assert.equal(nextImage("https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp"), "https://images.pokemontcg.io/sm75/1.png");
+assert.equal(nextImage("https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/high.webp"), "https://images.pokemontcg.io/swsh9tg/TG01_hires.png");
+assert.equal(nextImage("https://images.pokemontcg.io/sm75/1.png"), null);
 
 console.log("Katalog ok");

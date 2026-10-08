@@ -1,6 +1,6 @@
 "use strict";
 
-// Offline-Betrieb: eigene Dateien „Netz zuerst“ (Updates kommen sofort an), Kartenbilder & Schriften „Speicher zuerst“.
+// Offline-Betrieb: eigene Dateien „Netz zuerst“ (Updates kommen sofort an), Kartenbilder (TCGdex, pokemontcg.io) & Schriften „Speicher zuerst“.
 // Kartensuche/Preise (api.tcgdex.net) und das Sync-Backend laufen immer übers Netz.
 // ponytail: ein Cache ohne Aufräumen – alte ?v=-Stände bleiben liegen (wenige KB), CACHE umbenennen + löschen, falls das mal stört.
 const CACHE = "ps-v2"; // eigener Name: die alte Checkliste teilt sich den Speicher dieser Domain
@@ -41,7 +41,7 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
   if (url.origin === location.origin || url.hostname === "fonts.googleapis.com") e.respondWith(networkFirst(req));
-  else if (url.hostname === "assets.tcgdex.net" || url.hostname === "fonts.gstatic.com") e.respondWith(cacheFirst(req));
+  else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.gstatic.com"].includes(url.hostname)) e.respondWith(cacheFirst(req));
 });
 
 async function cacheFirst(req) {

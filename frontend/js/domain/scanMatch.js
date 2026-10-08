@@ -4,6 +4,8 @@ import { norm } from "../core/format.js";
 
 // Nummer als Zahl, wenn sie nur aus Ziffern besteht („023“ → 23); „TG05“ → null
 const numeric = (s) => (s != null && /^\d+$/.test(s) ? Number(s) : null);
+// Namen vergleichen ohne Bindestriche, Leerzeichen, Akzente: „Glurak ex“ = „Glurak-ex“
+const plain = (s) => norm(s).replace(/[^a-z0-9]/g, "");
 
 // Suchanfragen in dieser Reihenfolge, bis eine etwas findet: „Glurak-ex 199/165“, „199/165“, „Glurak-ex“.
 // Promo ohne Setgröße: nur „50“. Englischer Name findet nichts → die Nummer allein hilft weiter.
@@ -13,18 +15,19 @@ export function scanQueries({ name, number, total }) {
   return [...new Set([name && num && `${name} ${num}`, num, name].filter(Boolean))];
 }
 
-// Wie gut passt eine Karte zum Erkannten? Nummer zählt am meisten, dann Set-Kürzel, Setgröße, Name.
+// Wie gut passt eine Karte zum Erkannten? Der Name zählt am meisten – den liest die KI zuverlässig, die winzige
+// Nummer alter Karten nicht immer (verwechselt z. B. mit der Pokédex-Nummer). Dann Nummer, Set-Kürzel, Setgröße.
 export function matchScore(card, rec, setCode = null) {
   const n = numeric(rec.number);
   let score = 0;
-  if (rec.number && (n != null ? parseInt(card.num, 10) === n : norm(card.num) === norm(rec.number))) score += 4;
-  if (rec.setCode && setCode && setCode.toUpperCase() === rec.setCode) score += 3;
-  if (rec.total && card.total === Number(rec.total)) score += 2;
   if (rec.name) {
-    const [a, b] = [norm(card.name), norm(rec.name)];
-    if (a === b) score += 2;
-    else if (a.includes(b) || b.includes(a)) score += 1;
+    const [a, b] = [plain(card.name), plain(rec.name)];
+    if (a === b) score += 4;
+    else if (a.includes(b) || b.includes(a)) score += 2;
   }
+  if (rec.number && (n != null ? parseInt(card.num, 10) === n : norm(card.num) === norm(rec.number))) score += 3;
+  if (rec.setCode && setCode && setCode.toUpperCase() === rec.setCode) score += 3;
+  if (rec.total && card.total) score += card.total === Number(rec.total) ? 2 : -2; // „/102“ gelesen → keine Karte aus einem 165er-Set
   return score;
 }
 

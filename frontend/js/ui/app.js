@@ -1,6 +1,7 @@
 import { $, h } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
+import { nextImage } from "../domain/card.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { tileCard, updateTile } from "./components/cardTile.js";
 import { isDragging } from "./components/reorder.js";
@@ -222,12 +223,13 @@ export class App {
     this.afterChange(false);
   }
 
-  // Bild fehlt auf Deutsch → englisches, sonst Platzhalter
+  // Bild fehlt → nächste Quelle (deutsch → englisch → pokemontcg.io), sonst Platzhalter
   #onImageError(e) {
     const img = e.target;
     const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art");
     if (!box) return;
-    if (img.src.includes("/de/")) img.src = img.src.replace("/de/", "/en/");
+    const next = nextImage(img.src);
+    if (next) img.src = next;
     else box.classList.add("no-img");
   }
 

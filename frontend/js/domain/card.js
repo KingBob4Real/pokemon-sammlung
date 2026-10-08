@@ -21,6 +21,17 @@ export function toCard(c, setInfo) {
   };
 }
 
+// pokemontcg.io führt manche Sets unter anderem Namen
+const PTCGIO_SETS = { "sm7.5": "sm75", "swsh4.5sv": "swsh45sv", "swsh12.5gg": "swsh12pt5gg" };
+
+// Bild lädt nicht → nächste Quelle: TCGdex deutsch → englisch → pokemontcg.io. Letzteres hat Bilder, die TCGdex
+// ganz fehlen (Shiny Vault, Trainer-Galerien, Galarian Gallery, Drachenwandel, Promos …). null = keine weitere Quelle.
+export function nextImage(src) {
+  if (src.startsWith("https://assets.tcgdex.net/de/")) return src.replace("/de/", "/en/");
+  const m = src.match(/^https:\/\/assets\.tcgdex\.net\/en\/[^/]+\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
+  return m ? `https://images.pokemontcg.io/${PTCGIO_SETS[m[1]] || m[1]}/${m[2]}${m[3] === "high" ? "_hires" : ""}.png` : null;
+}
+
 // Gespeicherte Karte ohne Bild → mit englischem Bild (oder null, wenn nichts zu tun ist)
 export const withEnglishImage = (card, serie) => (card.img || !serie ? null : { ...card, img: englishImage(serie, card.set, card.num) });
 

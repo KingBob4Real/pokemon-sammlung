@@ -27,13 +27,15 @@ export class ScanService {
     return (await this.api.scan(this.sync.config, image)).recognized;
   }
 
-  // Erkanntes → { cards: beste zuerst (höchstens 6), sure }
+  // Erkanntes → { cards: beste zuerst (höchstens 6), sure }.
+  // Sucht weiter, bis ein Treffer eindeutig ist – eine falsch gelesene Nummer findet sonst nur fremde Karten.
   async match(rec) {
-    let found = [];
+    const byId = new Map();
     for (const query of scanQueries(rec)) {
-      found = await this.catalog.search(query);
-      if (found.length) break;
+      for (const card of await this.catalog.search(query)) byId.set(card.id, card);
+      if (rankMatches([...byId.values()], rec).sure) break;
     }
+    const found = [...byId.values()];
     const codes = new Map();
     if (rec.setCode && found.length > 1) {
       const setIds = [...new Set(rankMatches(found, rec).cards.map((c) => c.set))].slice(0, CODE_LOOKUPS);
