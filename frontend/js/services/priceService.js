@@ -53,7 +53,10 @@ export class PriceService extends EventTarget {
         const id = this.#queue.values().next().value;
         this.#queue.delete(id);
         try {
-          this.prices[id] = toPrice(await this.tcgdex.card(id));
+          const card = await this.tcgdex.card(id);
+          // Manche Karten haben auf Deutsch keine Preise, auf Englisch schon (McDonald's, Celebrations Klassische Kollektion, MEP …)
+          const pricing = card.pricing?.cardmarket ? card.pricing : (await this.tcgdex.card(id, "en").catch(() => null))?.pricing;
+          this.prices[id] = toPrice({ ...card, pricing });
           ok++;
         } catch (e) {
           this.#failed.add(id); // alter Wert bleibt

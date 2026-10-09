@@ -69,4 +69,15 @@ assert.deepEqual(setSorted("numDown"), ["s-4", "s-3", "s-2", "s-1"]);
 assert.deepEqual(setSorted("valueDown"), ["s-3", "s-1", "s-4", "s-2"], "gleicher Wert → nach Nummer");
 assert.deepEqual(setSorted("valueUp"), ["s-1", "s-4", "s-3", "s-2"]);
 
+// Preis: deutsche Karte ohne Preis (z. B. McDonald's 2014) → englischer Preis, deutsche Details bleiben
+Object.defineProperty(globalThis.navigator, "onLine", { value: true }); // Node kennt navigator, aber ohne onLine
+const { PriceService } = await import("../js/services/priceService.js");
+const fakeTcgdex = { card: async (id, lang) => (lang === "en" ? { pricing: { cardmarket: { avg7: 2.83 } } } : { rarity: "Common", dexId: [13] }) };
+const priceService = new PriceService(fakeTcgdex, storage, "p", 1000);
+const loaded = new Promise((r) => priceService.addEventListener("update", r, { once: true }));
+priceService.request(["2014xy-1"]);
+await loaded;
+assert.equal(priceService.value("2014xy-1"), 2.83);
+assert.equal(priceService.get("2014xy-1").dexId, 13);
+
 console.log("Sammlung ok");

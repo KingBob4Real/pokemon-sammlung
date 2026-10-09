@@ -33,7 +33,7 @@ export function storageKeys(profile = "") {
     rev: `${own}rev.v1`,
     sync: `${own}sync.v1`,
     prefs: `${own}prefs.v1`,
-    prices: `${P}prices.v3`, // v3: mit Ø 7 Tage (v2: Pokédex-Nummer)
+    prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
     sets: `${P}sets.v3`, // v3: deutsche + englische Sets, Serie für jedes Set (englische Ersatzbilder)
     // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
     legacyOwned: "pkc.owned.v1",
