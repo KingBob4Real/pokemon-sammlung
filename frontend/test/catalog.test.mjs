@@ -121,13 +121,14 @@ assert.deepEqual(await catalog.search("XYZ 11"), [], "unbekanntes Kürzel → ni
 assert.equal(withEnglishImage({ ...evoli, img: null }, "sv").img, evoli.img);
 assert.equal(withEnglishImage(evoli, "sv"), null, "Bild da → nichts zu tun");
 
-// Bildquellen der Reihe nach, egal ob die Kachel deutsch oder englisch startet: TCGdex de → en → Limitless → pokemontcg.io
+// Bildquellen der Reihe nach, egal ob die Kachel deutsch oder englisch startet: TCGdex de → en → Limitless → TCGplayer → pokemontcg.io
 const proxy = "https://b/img";
 const mep = "https://assets.tcgdex.net/en/me/mep/033/low.webp"; // API meldet kein Bild, die deutsche Datei gibt es aber
 assert.deepEqual(imageSources(mep, proxy), [
   "https://assets.tcgdex.net/de/me/mep/033/low.webp",
   mep,
   "https://b/img?set=MEP&n=033&size=SM", // Limitless: dreistellig
+  "https://b/img?card=mep-033&size=SM", // TCGplayer über die TCGdex-ID
   "https://images.pokemontcg.io/mep/33.png", // pokemontcg.io: ohne führende Null, zuletzt (sonst Kartenrückseite)
 ]);
 const walk = (first, p = proxy) => {
@@ -136,19 +137,26 @@ const walk = (first, p = proxy) => {
   return tried;
 };
 assert.deepEqual(walk(mep).slice(0, 2), ["https://assets.tcgdex.net/en/me/mep/033/low.webp", "https://assets.tcgdex.net/de/me/mep/033/low.webp"], "startet englisch → deutsch wird auch probiert");
-assert.equal(walk(mep).length, 4, "jede Quelle genau einmal, dann Platzhalter");
+assert.equal(walk(mep).length, 5, "jede Quelle genau einmal, dann Platzhalter");
 assert.deepEqual(walk("https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp"), [
   "https://assets.tcgdex.net/de/sm/sm7.5/1/low.webp",
   "https://assets.tcgdex.net/en/sm/sm7.5/1/low.webp",
+  "https://b/img?card=sm7.5-1&size=SM",
   "https://images.pokemontcg.io/sm75/1.png",
-], "Set ohne Limitless: deutsch → englisch → pokemontcg.io (mit dessen Set-Namen)");
+], "Set ohne Limitless: deutsch → englisch → TCGplayer → pokemontcg.io (mit dessen Set-Namen)");
 assert.equal(imageSources("https://assets.tcgdex.net/en/swsh/swsh9tg/TG01/high.webp", proxy).at(-1), "https://images.pokemontcg.io/swsh9tg/TG01_hires.png", "groß, Nummer mit Buchstaben");
 assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/high.webp", proxy)[2], "https://b/img?set=SVP&n=175&size=LG");
-assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/low.webp").length, 3, "ohne Durchreicher kein Limitless");
+assert.equal(imageSources("https://assets.tcgdex.net/en/sv/svp/175/low.webp").length, 3, "ohne Durchreicher kein Limitless und kein TCGplayer");
 assert.equal(imageSources("https://assets.tcgdex.net/en/mcd/2011bw/1/low.webp").at(-1), "https://images.pokemontcg.io/mcd11/1.png", "McDonald's heißt dort mcd11");
 assert.equal(imageSources("https://assets.tcgdex.net/en/ecard/ecard2/H01/low.webp").at(-1), "https://images.pokemontcg.io/ecard2/H1.png", "e-Card-Holo „H01“ → „H1“");
 assert.equal(imageSources("https://assets.tcgdex.net/en/sv/sve/017/low.webp", proxy)[2], "https://b/img?set=SVE&n=017&size=SM", "Energien bei Limitless");
 assert.equal(imageSources("https://assets.tcgdex.net/en/me/30th-c/014/low.webp", proxy)[2], "https://b/img?set=30C&n=CC1&size=SM", "Klassische Sammlung: TCGdex 014 Pikachu = Limitless CC1");
 assert.equal(imageSources("https://assets.tcgdex.net/en/me/30th-c/001/high.webp", proxy)[2], "https://b/img?set=30C&n=CC2&size=LG", "TCGdex 001 Glurak = Limitless CC2");
+
+assert.equal(imageSources("https://assets.tcgdex.net/en/me/30th/B/high.webp", proxy)[2], "https://b/img?set=30C&n=B&size=LG", "30 Jahre: Mew B/G/R bei Limitless");
+assert.equal(imageSources("https://assets.tcgdex.net/en/swsh/cel25cc/CC001/low.webp", proxy)[2], "https://b/img?set=CEL&n=CC1&size=SM", "Celebrations Klassische Kollektion: CC001 = Limitless CEL CC1");
+assert.equal(imageSources("https://assets.tcgdex.net/en/mc/2014xy/1/high.webp", proxy)[2], "https://b/img?card=2014xy-1&size=LG", "McDonald's 2014: TCGplayer, groß");
+assert.equal(imageSources("https://assets.tcgdex.net/en/me/mep/Museum/low.webp", proxy)[2], "https://b/img?card=mep-Museum&size=SM", "keine Limitless-Nummer → gleich TCGplayer");
+assert.equal(imageSources("https://assets.tcgdex.net/en/ex/exu/%3F/low.webp", proxy)[2], "https://b/img?card=exu-%253F&size=SM", "Icognito „?“: ID bleibt heil");
 
 console.log("Katalog ok");

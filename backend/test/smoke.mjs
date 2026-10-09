@@ -39,6 +39,9 @@ assert.equal(parseImageRequest("https://x/img?set=../..&n=1&size=SM"), null, "ke
 assert.deepEqual(parseImageRequest("https://x/img?set=MEP&n=033&size=LG"), { set: "MEP", n: "033", size: "LG" }, "Nummer dreistellig wie bei Limitless");
 assert.equal(parseImageRequest("https://x/img?set=SVP&n=1a&size=SM"), null, "nur Ziffern");
 assert.equal(parseImageRequest("https://x/img?set=30C&n=CC12&size=SM")?.n, "CC12", "Klassische Sammlung");
+assert.equal(parseImageRequest("https://x/img?set=30C&n=B&size=SM")?.n, "B", "30 Jahre: Mew B/G/R");
+assert.deepEqual(parseImageRequest("https://x/img?card=2014xy-1&size=LG"), { card: "2014xy-1", size: "LG" }, "TCGplayer über TCGdex-ID");
+assert.equal(parseImageRequest("https://x/img?card=a/../b&size=SM"), null, "kein Pfad in der ID");
 
 const [baseArg, key, otherKey] = process.argv.slice(2);
 if (!baseArg || !key) {
@@ -166,5 +169,6 @@ const img = await fetch(`${base}/img?set=MEP&n=033&size=SM`);
 assert.equal(img.status, 200, "MEP 033 kommt über /img");
 assert.equal(img.headers.get("Access-Control-Allow-Origin"), "*", "mit CORS-Header");
 assert.equal((await fetch(`${base}/img?set=SVP&n=9999&size=SM`)).status, 404, "fehlendes Bild → 404");
+assert.equal((await fetch(`${base}/img?card=2014xy-1&size=SM`)).status, 200, "McDonald's 2014 kommt von TCGplayer");
 
 console.log(`Backend ok: ${base} (Person: ${start.body.user}${otherKey ? ", Trennung zu zweiter Person geprüft" : ""}${scanned.status === 200 ? `, Scan: ${scanned.body.recognized.name} ${scanned.body.recognized.number}/${scanned.body.recognized.total}` : ""})`);

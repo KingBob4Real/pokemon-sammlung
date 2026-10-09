@@ -27,3 +27,18 @@ export function createSorters({ valueOf, setOrder, dexOf }) {
     pokedex: { label: "Pokédex (Entwicklung)", compare: (a, b) => dex(a) - dex(b) || a.card.name.localeCompare(b.card.name, "de") || bySet(a, b) },
   };
 }
+
+// Sortierungen im Set. Einträge haben { card, i } – i = Stelle im Katalog, der schon nach Nummer sortiert (numCmp).
+// Karten ohne Preis stehen beim Wert immer am Ende.
+export function createSetSorters(valueOf) {
+  const byValue = (dir) => (a, b) => {
+    const [x, y] = [valueOf(a.card.id), valueOf(b.card.id)];
+    return (x == null) - (y == null) || dir * (x - y) || a.i - b.i;
+  };
+  return {
+    numUp: { label: "Nummer aufsteigend", compare: (a, b) => a.i - b.i },
+    numDown: { label: "Nummer absteigend", compare: (a, b) => b.i - a.i },
+    valueUp: { label: "Wert aufsteigend", compare: byValue(1) },
+    valueDown: { label: "Wert absteigend", compare: byValue(-1) },
+  };
+}

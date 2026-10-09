@@ -24,6 +24,7 @@ export function toCard(c, setInfo) {
 // pokemontcg.io führt manche Sets unter anderem Namen (McDonald's, Best of Game, EX-Trainer-Kits, HGSS-Promos …)
 // ponytail: von Hand gepflegt – neue Lücken findet ein Abgleich aller Sets (siehe README „Suche“)
 const PTCGIO_SETS = {
+  "sm3.5": "sm35",
   "sm7.5": "sm75",
   "swsh4.5sv": "swsh45sv",
   "swsh12.5gg": "swsh12pt5gg",
@@ -36,7 +37,7 @@ const PTCGIO_SETS = {
   hgssp: "hsp",
 };
 // Sets, für die Limitless TCG Bilder hat, die sonst fehlen (TCGdex-Set → Kürzel bei Limitless). Weitere hier eintragen.
-const LIMITLESS_SETS = { svp: "SVP", mep: "MEP", mee: "MEE", sve: "SVE", "30th-c": "30C" };
+const LIMITLESS_SETS = { svp: "SVP", mep: "MEP", mee: "MEE", sve: "SVE", "30th-c": "30C", "30th": "30C", cel25cc: "CEL" };
 // Nachdrucke mit der Nummer des Originals auf der Karte (Palkia LV.X: „106/106“) – TCGdex zählt sie neu durch (001–030 bzw.
 // CC001–CC025, in der Reihenfolge dieser Nummern). Stelle = TCGdex-Nummer − 1. Abgelesen von den Kartenbildern.
 //   30th-c: „30 Jahre: Klassische Sammlung“, dazu die Nummer bei Limitless (Set 30C, CC1–CC30, andere Reihenfolge)
@@ -71,20 +72,29 @@ export function classicId(cc) {
   return i < 0 ? null : `30th-c-${String(i + 1).padStart(3, "0")}`;
 }
 
+// Nummer bei Limitless: dreistellig („085“), Klassische Sammlung „CC12“ (andere Reihenfolge), Celebrations „CC1“,
+// 30 Jahre „B“/„G“/„R“ (die drei Mew); sonst null (z. B. MEP „Museum“)
+const limitlessNumber = (set, n) =>
+  set === "30th-c" ? CLASSIC_30C[n - 1]?.[1] : /^\d+$/.test(n) ? n.padStart(3, "0") : /^(CC\d+|[A-Z])$/.test(n) ? n.replace(/^CC0*/, "CC") : null;
+
 // Alle Bildquellen einer Karte in der Reihenfolge, in der die App sie probiert – egal, ob die Kachel mit dem deutschen
 // oder englischen TCGdex-Bild startet (die API meldet nicht jedes vorhandene Bild):
-//   TCGdex deutsch → TCGdex englisch → Limitless (über imageProxy = GET /img des Backends, Limitless schickt keinen
-//   CORS-Header) → pokemontcg.io (Shiny Vault, Trainer-Galerien … – fehlt dort etwas, kommt eine Kartenrückseite, darum zuletzt)
+//   TCGdex deutsch → TCGdex englisch → Limitless → TCGplayer (beide über imageProxy = GET /img des Backends, sie schicken
+//   keinen CORS-Header; TCGplayer: McDonald's, Trainer-Kits, Celebrations Klassische Kollektion …) → pokemontcg.io
+//   (Shiny Vault, Trainer-Galerien … – fehlt dort etwas, kommt eine Kartenrückseite, die als geladen zählt, darum zuletzt)
 export function imageSources(src, imageProxy = null) {
   const t = src.match(/^https:\/\/assets\.tcgdex\.net\/(?:de|en)\/([^/]+)\/([^/]+)\/([^/]+)\/(low|high)\.webp$/);
   if (!t) return [src];
   const [, serie, set, num, size] = t;
   const n = num.replace(/^0+(?=\d)/, ""); // pokemontcg.io: „85“, Limitless: „085“
-  const code = imageProxy && /^\d+$/.test(n) && LIMITLESS_SETS[set];
+  const sz = size === "high" ? "LG" : "SM";
+  const code = imageProxy && LIMITLESS_SETS[set];
+  const ln = code && limitlessNumber(set, n);
   return [
     `https://assets.tcgdex.net/de/${serie}/${set}/${num}/${size}.webp`,
     `https://assets.tcgdex.net/en/${serie}/${set}/${num}/${size}.webp`,
-    code && `${imageProxy}?set=${code}&n=${set === "30th-c" ? CLASSIC_30C[n - 1][1] : n.padStart(3, "0")}&size=${size === "high" ? "LG" : "SM"}`,
+    ln && `${imageProxy}?set=${code}&n=${ln}&size=${sz}`,
+    imageProxy && `${imageProxy}?card=${encodeURIComponent(`${set}-${num}`)}&size=${sz}`,
     `https://images.pokemontcg.io/${PTCGIO_SETS[set] || set}/${n.replace(/^H0(?=\d)/, "H")}${size === "high" ? "_hires" : ""}.png`, // e-Card „H01“ → „H1“
   ].filter(Boolean);
 }

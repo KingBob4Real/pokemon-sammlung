@@ -17,8 +17,8 @@ export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 // klein, ohne Akzente: „Pokémon“ findet man auch mit „pokemon“
 export const norm = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
-// Kartennummern: „023“ < „199“ < „TG01“
-export const numCmp = (a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0) || String(a).localeCompare(String(b));
+// Kartennummern: „023“ < „199“ < „B“ < „TG01“ < „TG10“, „SM11“ < „SM100“
+export const numCmp = (a, b) => String(a).localeCompare(String(b), "en", { numeric: true });
 
 // „12,50 €“, „1.234,5“ → Zahl; leer → null; Tippfehler → NaN
 export function parseEuro(text) {

@@ -4,7 +4,7 @@
 //   services/      Abgleich-Logik, Karten-Scanner, Anmelden
 //   repositories/  SQL pro Tabelle
 //   validation/    Prüfung eingehender Daten
-import { LIMITLESS_IMAGES, SCAN_MAX_TOKENS, SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL } from "./config.js";
+import { LIMITLESS_IMAGES, SCAN_MAX_TOKENS, SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL, TCGDEX_API, TCGPLAYER_IMAGES } from "./config.js";
 import { AuthController } from "./controllers/authController.js";
 import { ImageController } from "./controllers/imageController.js";
 import { ScanController } from "./controllers/scanController.js";
@@ -45,15 +45,15 @@ export function createApp(env) {
   });
   const scanController = new ScanController(scanService);
   const authController = new AuthController(new AuthService(users));
-  const imageController = new ImageController(LIMITLESS_IMAGES);
+  const imageController = new ImageController({ limitless: LIMITLESS_IMAGES, tcgdex: TCGDEX_API, tcgplayer: TCGPLAYER_IMAGES });
 
   return new Router()
     .get("/", () => json({ ok: true, app: "pokemon-sammlung" }))
     .post("/sync", requireUser(users, (request, user) => syncController.sync(request, user)))
     .post("/scan", requireUser(users, (request, user) => scanController.scan(request, user)))
     .get("/scan/usage", requireUser(users, (request, user) => scanController.usage(user)))
-    // Kartenbilder, die es nur bei Limitless gibt (ohne Schlüssel – <img> schickt keinen mit)
-    .get("/img", (request) => imageController.limitless(request))
+    // Kartenbilder, die es nur bei Limitless oder TCGplayer gibt (ohne Schlüssel – <img> schickt keinen mit)
+    .get("/img", (request) => imageController.image(request))
     // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden per Antippen oder mit Passwort
     .get("/people", () => authController.people())
     .post("/login", (request) => authController.login(request))

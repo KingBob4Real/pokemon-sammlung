@@ -13,7 +13,7 @@ import { AccountApi } from "./data/accountApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
 import { withEnglishImage } from "./domain/card.js";
-import { createSorters } from "./domain/sorting.js";
+import { createSetSorters, createSorters } from "./domain/sorting.js";
 import { BackupService } from "./services/backupService.js";
 import { CatalogService } from "./services/catalogService.js";
 import { CollectionService } from "./services/collectionService.js";
@@ -46,10 +46,11 @@ const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shr
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
+const setSorters = createSetSorters((id) => prices.value(id));
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
-const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all", scanMode: "single", scanLayout: "3x3" });
+const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all", scanMode: "single", scanLayout: "3x3", setSort: "numUp" });
 
-const app = new App({ store, sets, prices, collection, lists, catalog, sync, scanner, profiles, legacyImport, backup, sorters, updates }, prefs);
+const app = new App({ store, sets, prices, collection, lists, catalog, sync, scanner, profiles, legacyImport, backup, sorters, setSorters, updates }, prefs);
 app.start();
 
 // Karten ohne Bild (deutsches fehlt) bekommen das englische, sobald bekannt ist, zu welcher Serie ihr Set gehört

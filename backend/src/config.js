@@ -15,3 +15,7 @@ export const MAX_IMAGE_CHARS = 1.5 * 1024 * 1024; // Base64 inkl. „data:image/
 // Kartenbilder, die es nur bei Limitless TCG gibt (neueste Promos). Deren Speicher schickt keinen CORS-Header,
 // darum reicht GET /img sie durch.
 export const LIMITLESS_IMAGES = "https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci";
+// Letzte Quelle für Bilder, die sonst niemand hat (McDonald's 2014–2024, Celebrations Klassische Kollektion, Trainer-Kits,
+// MEP 093/102–110 …): TCGdex kennt die TCGplayer-Produktnummer der Karte, TCGplayer hat ein Foto (ebenfalls ohne CORS-Header).
+export const TCGDEX_API = "https://api.tcgdex.net/v2/en";
+export const TCGPLAYER_IMAGES = "https://tcgplayer-cdn.tcgplayer.com/product";

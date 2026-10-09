@@ -50,11 +50,23 @@ assert.deepEqual([collection.entry("a").section, collection.entries().length], [
 collection.removeSection(tausch);
 
 // Eigene Reihenfolge: verschieben und neu durchnummerieren
-const { orderOf } = await import("../js/domain/sorting.js");
+const { orderOf, createSetSorters } = await import("../js/domain/sorting.js");
 const ordered = () => collection.entries().sort((x, y) => orderOf(x) - orderOf(y)).map((e) => e.card.id);
 collection.renumber(["c", "a", "b"]);
 assert.deepEqual(ordered(), ["c", "a", "b"]);
 collection.move("b", 500); // vor „c“ (1000)
 assert.deepEqual(ordered(), ["b", "c", "a"]);
+
+const { numCmp } = await import("../js/core/format.js");
+assert.deepEqual(["TG01", "R", "158", "SM100", "023", "SM11", "B"].sort(numCmp), ["023", "158", "B", "R", "SM11", "SM100", "TG01"], "Buchstaben-Nummern nach den Zahlen");
+
+// Im Set: Nummer = Reihenfolge des Katalogs, Wert auf- und absteigend, ohne Preis immer am Ende
+const setCards = ["s-1", "s-2", "s-3", "s-4"].map((id, i) => ({ card: { id }, i }));
+const worth = { "s-1": 5, "s-2": null, "s-3": 20, "s-4": 5 };
+const setSorted = (key) => [...setCards].sort(createSetSorters((id) => worth[id])[key].compare).map((e) => e.card.id);
+assert.deepEqual(setSorted("numUp"), ["s-1", "s-2", "s-3", "s-4"]);
+assert.deepEqual(setSorted("numDown"), ["s-4", "s-3", "s-2", "s-1"]);
+assert.deepEqual(setSorted("valueDown"), ["s-3", "s-1", "s-4", "s-2"], "gleicher Wert → nach Nummer");
+assert.deepEqual(setSorted("valueUp"), ["s-1", "s-4", "s-3", "s-2"]);
 
 console.log("Sammlung ok");
