@@ -13,6 +13,7 @@ import { AccountApi } from "./data/accountApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TradeApi } from "./data/tradeApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
+import { fetchCardmarketPrices } from "./data/cardmarketPrices.js";
 import { withEnglishImage } from "./domain/card.js";
 import { createSetSorters, createSorters } from "./domain/sorting.js";
 import { BackupService } from "./services/backupService.js";
@@ -43,7 +44,7 @@ OLD_KEYS.forEach((key) => storage.remove(key)); // Reste früherer Fassungen
 useImageMemory(storage, STORAGE_KEYS.images, IMAGE_MEMORY_MS);
 const store = new EntityStore(storage, STORAGE_KEYS);
 const sets = new SetService(tcgdex, storage, STORAGE_KEYS.sets, SETS_TTL_MS, POCKET_SERIES);
-const prices = new PriceService(tcgdex, storage, STORAGE_KEYS.prices, PRICE_TTL_MS, PRICE_KEEP_MS);
+const prices = new PriceService(tcgdex, storage, STORAGE_KEYS.prices, PRICE_TTL_MS, PRICE_KEEP_MS, () => fetchCardmarketPrices(fetchJson));
 const collection = new CollectionService(store);
 const lists = new ListService(store);
 const history = new HistoryService(storage, STORAGE_KEYS.history, collection, prices);

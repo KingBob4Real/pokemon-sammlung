@@ -3,6 +3,7 @@ import { h, ICONS } from "../../core/dom.js";
 import { fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
 import { cardNumber } from "../../domain/card.js";
 import { cardmarketUrl } from "../../domain/price.js";
+import { TRADE_CHOICES } from "../../domain/trade.js";
 import { ask } from "./ask.js";
 import { cardImg, imageFor } from "./cardTile.js";
 
@@ -34,7 +35,7 @@ export function cardHead(card, prices, language = () => "Deutsch") {
               : prices.hasFailed(card.id)
                 ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
                 : h("p", { class: "muted" }, "Preis wird geladen …"),
-      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
+      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}${p?.extra ? " · aus Cardmarkets Preisliste (TCGdex ordnet diese Karte nicht zu)" : ""}`),
       h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
     );
   };
@@ -84,7 +85,13 @@ export function renderCardSheet(body, card, ctx) {
     collection.setSection([card], id);
     ctx.afterChange(false);
   });
-  const fields = [cond, lang, paid, section];
+  // Tauschen: im Reiter „Tauschen“ anbieten – automatisch, wenn doppelt, oder selbst festgelegt
+  const trade = h("select", { class: "field" }, TRADE_CHOICES.map(([value, text]) => h("option", { value: String(value), selected: (entry?.trade ?? null) === value }, text)));
+  trade.addEventListener("change", () => {
+    collection.setTrade([card], JSON.parse(trade.value));
+    ctx.afterChange(false);
+  });
+  const fields = [cond, lang, paid, section, trade];
   // Ganz raus aus der Sammlung – mit „Rückgängig“ (Zustand & Kaufpreis bleiben ohnehin gespeichert)
   const removeAll = () => {
     const undo = collection.removeAll([card]);
@@ -169,6 +176,7 @@ export function renderCardSheet(body, card, ctx) {
       h("label", { class: "label" }, ["Sprache", lang]),
       h("label", { class: "label" }, ["Kaufpreis pro Stück", paid]),
       h("label", { class: "label" }, ["Ordner", section]),
+      h("label", { class: "label" }, ["Tauschen", trade]),
       h("div", { class: "buttons" }, [remove]),
     ]),
     h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), listBox])

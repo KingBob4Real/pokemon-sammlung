@@ -1,6 +1,7 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, fmtSigned, norm, plural } from "../../core/format.js";
 import { orderOf, positionBetween, QUICK_FILTERS } from "../../domain/sorting.js";
+import { TRADE_CHOICES } from "../../domain/trade.js";
 import { COLLECTION_TARGET, links } from "../router.js";
 import { ask, confirmDialog } from "../components/ask.js";
 import { NEW_FOLDER, NEW_FOLDER_HINT } from "../components/cardSheet.js";
@@ -217,6 +218,10 @@ export function render(main, ctx, folderId = "") {
           ["+ Neuer Ordner …", createAndPut],
           ...(inFolder ? [] : [["Aus dem Ordner nehmen", inFolderTo(null)]]),
         ],
+      },
+      {
+        label: "Tauschen",
+        items: TRADE_CHOICES.map(([value, text]) => [text, (cards) => (collection.setTrade(cards, value), { message: `– Tauschen: ${text}` })]),
       },
     ],
     buttons: (chosen, stop) =>

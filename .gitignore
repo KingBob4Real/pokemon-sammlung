@@ -5,3 +5,5 @@ node_modules/
 # Sync-Schlüssel der Personen – nie committen
 .keys/
 .sync-key.txt
+# täglich vom Pages-Workflow erzeugt (scripts/cardmarket.mjs prices)
+frontend/data/

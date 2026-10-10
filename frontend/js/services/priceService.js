@@ -15,9 +15,13 @@ export class PriceService extends EventTarget {
   #running = false;
   #failed = new Set(); // Karten, deren Preis zuletzt nicht geladen werden konnte
 
-  constructor(tcgdex, storage, storageKey, ttlMs, keepMs = Infinity) {
+  #extra = null; // Ersatz-Preise (einmal pro Sitzung geladen)
+
+  // extraPrices() → { updated, prices } für Karten, die TCGdex keinem Cardmarket-Produkt zuordnet (data/cardmarketPrices.js)
+  constructor(tcgdex, storage, storageKey, ttlMs, keepMs = Infinity, extraPrices = async () => ({ prices: {} })) {
     super();
     this.tcgdex = tcgdex;
+    this.extraPrices = extraPrices;
     this.storage = storage;
     this.storageKey = storageKey;
     this.ttlMs = ttlMs;
@@ -94,10 +98,17 @@ export class PriceService extends EventTarget {
     const de = prev?.en ? null : await this.tcgdex.card(id, "de").catch(notFound);
     if (de?.pricing?.cardmarket) return toPrice(de);
     const en = await this.tcgdex.card(id, "en").catch(notFound);
-    if (!en?.pricing?.cardmarket) return toPrice(de || en); // nirgends ein Preis (oder die Karte gibt es nicht mehr)
+    if (!en?.pricing?.cardmarket) return this.#fromCardmarketList(id, toPrice(de || en));
     const rarity = de?.rarity ?? (prev?.en ? prev.rarity : null) ?? en.rarity;
     const dexId = de?.dexId ?? (prev?.en && prev.dexId != null ? [prev.dexId] : en.dexId);
     return { ...toPrice({ ...en, rarity, dexId }), en: true };
+  }
+
+  // TCGdex ordnet die Karte keinem Cardmarket-Produkt zu (Namen mit ♀/♂/◇/’ …) → Preis aus Cardmarkets Preisliste, sonst ohne
+  async #fromCardmarketList(id, price) {
+    const list = await (this.#extra ??= this.extraPrices());
+    const found = list.prices[id];
+    return found ? { ...price, avg1: found.avg1, avg7: found.avg7, avg30: found.avg30, low: found.low, cardmarketId: found.id, updated: list.updated, extra: true } : price;
   }
 
   #notify() {

@@ -118,11 +118,15 @@ assert.deepEqual([again.id, again.added, lists.items(first.id).length], [first.i
 
 // D: Tauschen – Abgleich per Karten-ID, die Sprache zählt nicht
 const { tradeMatches } = await import("../js/domain/trade.js");
-const tim = { duplicates: [{ card: card("t1"), qty: 2, cond: "Mint", lang: "Englisch" }, { card: card("a"), qty: 3, cond: "Mint", lang: "Deutsch" }], missing: [card("a"), card("b")] };
-const owned = [{ card: card("a"), qty: 2, cond: "Near Mint", lang: "Deutsch" }, { card: card("b"), qty: 1, cond: "Near Mint", lang: "Deutsch" }];
+const tim = { offers: [{ card: card("t1"), qty: 2, cond: "Mint", lang: "Englisch" }, { card: card("a"), qty: 3, cond: "Mint", lang: "Deutsch" }], missing: [card("a"), card("b"), card("c")] };
+const owned = [{ card: card("a"), qty: 2, cond: "Near Mint", lang: "Deutsch" }, { card: card("b"), qty: 1, cond: "Near Mint", lang: "Deutsch" }, { card: card("c"), qty: 1, trade: true }];
 const t = tradeMatches(tim, owned, [card("t1"), card("a"), card("x")]);
-assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim hat doppelt, was mir fehlt (a habe ich schon)");
-assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2]], "ich habe doppelt, was Tim fehlt (b nur einmal)");
+assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim bietet an, was mir fehlt (a habe ich schon)");
+assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2], ["c", 1]], "ich biete an, was Tim fehlt: a doppelt, c auf „ja“ (b nur einmal)");
+const { isOffered } = await import("../js/domain/trade.js");
+assert.deepEqual([{ qty: 2 }, { qty: 2, trade: false }, { qty: 1 }, { qty: 1, trade: true }, { qty: 0, trade: true }].map(isOffered), [true, false, false, true, false], "Tauschen: wenn doppelt / nein / ja");
+collection.setTrade([card("a")], false);
+assert.equal(collection.entry("a").trade, false, "Tauschen bleibt am Eintrag");
 
 // Cardmarket-Suche ohne Produkt: Namen ohne ♀/♂/◇ und mit geradem Apostroph, sonst findet Cardmarket nichts
 const { searchName } = await import("../js/domain/price.js");

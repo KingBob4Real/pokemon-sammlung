@@ -127,6 +127,16 @@ export class CollectionService {
     });
   }
 
+  // Tauschen: true = anbieten, false = behalten, null = automatisch (wenn doppelt) – siehe domain/trade.js
+  setTrade(cards, trade) {
+    this.store.batch(() => {
+      for (const card of cards) {
+        const e = this.entry(card.id);
+        if (e) this.store.put("collection", card.id, { ...e, trade });
+      }
+    });
+  }
+
   // Karten in einen Ordner legen (null = aus dem Ordner nehmen)
   setSection(cards, sectionId) {
     this.store.batch(() => {

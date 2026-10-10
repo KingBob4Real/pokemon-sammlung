@@ -22,16 +22,27 @@ export function tradeSums(items, priceOf) {
   );
 }
 
+// Wird die Karte zum Tausch angeboten? trade: true = ja (auch einzeln), false = nein (auch doppelt), leer = wenn doppelt.
+// Dieselbe Regel steht im Backend (CollectionRepository.offers).
+export const isOffered = (entry) => entry.qty > 0 && (entry.trade ?? entry.qty > 1);
+
+// Die drei Einstellungen in der Kartenansicht und bei „Auswählen“
+export const TRADE_CHOICES = [
+  [null, "Wenn doppelt"],
+  [true, "Ja, anbieten"],
+  [false, "Nein, behalten"],
+];
+
 // Tauschen: Abgleich per Karten-ID – die Sprache zählt nicht.
-//   person – vom Backend: { duplicates: [{ card, qty, cond, lang }], missing: [card] }
-//   owned  – meine Sammlung [{ card, qty, cond, lang }] (Anzahl > 0), wanted – Karten aus meinen Listen
-// → { forMe: was die Person doppelt hat und mir fehlt, forThem: was ich doppelt habe und ihr fehlt }
+//   person – vom Backend: { offers: [{ card, qty, cond, lang }], missing: [card] }
+//   owned  – meine Sammlung [{ card, qty, cond, lang, trade }] (Anzahl > 0), wanted – Karten aus meinen Listen
+// → { forMe: was die Person anbietet und mir fehlt, forThem: was ich anbiete und ihr fehlt }
 export function tradeMatches(person, owned, wanted) {
   const have = new Set(owned.map((e) => e.card.id));
   const iMiss = new Set(wanted.filter((card) => !have.has(card.id)).map((card) => card.id));
   const theyMiss = new Set(person.missing.map((card) => card.id));
   return {
-    forMe: person.duplicates.filter((d) => iMiss.has(d.card.id)),
-    forThem: owned.filter((e) => e.qty > 1 && theyMiss.has(e.card.id)).map(({ card, qty, cond, lang }) => ({ card, qty, cond, lang })),
+    forMe: person.offers.filter((d) => iMiss.has(d.card.id)),
+    forThem: owned.filter((e) => isOffered(e) && theyMiss.has(e.card.id)).map(({ card, qty, cond, lang }) => ({ card, qty, cond, lang })),
   };
 }

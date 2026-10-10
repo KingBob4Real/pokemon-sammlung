@@ -1,11 +1,15 @@
 # Veröffentlicht frontend/ auf GitHub Pages: main unter /, develop unter /dev/ – ein Pages-Auftritt für beide.
 # Pages nimmt nur Läufe von main an (Umgebungsschutz) → ein Push auf develop stößt einen Lauf auf main an.
+# Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Preise für Karten, die TCGdex nicht zuordnet).
+# Achtung: Zeitplan und Ablauf kommen immer aus der Datei auf main – Änderungen hier wirken erst nach dem Merge.
 name: Frontend auf GitHub Pages
 
 on:
   push:
     branches: [main, develop]
-    paths: ["frontend/**", ".github/workflows/pages.yml"]
+    paths: ["frontend/**", "scripts/**", ".github/workflows/pages.yml"]
+  schedule:
+    - cron: "30 4 * * *" # Cardmarket erneuert seine Preisliste nachts
   workflow_dispatch:
 
 permissions:
@@ -40,6 +44,16 @@ jobs:
       - uses: actions/checkout@v7
         with: { ref: develop, path: develop }
       - run: cp -r main/frontend site && cp -r develop/frontend site/dev
+      # Fehlt die Preisliste mal, wird trotzdem veröffentlicht – die App kommt ohne die Datei aus
+      - name: Cardmarket-Preise für Karten ohne TCGdex-Zuordnung
+        continue-on-error: true
+        run: |
+          for branch in main develop; do
+            out=site; [ "$branch" = develop ] && out=site/dev
+            if [ -f "$branch/scripts/cardmarket.mjs" ] && [ -f "$branch/scripts/cardmarket-map.json" ]; then
+              node "$branch/scripts/cardmarket.mjs" prices "$branch/scripts/cardmarket-map.json" "$out/data/cardmarket-prices.json"
+            fi
+          done
       - uses: actions/upload-pages-artifact@v5
         with:
           path: site

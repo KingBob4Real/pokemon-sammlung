@@ -6,7 +6,7 @@
 //   index.html mit anderer Version, werden die gespeicherten App-Dateien vorher weggeworfen – danach lädt jedes Modul frisch,
 //   alte und neue mischen sich nie. Darum: nach jeder Änderung an CSS/JS ?v= in index.html hochzählen.
 //   Kartenbilder (TCGdex, pokemontcg.io, Limitless/TCGplayer über GET /img des Backends) & Schriften „Speicher zuerst“.
-//   Kartensuche/Preise (api.tcgdex.net) und das Sync-Backend laufen immer übers Netz.
+//   Kartensuche/Preise (api.tcgdex.net), data/ (täglich neue Cardmarket-Preise) und das Sync-Backend laufen immer übers Netz.
 // Live (/) und Dev (/dev/) liegen auf derselben Domain → je ein eigener Speicher, sonst räumt der eine dem anderen auf.
 // ponytail: Bilder werden nie aufgeräumt (wenige MB) – Speicher umbenennen, falls das mal stört.
 const CACHE = `ps-v3${new URL(self.registration.scope).pathname}`;
@@ -51,6 +51,7 @@ self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
+  if (url.origin === location.origin && url.pathname.includes("/data/")) return; // tägliche Daten (Cardmarket-Preise): immer übers Netz
   if (url.origin === location.origin) e.respondWith(req.mode === "navigate" || url.pathname.endsWith("/") ? page(req) : cacheFirst(req, { cache: "no-cache" }));
   else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.googleapis.com", "fonts.gstatic.com"].includes(url.hostname) || isProxiedImage(url)) e.respondWith(cacheFirst(req));
 });

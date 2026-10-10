@@ -79,4 +79,37 @@ assert.equal(dayOf(noon + 7 * DAY), "2026-10-17");
 assert.deepEqual([history.change(7, noon + 7 * DAY), history.change(30, noon + 7 * DAY)], [20, null], "+20 € seit 7 Tagen, 30 Tage gibt es noch nicht");
 assert.deepEqual(history.series().map((e) => e.day), ["2026-10-10", "2026-10-17"]);
 
+// Karten ohne TCGdex-Zuordnung: Preis aus Cardmarkets Preisliste (täglich neben der App), einmal pro Sitzung geladen
+let loads = 0;
+const noCardmarket = { card: async (id, lang) => ({ rarity: lang === "de" ? "Häufig" : "Common", pricing: { cardmarket: null } }) };
+const extra = new PriceService(noCardmarket, storage, "p2", DAY, 30 * DAY, async () => (loads++, { updated: "2026-10-10", prices: { "bw9-40": { id: 280918, avg1: 0.27, avg7: 0.18, avg30: 0.19, low: 0.02 } } }));
+done = loaded(extra);
+extra.request(["bw9-40", "bw9-41"]);
+await done;
+assert.deepEqual([extra.value("bw9-40"), extra.get("bw9-40").cardmarketId, extra.get("bw9-40").extra, extra.get("bw9-40").rarity], [0.18, 280918, true, "Häufig"], "Preis aus der Liste, Details von TCGdex");
+assert.deepEqual([extra.value("bw9-41"), extra.get("bw9-41").extra, loads], [null, undefined, 1], "nicht in der Liste: ohne Preis; Liste nur einmal geladen");
+
+// Zuordnung im Skript: Name + Attacken im selben Set, ♀ und ’ wie bei Cardmarket; Doppeldrucke nur in Sets mit
+// fortlaufenden Produkt-IDs (ID = Startwert + Nummer), dann genau dieses Produkt
+const { matchSet } = await import("../../scripts/cardmarket.mjs");
+const tc = (id, localId, name, attacks, idProduct) => ({ id, localId, name, attacks: attacks.map((n) => ({ name: n })), pricing: idProduct ? { cardmarket: { idProduct } } : { cardmarket: null } });
+const filler = (offset) => Array.from({ length: 10 }, (_, i) => tc(`s-${i + 1}`, String(i + 1), `Mon${i}`, ["Tackle"], offset(i + 1)));
+const fillerProducts = (offset) => Array.from({ length: 10 }, (_, i) => ({ idProduct: offset(i + 1), name: `Mon${i} [Tackle]` }));
+const open = [
+  tc("s-40", "40", "Nidoran♀", ["Poison Sting"]),
+  tc("s-109", "109", "Heatran-EX", ["Heat Boiler", "Dynamite Press"]),
+  tc("s-13", "13", "Heatran-EX", ["Heat Boiler", "Dynamite Press"]),
+  tc("s-135", "135", "Brock’s Grit", []),
+];
+const cmProducts = [
+  { idProduct: 1040, name: "Nidoran ♀ [Poison Sting]" },
+  { idProduct: 1013, name: "Heatran EX [Heat Boiler | Dynamite Press]" },
+  { idProduct: 1109, name: "Heatran EX [Heat Boiler | Dynamite Press]" },
+  { idProduct: 1135, name: "Brock's Grit" },
+];
+const sequential = matchSet([...filler((n) => 1000 + n), ...open], [...fillerProducts((n) => 1000 + n), ...cmProducts]);
+assert.deepEqual(Object.fromEntries(sequential), { "s-40": 1040, "s-13": 1013, "s-109": 1109, "s-135": 1135 }, "fortlaufend: Doppeldruck über Startwert + Nummer");
+const scattered = matchSet([...filler((n) => 5000 + n * 7), ...open], [...fillerProducts((n) => 5000 + n * 7), ...cmProducts]);
+assert.deepEqual(Object.fromEntries(scattered), { "s-40": 1040, "s-135": 1135 }, "nicht fortlaufend: Doppeldruck lieber ohne Preis");
+
 console.log("Speicher ok");
