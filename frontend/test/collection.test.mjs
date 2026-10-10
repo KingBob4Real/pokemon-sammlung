@@ -124,4 +124,28 @@ const t = tradeMatches(tim, owned, [card("t1"), card("a"), card("x")]);
 assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim hat doppelt, was mir fehlt (a habe ich schon)");
 assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2]], "ich habe doppelt, was Tim fehlt (b nur einmal)");
 
+// Tauschrechner: Summen je Preisart, eigener Preis zählt vor jedem Richtwert, fehlende Werte werden mitgezählt
+const { tradeSums } = await import("../js/domain/trade.js");
+const priceOf = (id) => ({ g1: { low: 10, avg1: 12, avg7: 15, avg30: 20 }, g2: { low: 1, avg1: null, avg7: 2, avg30: 2 } })[id] ?? null;
+const sums = tradeSums([{ card: card("g1"), qty: 2, own: null }, { card: card("g2"), qty: 1, own: null }, { card: card("g3"), qty: 1, own: 5 }], priceOf);
+assert.deepEqual(sums.low, { sum: 26, unknown: 0 }, "2 × 10 + 1 + eigener Preis 5");
+assert.deepEqual(sums.avg1, { sum: 29, unknown: 1 }, "Ø 1 Tag fehlt bei g2");
+assert.deepEqual(sums.avg30, { sum: 47, unknown: 0 });
+
+// Entwurf: auf dem Gerät gemerkt; nochmal hinzufügen = eine mehr; was ich gebe, startet mit Sprache/Zustand aus meiner Sammlung
+const { TradeService } = await import("../js/services/tradeService.js");
+const tradeOf = () => new TradeService(null, null, collection, lists, storage, "trade");
+const draft = tradeOf();
+draft.add("give", card("a"));
+draft.add("give", card("a"));
+draft.add("get", card("t1"));
+draft.change("get", "t1", { own: 7.5, lang: "Englisch" });
+const reloaded = tradeOf().draft;
+assert.deepEqual(reloaded.give.map((i) => [i.card.id, i.qty, i.cond]), [["a", 2, "Mint"]], "a doppelt, Zustand aus der Sammlung (Mint statt Near Mint)");
+assert.deepEqual([reloaded.get[0].own, reloaded.get[0].lang], [7.5, "Englisch"], "nach Neustart noch da");
+draft.change("give", "a", { qty: 0 });
+assert.equal(draft.draft.give.length, 0, "Anzahl 0 nimmt die Karte raus");
+draft.fill([{ card: card("a"), qty: 2, cond: "Mint", lang: "Deutsch" }], [{ card: card("t1"), qty: 3, cond: "Good", lang: "Englisch" }]);
+assert.deepEqual([draft.draft.give[0].qty, draft.draft.get[0].cond], [1, "Good"], "Vorschlag: je ein Exemplar");
+
 console.log("Sammlung ok");

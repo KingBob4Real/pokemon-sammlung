@@ -538,6 +538,27 @@ h3.group-title { font-size: 17px; }
 /* ===== Tauschen ===== */
 .trade-person { margin-top: 26px; font-size: 24px; }
 .trade-person:first-child { margin-top: 4px; }
+.trade-others { margin-top: 24px; }
+.trade-calc .group-title { margin-top: 16px; }
+.trade-item { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; margin-top: 8px; padding: 10px; border-radius: 14px; background: var(--surface-2); }
+.trade-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.trade-prices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.trade-prices span { display: flex; flex-direction: column; }
+.trade-prices small { font-size: 11px; font-weight: 800; color: var(--muted); }
+.trade-prices b { font-size: 14px; }
+.trade-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; margin-top: 8px; }
+.trade-fields .field { min-height: 40px; padding: 6px 10px; }
+.trade-fields .link-button { justify-self: start; min-height: 40px; }
+.trade-qty { flex: none; display: flex; align-items: center; }
+.trade-qty button { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
+.trade-qty output { min-width: 16px; text-align: center; font-weight: 800; }
+.trade-sum { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.trade-sum th, .trade-sum td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+.trade-sum th:first-child { text-align: left; }
+.trade-sum thead th { font-size: 12px; color: var(--muted); }
+.trade-sum td small { color: var(--muted); }
+.trade-sum .up { color: var(--accent); font-weight: 800; }
+.trade-sum .down { color: #d6336c; font-weight: 800; }
 .trade-all { margin: 16px 0 8px; }
 .trade-all summary { display: flex; align-items: center; min-height: 44px; font-weight: 800; color: var(--muted); cursor: pointer; }
 .trade-all[open] summary { margin-bottom: 8px; }

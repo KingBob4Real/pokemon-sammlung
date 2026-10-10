@@ -47,7 +47,8 @@ export class PriceService extends EventTarget {
     for (const id of cardIds) {
       this.#failed.delete(id); // neuer Versuch
       const p = this.prices[id];
-      if (!p || Date.now() - p.at > this.ttlMs) this.#queue.add(id);
+      // ponytail: p.low fehlt = gespeichert vor dem Tauschrechner → einmal neu laden (alter Wert bleibt bis dahin sichtbar)
+      if (!p || p.low === undefined || Date.now() - p.at > this.ttlMs) this.#queue.add(id);
     }
     this.resume();
   }

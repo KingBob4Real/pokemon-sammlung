@@ -1,8 +1,9 @@
 import { CARDMARKET_LANGUAGES, CARDMARKET_MIN_CONDITION } from "../config.js";
 import { positive } from "../core/format.js";
 
-// Cardmarket-Richtwerte aus einer TCGdex-Karte (mischen alle Sprachen und Zustände),
-// dazu Kartendetails, die nur die volle Karte hat: Seltenheit und Pokédex-Nummer (Trainer/Energie: null).
+// Cardmarket-Richtwerte aus einer TCGdex-Karte (mischen alle Sprachen und Zustände): Ø 7 und Ø 30 Tage, dazu für den
+// Tauschrechner „ab“ (low) und Ø 1 Tag; außerdem Kartendetails, die nur die volle Karte hat: Seltenheit und
+// Pokédex-Nummer (Trainer/Energie: null).
 export function toPrice(card) {
   const cm = card?.pricing?.cardmarket;
   const first = (...values) => values.map(positive).find((x) => x != null) ?? null;
@@ -10,6 +11,8 @@ export function toPrice(card) {
     at: Date.now(),
     avg7: cm ? first(cm.avg7, cm["avg7-holo"]) : null,
     avg30: cm ? first(cm.avg30, cm["avg30-holo"]) : null,
+    avg1: cm ? first(cm.avg1, cm["avg1-holo"]) : null,
+    low: cm ? first(cm.low, cm["low-holo"]) : null,
     cardmarketId: cm?.idProduct || null,
     updated: cm?.updated || null,
     rarity: card?.rarity || null,
@@ -35,10 +38,11 @@ export function movers(entries, priceOf, n = 5) {
   };
 }
 
-// Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
-export function cardmarketUrl(card, price, language = "Deutsch") {
+// Link mit Filter „Sprache der Karte, ab Zustand“ (Cardmarket: 1 Mint … 7 Poor, Standard Excellent) – zeigt den
+// echten Preis für genau solche Karten
+export function cardmarketUrl(card, price, language = "Deutsch", minCondition = CARDMARKET_MIN_CONDITION) {
   const lang = CARDMARKET_LANGUAGES[language];
-  const filter = `${lang ? `language=${lang}&` : ""}minCondition=${CARDMARKET_MIN_CONDITION}`;
+  const filter = `${lang ? `language=${lang}&` : ""}minCondition=${minCondition}`;
   return price?.cardmarketId
     ? `https://www.cardmarket.com/de/Pokemon/Products?idProduct=${encodeURIComponent(price.cardmarketId)}&${filter}`
     : `https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&${filter}`;

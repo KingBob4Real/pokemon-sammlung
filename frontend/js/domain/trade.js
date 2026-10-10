@@ -1,3 +1,27 @@
+// Tauschrechner: diese Cardmarket-Werte werden je Seite summiert – alle mischen Sprachen und Zustände (TCGdex).
+export const TRADE_PRICES = [
+  ["low", "ab"],
+  ["avg1", "Ø 1 Tag"],
+  ["avg7", "Ø 7 Tage"],
+  ["avg30", "Ø 30 Tage"],
+];
+
+// Summe einer Seite je Preisart. items: [{ card, qty, own }] – own = eigener Preis pro Stück, zählt vor jedem Richtwert.
+// priceOf(cardId) → Preis oder null → { low: { sum, unknown }, avg1: …, avg7: …, avg30: … } (unknown = Stück ohne Wert)
+export function tradeSums(items, priceOf) {
+  return Object.fromEntries(
+    TRADE_PRICES.map(([key]) => {
+      let [sum, unknown] = [0, 0];
+      for (const it of items) {
+        const value = it.own ?? priceOf(it.card.id)?.[key] ?? null;
+        if (value == null) unknown += it.qty;
+        else sum += value * it.qty;
+      }
+      return [key, { sum, unknown }];
+    })
+  );
+}
+
 // Tauschen: Abgleich per Karten-ID – die Sprache zählt nicht.
 //   person – vom Backend: { duplicates: [{ card, qty, cond, lang }], missing: [card] }
 //   owned  – meine Sammlung [{ card, qty, cond, lang }] (Anzahl > 0), wanted – Karten aus meinen Listen

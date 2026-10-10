@@ -299,9 +299,9 @@ export class App {
     if (img.dataset.tried && img.dataset.img) rememberImage(img.dataset.img, img.src);
   }
 
-  // Sync hat Neues gebracht. Suche/Set/Mehr nicht neu aufbauen (Eingaben gingen verloren), nur aktualisieren.
+  // Sync hat Neues gebracht. Suche/Set/Mehr/Tauschen nicht neu aufbauen (Eingaben gingen verloren), nur aktualisieren.
   #onRemoteChange() {
-    if (["suche", "set", "mehr", "hinzufuegen"].includes(currentRoute().view)) this.refresh();
+    if (["suche", "set", "mehr", "hinzufuegen", "tauschen"].includes(currentRoute().view)) this.refresh();
     else this.render();
   }
 

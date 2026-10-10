@@ -36,6 +36,7 @@ export function storageKeys(profile = "") {
     sync: `${own}sync.v1`,
     prefs: `${own}prefs.v1`,
     history: `${own}history.v1`, // Wertverlauf der Sammlung (services/historyService.js)
+    trade: `${own}trade.v1`, // Tauschrechner: was ich gebe / bekomme (services/tradeService.js)
     prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
     sets: `${P}sets.v4`, // v4: Kartenzahl = Deutsch oder Englisch, was mehr hat (v3: deutsche + englische Sets, Serie je Set)
     images: `${P}images.v1`, // Karten-ID + Größe → Bild-Adresse, die geklappt hat, oder "" (ui/components/cardTile.js)
