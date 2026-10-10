@@ -27,6 +27,7 @@ import { ProfileService } from "./services/profileService.js";
 import { ScanService } from "./services/scanService.js";
 import { SetService } from "./services/setService.js";
 import { SyncService } from "./services/syncService.js";
+import { TradeDraftService } from "./services/tradeDraftService.js";
 import { TradeService } from "./services/tradeService.js";
 import { UpdateService } from "./services/updateService.js";
 import { App } from "./ui/app.js";
@@ -49,7 +50,8 @@ const history = new HistoryService(storage, STORAGE_KEYS.history, collection, pr
 const catalog = new CatalogService(tcgdex, sets);
 const sync = new SyncService(store, syncApi, storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH);
 sync.addEventListener("status", () => profiles.remember(sync.config.userId, sync.config.user)); // wer angemeldet ist, sagt das Backend
-const trade = new TradeService(new TradeApi(fetchJson), sync, collection, lists, storage, STORAGE_KEYS.trade);
+const trade = new TradeService(new TradeApi(fetchJson), sync, collection, lists);
+const tradeDraft = new TradeDraftService(storage, STORAGE_KEYS.trade, collection);
 const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto);
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
 const backup = new BackupService(store, legacyImport);
@@ -58,7 +60,7 @@ const setSorters = createSetSorters((id) => prices.value(id));
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
 const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all", setFilter: "all", scanMode: "single", scanLayout: "3x3", setSort: "numUp" });
 
-const app = new App({ store, sets, prices, collection, lists, history, trade, catalog, sync, scanner, profiles, legacyImport, backup, sorters, setSorters, updates }, prefs);
+const app = new App({ store, sets, prices, collection, lists, history, trade, tradeDraft, catalog, sync, scanner, profiles, legacyImport, backup, sorters, setSorters, updates }, prefs);
 app.start();
 
 // Wertverlauf: Tageswert merken, sobald alle Preise der Sammlung frisch sind (beim Start oft schon, sonst nach dem Laden)
@@ -76,8 +78,13 @@ profiles.refresh(); // Namen und Schlösser aktuell halten
 // auch in der iPhone-App vom Home-Bildschirm sofort an.
 sync.run();
 updates.reloadIfUpdated();
+// Höchstens einmal pro Minute – kurz zu Cardmarket und zurück soll nicht jedes Mal zwei Anfragen kosten.
+// Eigene Änderungen lädt der Sync ohnehin sofort hoch (store „change“).
+const RETURN_CHECK_MS = 60_000;
+let lastCheck = Date.now();
 document.addEventListener("visibilitychange", async () => {
-  if (document.hidden) return;
+  if (document.hidden || Date.now() - lastCheck < RETURN_CHECK_MS) return;
+  lastCheck = Date.now();
   if (!(await updates.reloadIfUpdated())) sync.run();
 });
 window.addEventListener("online", () => {

@@ -21,7 +21,7 @@ const SIDES = [
  * → { element, refresh } – refresh() zeichnet nur Zahlen neu (Eingaben behalten den Fokus)
  */
 export function tradeCalculator(ctx) {
-  const { trade, prices } = ctx;
+  const { tradeDraft, prices } = ctx;
   const element = h("section", { class: "panel trade-calc" });
   let updates = []; // zeichnen Preise und Links der Zeilen neu
 
@@ -37,12 +37,12 @@ export function tradeCalculator(ctx) {
     const priceLine = h("div", { class: "trade-prices" });
     const link = h("a", { class: "link-button", target: "_blank", rel: "noopener" }, "Auf Cardmarket ↗");
     const qty = h("output", {}, String(it.qty));
-    const step = (d) => (trade.change(side, card.id, { qty: it.qty + d }), draw());
+    const step = (d) => (tradeDraft.change(side, card.id, { qty: it.qty + d }), draw());
     const own = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "Eigener Preis", "aria-label": `Eigener Preis für ${card.name}`, value: fmtPriceInput(it.own) });
     own.addEventListener("input", () => {
       const n = parseEuro(own.value);
       if (Number.isNaN(n)) return; // Tippfehler ignorieren
-      trade.change(side, card.id, { own: n || null });
+      tradeDraft.change(side, card.id, { own: n || null });
       refresh();
     });
     own.addEventListener("keydown", (e) => e.key === "Enter" && own.blur());
@@ -51,7 +51,7 @@ export function tradeCalculator(ctx) {
       priceLine.replaceChildren(...TRADE_PRICES.map(([key, label]) => h("span", {}, [h("small", {}, label), h("b", {}, fmtEur(p?.[key] ?? null))])));
       link.href = cardmarketUrl(card, p, it.lang, CONDITIONS.indexOf(it.cond) + 1);
     };
-    const set = (patch) => (trade.change(side, card.id, patch), update());
+    const set = (patch) => (tradeDraft.change(side, card.id, patch), update());
     updates.push(update);
     return h("div", { class: "trade-item" }, [
       h("span", { class: img ? "mover-art" : "mover-art no-img" }, img ? [cardImg(card, "low", img, { alt: "", loading: "lazy" })] : []),
@@ -73,7 +73,7 @@ export function tradeCalculator(ctx) {
   // Summen je Wert: Ich gebe · Ich bekomme · Differenz (= bekommen − geben; Plus = du bekommst mehr)
   const table = h("table", { class: "trade-sum" });
   const drawTable = () => {
-    const [give, get] = SIDES.map(([side]) => tradeSums(trade.draft[side], (id) => prices.get(id)));
+    const [give, get] = SIDES.map(([side]) => tradeSums(tradeDraft.draft[side], (id) => prices.get(id)));
     const cell = (s) => h("td", {}, [fmtEur(s.sum), s.unknown ? h("small", {}, " + ?") : ""]);
     table.replaceChildren(
       h("thead", {}, h("tr", {}, [h("th"), h("th", {}, "Ich gebe"), h("th", {}, "Ich bekomme"), h("th", {}, "Differenz")])),
@@ -94,7 +94,7 @@ export function tradeCalculator(ctx) {
         query: "",
         live: () => true,
         onPick: (card) => {
-          trade.add(side, card);
+          tradeDraft.add(side, card);
           prices.request([card.id]);
           draw();
           sheet.close();
@@ -106,18 +106,18 @@ export function tradeCalculator(ctx) {
     });
 
   const clear = async () => {
-    if (await confirmDialog("Tauschrechner leeren?", { ok: "Leeren", danger: true })) (trade.clear(), draw());
+    if (await confirmDialog("Tauschrechner leeren?", { ok: "Leeren", danger: true })) (tradeDraft.clear(), draw());
   };
 
   function draw() {
     updates = [];
-    const empty = !trade.draft.give.length && !trade.draft.get.length;
+    const empty = !tradeDraft.draft.give.length && !tradeDraft.draft.get.length;
     element.replaceChildren(
       h("h2", {}, "Tausch berechnen"),
       h("p", { class: "muted" }, "Mit jedem – auch ohne App. Karten suchen, die ihr tauschen wollt, und die Werte vergleichen."),
       ...SIDES.flatMap(([side, label, title]) => [
-        h("h3", { class: "group-title" }, [h("span", {}, label), h("small", {}, plural(trade.draft[side].reduce((n, i) => n + i.qty, 0), "Karte", "Karten"))]),
-        ...trade.draft[side].map((it) => row(side, it)),
+        h("h3", { class: "group-title" }, [h("span", {}, label), h("small", {}, plural(tradeDraft.draft[side].reduce((n, i) => n + i.qty, 0), "Karte", "Karten"))]),
+        ...tradeDraft.draft[side].map((it) => row(side, it)),
         h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: () => pick(side, title) }, "+ Karte")]),
       ]),
       ...(empty
@@ -128,7 +128,7 @@ export function tradeCalculator(ctx) {
             h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost danger", onclick: clear }, "Leeren")]),
           ])
     );
-    prices.request([...trade.draft.give, ...trade.draft.get].map((i) => i.card.id));
+    prices.request([...tradeDraft.draft.give, ...tradeDraft.draft.get].map((i) => i.card.id));
     refresh();
   }
 

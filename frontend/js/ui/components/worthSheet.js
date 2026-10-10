@@ -47,7 +47,10 @@ export function openWorthSheet(ctx) {
     const last = series.at(-1);
     const { up, down } = movers(collection.entries(), (id) => prices.get(id));
     const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, value)]);
-    const change = (days) => history.change(days);
+    const change = (days) => {
+      const diff = history.change(days);
+      return diff == null ? "–" : fmtSigned(diff);
+    };
     const row = ({ entry: { card }, price, diff }) => {
       const img = imageFor(card, "low");
       return h("button", { type: "button", class: "mover", onclick: () => sheet.openCard(card) }, [
@@ -66,8 +69,8 @@ export function openWorthSheet(ctx) {
       h("div", { class: "prices" }, [
         h("div", { class: "price-grid three" }, [
           cell(`Stand ${shortDay(last.day)}`, fmtEur(last.worth)),
-          cell("Seit 7 Tagen", change(7) == null ? "–" : fmtSigned(change(7))),
-          cell("Seit 30 Tagen", change(30) == null ? "–" : fmtSigned(change(30))),
+          cell("Seit 7 Tagen", change(7)),
+          cell("Seit 30 Tagen", change(30)),
         ]),
         series.length > 1 ? chart(series) : h("p", { class: "muted" }, "Ab morgen siehst du hier eine Kurve."),
       ]),

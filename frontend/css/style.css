@@ -343,6 +343,15 @@ select.field { padding-right: 8px; }
 .progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
 
 .section-title { font-size: 20px; font-weight: 600; margin: 4px 2px 10px; }
+/* Ordner in der Sammlung: eine Zeile zum Wischen, bis an den Bildschirmrand */
+.folder-strip { display: flex; gap: 8px; margin: 0 -16px 16px; padding: 2px 16px 6px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 16px; scrollbar-width: none; }
+.folder-strip::-webkit-scrollbar { display: none; }
+.folder-chip { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 120px; max-width: 200px; min-height: 56px; padding: 8px 14px; border: 0; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: left; text-decoration: none; scroll-snap-align: start; cursor: pointer; }
+.folder-chip b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; }
+.folder-chip small { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.folder-chip small:empty { display: none; }
+.folder-chip.new { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
+.folder-chip:active { transform: scale(0.97); }
 .set-row { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; }
 .set-row b { flex: 1; font-size: 15px; }
 .set-row small { flex: none; }

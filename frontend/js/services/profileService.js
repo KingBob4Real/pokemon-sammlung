@@ -34,16 +34,16 @@ export class ProfileService {
     return this.data.people;
   }
 
-  // Liste vom Backend holen (Namen, Schloss); offline bleibt die gespeicherte
-  async refresh() {
-    try {
-      this.data.people = (await this.api.people(this.url)).people;
-      this.#save();
-      return true;
-    } catch {
-      return false;
-    }
+  // Liste vom Backend holen (Namen, Schloss); offline bleibt die gespeicherte. Läuft schon eine Anfrage, gilt deren Ergebnis.
+  refresh() {
+    this.#refreshing ??= this.api
+      .people(this.url)
+      .then(({ people }) => ((this.data.people = people), this.#save(), true), () => false)
+      .finally(() => (this.#refreshing = null));
+    return this.#refreshing;
   }
+
+  #refreshing = null;
 
   // Sync nennt, wer angemeldet ist – so kennt auch ein Gerät mit altem Sync-Schlüssel „seine“ Person
   remember(id, name) {

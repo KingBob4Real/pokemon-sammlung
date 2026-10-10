@@ -250,7 +250,8 @@ function folderHead(ctx, folder) {
   ]);
 }
 
-// Übersicht der Ordner in der Sammlung: Name, Kartenzahl, Wert; „Ohne Ordner“; „+ Neuer Ordner“. → { elements, refresh }
+// Ordner der Sammlung als waagerecht wischbare Leiste (bleibt gleich hoch, egal wie viele Ordner – die Karten stehen so
+// schon auf dem ersten Bildschirm): Name, Kartenzahl, Wert; „Ohne Ordner“; „+ Neuer Ordner“. → { elements, refresh }
 function folderOverview(ctx, folders, all, valueOf) {
   const { collection } = ctx;
   const known = new Set(folders.map((f) => f.id));
@@ -259,7 +260,7 @@ function folderOverview(ctx, folders, all, valueOf) {
     ...(folders.length ? [[links.folder(NO_FOLDER), "Ohne Ordner", all.filter((e) => !known.has(e.section))]] : []),
   ].map(([href, name, own]) => {
     const hint = h("small");
-    return { own, hint, el: h("a", { class: "row set-row", href }, [h("b", {}, name), hint]) };
+    return { own, hint, el: h("a", { class: "folder-chip", href }, [h("b", {}, name), hint]) };
   });
   const create = async () => {
     const id = collection.createSection((await ask(NEW_FOLDER, NEW_FOLDER_HINT)) || "");
@@ -268,8 +269,10 @@ function folderOverview(ctx, folders, all, valueOf) {
   return {
     elements: [
       h("h2", { class: "section-title" }, "Ordner"),
-      rows.length ? h("div", { class: "rows" }, rows.map((r) => r.el)) : h("p", { class: "muted pad" }, "Sortiere Karten in Ordner, z. B. „Ordner 1“ oder „Tauschkarten“."),
-      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: create }, "+ Neuer Ordner")]),
+      h("div", { class: "folder-strip" }, [
+        ...rows.map((r) => r.el),
+        h("button", { type: "button", class: "folder-chip new", onclick: create }, [h("b", {}, "+ Neuer Ordner"), h("small", {}, rows.length ? "" : "z. B. Tauschkarten")]),
+      ]),
     ],
     refresh: () => rows.forEach((r) => (r.hint.textContent = r.own.length ? groupHint(r.own, valueOf) : "leer")),
   };

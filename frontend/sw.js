@@ -1,10 +1,17 @@
 "use strict";
 
-// Offline-Betrieb: eigene Dateien „Netz zuerst“ (Updates kommen sofort an), Kartenbilder (TCGdex, pokemontcg.io, Limitless über
-// GET /img des Backends) & Schriften „Speicher zuerst“.
-// Kartensuche/Preise (api.tcgdex.net) und das Sync-Backend laufen immer übers Netz.
-// ponytail: ein Cache ohne Aufräumen – alte ?v=-Stände bleiben liegen (wenige KB), CACHE umbenennen + löschen, falls das mal stört.
-const CACHE = "ps-v2"; // eigener Name: die alte Checkliste teilt sich den Speicher dieser Domain
+// Offline-Betrieb und wenig Anfragen:
+//   index.html „Netz zuerst“ (neue Version erkennen, bei schlechtem Empfang nach 3 s die gespeicherte),
+//   alle anderen eigenen Dateien „Speicher zuerst“, solange die Version gleich ist (main.js?v= in index.html). Kommt eine
+//   index.html mit anderer Version, werden die gespeicherten App-Dateien vorher weggeworfen – danach lädt jedes Modul frisch,
+//   alte und neue mischen sich nie. Darum: nach jeder Änderung an CSS/JS ?v= in index.html hochzählen.
+//   Kartenbilder (TCGdex, pokemontcg.io, Limitless/TCGplayer über GET /img des Backends) & Schriften „Speicher zuerst“.
+//   Kartensuche/Preise (api.tcgdex.net) und das Sync-Backend laufen immer übers Netz.
+// Live (/) und Dev (/dev/) liegen auf derselben Domain → je ein eigener Speicher, sonst räumt der eine dem anderen auf.
+// ponytail: Bilder werden nie aufgeräumt (wenige MB) – Speicher umbenennen, falls das mal stört.
+const CACHE = `ps-v3${new URL(self.registration.scope).pathname}`;
+const VERSION = "./version"; // Version der gespeicherten App-Dateien
+const versionOf = (html) => html.match(/js\/main\.js\?v=(\d+)/)?.[1] ?? null;
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();
@@ -18,6 +25,7 @@ self.addEventListener("install", (e) => {
       const seen = new Set();
       const files = [...html.matchAll(/(?:href|src)="([^":#]+)"/g)].map((m) => new URL(m[1], location.href).href);
       await Promise.all(files.map((url) => precache(cache, url, seen)));
+      await cache.put(VERSION, new Response(versionOf(html) ?? ""));
     })
   );
 });
@@ -35,42 +43,50 @@ async function precache(cache, url, seen) {
   }
 }
 
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+// Alte Speicher (ps-v2 teilten sich Live und Dev) weg
+self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("ps-v2")).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin === location.origin || url.hostname === "fonts.googleapis.com") e.respondWith(networkFirst(req));
-  else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.gstatic.com"].includes(url.hostname) || isProxiedImage(url)) e.respondWith(cacheFirst(req));
+  if (url.origin === location.origin) e.respondWith(req.mode === "navigate" || url.pathname.endsWith("/") ? page(req) : cacheFirst(req, { cache: "no-cache" }));
+  else if (["assets.tcgdex.net", "images.pokemontcg.io", "fonts.googleapis.com", "fonts.gstatic.com"].includes(url.hostname) || isProxiedImage(url)) e.respondWith(cacheFirst(req));
 });
 
 // Kartenbild über den Durchreicher des Backends (Live und Dev)
 const isProxiedImage = (url) => url.hostname.endsWith(".pokemon-sammlung-backend.workers.dev") && url.pathname === "/img";
 
-async function cacheFirst(req) {
+// init: für eigene Dateien { cache: "no-cache" } – nach einem Versionswechsel nie eine alte Fassung aus dem Browser-Cache
+async function cacheFirst(req, init) {
   const cache = await caches.open(CACHE);
   const hit = await cache.match(req);
   if (hit) return hit;
-  const res = await fetch(req);
+  const res = await fetch(req, init);
   if (res.ok) cache.put(req, res.clone());
   return res;
 }
 
-// Immer beim Server nachfragen (no-cache), damit nie alte und neue Module gemischt werden.
-// Schlechter Empfang (Kartenbörse): nach 3 s die gespeicherte Fassung zeigen statt ewig zu warten.
-async function networkFirst(req) {
+// index.html: übers Netz; schlechter Empfang (Kartenbörse) → nach 3 s die gespeicherte. Nur die tatsächlich ausgelieferte
+// Antwort wird übernommen – eine verspätete neue Fassung darf den Speicher nicht leeren, während die Seite schon aus ihm lädt.
+async function page(req) {
   const cache = await caches.open(CACHE);
-  const net = (req.mode === "navigate" ? fetch(req) : fetch(req, { cache: "no-cache" })).then((res) => {
-    if (res.ok) cache.put(req, res.clone());
-    return res;
-  });
+  const net = req.mode === "navigate" ? fetch(req) : fetch(req, { cache: "no-cache" });
   net.catch(() => {});
-  try {
-    const res = await Promise.race([net, new Promise((r) => setTimeout(r, 3000))]);
-    if (res) return res;
-  } catch {
-    /* offline → Speicher */
+  const res = await Promise.race([net, new Promise((r) => setTimeout(r, 3000))]).catch(() => null);
+  if (res?.ok) {
+    await adopt(cache, req, res.clone());
+    return res;
   }
   return (await cache.match(req)) || (req.mode === "navigate" && (await cache.match("./"))) || net;
+}
+
+// Neue Version? Dann erst die gespeicherten eigenen Dateien weg, danach die neue index.html merken
+async function adopt(cache, req, res) {
+  const version = versionOf(await res.clone().text());
+  if (version && version !== (await (await cache.match(VERSION))?.text())) {
+    for (const key of await cache.keys()) if (new URL(key.url).origin === location.origin) await cache.delete(key);
+    await cache.put(VERSION, new Response(version));
+  }
+  await cache.put(req, res);
 }

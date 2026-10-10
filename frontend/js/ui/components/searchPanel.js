@@ -1,10 +1,11 @@
 import { SEARCH_LIMIT } from "../../config.js";
 import { h } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
+import { searchable } from "../../services/catalogService.js";
 import { progressBar, trackFirstImages } from "./progressBar.js";
 import { emptyState, note } from "./widgets.js";
 
-const TYPING_PAUSE_MS = 250;
+const TYPING_PAUSE_MS = 400; // am Handy tippt man langsamer – sonst sucht jede Pause zwischen zwei Buchstaben
 
 /**
  * Suchfeld + Ergebnisse (passende Sets und Karten); ohne Eingabe „Meine Sets“ (mit Fortschritt) und alle Sets.
@@ -59,6 +60,11 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
       return showSets();
     }
     if (session.results?.query === query) return; // schon angezeigt
+    if (!searchable(query)) {
+      session.results = null;
+      bar.done();
+      return box.replaceChildren(note("Noch ein Zeichen mehr – gesucht wird ab 2 Buchstaben oder mit Nummer."));
+    }
     bar.busy();
     box.replaceChildren(note("Suche läuft …"));
     try {

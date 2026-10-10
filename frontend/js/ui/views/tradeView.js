@@ -10,9 +10,9 @@ const FRESH_MS = 60_000; // so lange gilt die letzte Antwort, ohne neu zu fragen
 // Reiter „Tauschen“ (#tauschen): oben der Tauschrechner (mit jedem, auch ohne App), darunter „Mit den anderen“ – pro Person
 // „Tim hat doppelt, was dir fehlt“ und „Du hast doppelt, was Tim fehlt“, je mit Anzahl und Marktwert, ein Knopf übernimmt
 // beides in den Rechner, aufklappbar alle Doppelten. Antippen öffnet die Karte. „Mit den anderen“ braucht Internet und
-// Anmeldung; die letzte Antwort bleibt im Speicher (services/tradeService.js).
+// Anmeldung; die letzte Antwort bleibt im Speicher (services/tradeService.js), der Rechner auf dem Gerät (tradeDraftService.js).
 export function render(main, ctx) {
-  const { trade, sync, prices } = ctx;
+  const { trade, tradeDraft, sync, prices } = ctx;
   ctx.setTitle("Tauschen");
   const calc = tradeCalculator(ctx);
   main.append(calc.element, h("h2", { class: "section-title trade-others" }, "Mit den anderen in der App"));
@@ -43,7 +43,7 @@ export function render(main, ctx) {
   };
   // Vorschlag in den Rechner: ich gebe meine Doppelten, die Tim fehlen, und bekomme seine, die mir fehlen
   const toCalculator = (name, forThem, forMe) => {
-    trade.fill(forThem, forMe);
+    tradeDraft.fill(forThem, forMe);
     ctx.render();
     window.scrollTo(0, 0);
     ctx.notify(`Tausch mit ${name} im Rechner – Karten rausnehmen oder dazusuchen, bis es passt.`, { type: "success" });

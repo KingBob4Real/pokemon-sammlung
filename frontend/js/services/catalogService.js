@@ -15,6 +15,13 @@ export function parseQuery(query) {
   return { words, number, total, code, cc: cc && cc.toUpperCase() };
 }
 
+// Lohnt eine Suche? Ein einzelner Buchstabe findet bei TCGdex alles, was ihn enthält (für „g“ ~1,2 MB auf Deutsch und
+// Englisch) – darum ab 2 Zeichen oder mit Nummer. ponytail: die Trainerkarte „N“ findet man mit Nummer („N 96“).
+export function searchable(query) {
+  const { words, number, cc } = parseQuery(query);
+  return number != null || cc != null || words.length >= 2;
+}
+
 // Passt die Nummer (und Setgröße)? Nachdrucke tragen die Nummer des Originals („106/106“)
 function hasNumber(card, number, total) {
   const [num, t] = printedNumber(card)?.split("/") ?? [card.num, card.total];
@@ -50,7 +57,7 @@ export class CatalogService {
   async #search(query) {
     const { words, number, total, code, cc } = parseQuery(query);
     if (cc) return this.#cards([classicId(cc)]); // „CC12“, „30C CC12“: genau diese Karte
-    if (!words && number == null) return [];
+    if (!searchable(query)) return [];
     const byCode = code ? this.#byCode(code, number, total).catch(() => []) : [];
     // Nachdrucke mit der Nummer des Originals findet TCGdex über die Nummer nicht. Mit Kürzel nur bei Setgröße
     // (Karpador der Klassischen Sammlung trägt „PAL 203/193“; „MEP 97“ soll keinen Xerneas 97/146 bringen)

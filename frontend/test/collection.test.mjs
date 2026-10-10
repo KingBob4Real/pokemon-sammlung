@@ -133,8 +133,8 @@ assert.deepEqual(sums.avg1, { sum: 29, unknown: 1 }, "Ø 1 Tag fehlt bei g2");
 assert.deepEqual(sums.avg30, { sum: 47, unknown: 0 });
 
 // Entwurf: auf dem Gerät gemerkt; nochmal hinzufügen = eine mehr; was ich gebe, startet mit Sprache/Zustand aus meiner Sammlung
-const { TradeService } = await import("../js/services/tradeService.js");
-const tradeOf = () => new TradeService(null, null, collection, lists, storage, "trade");
+const { TradeDraftService } = await import("../js/services/tradeDraftService.js");
+const tradeOf = () => new TradeDraftService(storage, "trade", collection);
 const draft = tradeOf();
 draft.add("give", card("a"));
 draft.add("give", card("a"));
