@@ -43,8 +43,9 @@ async function precache(cache, url, seen) {
   }
 }
 
-// Alte Speicher (ps-v2 teilten sich Live und Dev) weg
-self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith("ps-v2")).map((k) => caches.delete(k)))).then(() => self.clients.claim())));
+// Den alten gemeinsamen Speicher (ps-v2) räumt nur Live weg – Live braucht ihn, bis es selbst diese Fassung hat
+const OWNS_OLD_CACHE = new URL(self.registration.scope).pathname === "/";
+self.addEventListener("activate", (e) => e.waitUntil((OWNS_OLD_CACHE ? caches.delete("ps-v2") : Promise.resolve()).then(() => self.clients.claim())));
 
 self.addEventListener("fetch", (e) => {
   const req = e.request;
