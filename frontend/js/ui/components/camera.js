@@ -33,11 +33,11 @@ export const cutCells = (source, rect, layout, bounds) => Promise.all(gridCells(
  *   series – Kamera bleibt an, löst auch selbst aus:     onShot(blob, { auto })
  *   page   – ganze Ordnerseite, ein Bild pro Fach:       onPage(blobs)
  *   onMode(mode, layout), onCancel(), onPick() („Foto wählen“), onUnavailable(e)
- *   tray – Element über dem Auslöser (Liste der Serie)
+ *   tray – Element über dem Auslöser (Liste der Serie); modes – angebotene Arten (im Tauschrechner nur „single“)
  * start() fragt die Kamera an; stop() gibt sie frei – auch von selbst, wenn die App in den Hintergrund geht.
  * setRemaining(n) zeigt die übrigen Scans; bei 0 ist der Auslöser aus. lockSingle(true): „Einzeln“ gesperrt.
  */
-export function cameraView({ mode = "single", layout = "3x3", tray = null, onPhoto, onShot, onPage, onMode, onCancel, onPick, onUnavailable }) {
+export function cameraView({ mode = "single", modes = Object.keys(MODES), layout = "3x3", tray = null, onPhoto, onShot, onPage, onMode, onCancel, onPick, onUnavailable }) {
   const video = h("video", { playsinline: true, muted: true, autoplay: true, "aria-hidden": "true" });
   const frame = h("div", { class: "camera-frame" });
   const flash = h("div", { class: "camera-flash", "aria-hidden": "true" });
@@ -47,11 +47,11 @@ export function cameraView({ mode = "single", layout = "3x3", tray = null, onPho
   const auto = h("input", { type: "checkbox", checked: true });
   const autoLabel = h("label", { class: "camera-chip" }, [auto, "Auto"]);
   const grid = h("select", { class: "camera-chip", "aria-label": "Fächer pro Seite (Spalten × Zeilen)" }, LAYOUTS.map((l) => h("option", { value: l, selected: l === layout }, l.replace("x", " × "))));
-  const modeButtons = Object.entries(MODES).map(([m, label]) => h("button", { type: "button", class: "camera-mode", "data-mode": m, onclick: () => setMode(m) }, label));
+  const modeButtons = Object.entries(MODES).filter(([m]) => modes.includes(m)).map(([m, label]) => h("button", { type: "button", class: "camera-mode", "data-mode": m, onclick: () => setMode(m) }, label));
   const el = h("div", { class: "camera" }, [
     video,
     flash,
-    h("div", { class: "camera-top" }, [h("div", { class: "camera-row" }, [h("div", { class: "camera-modes", role: "group", "aria-label": "Art des Scans" }, modeButtons), autoLabel, grid]), hint]),
+    h("div", { class: "camera-top" }, [h("div", { class: "camera-row" }, [h("div", { class: "camera-modes", role: "group", "aria-label": "Art des Scans", hidden: modeButtons.length < 2 }, modeButtons), autoLabel, grid]), hint]),
     h("div", { class: "camera-stage" }, [frame]),
     h("div", { class: "camera-bottom" }, [
       tray,

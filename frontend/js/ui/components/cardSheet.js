@@ -25,13 +25,15 @@ export function cardHead(card, prices, language = () => "Deutsch") {
     priceBox.replaceChildren(
       p && (p.avg7 || p.avg30)
         ? h("div", { class: "price-grid" }, [cell("Ø 7 Tage · zählt", p.avg7), cell("Ø 30 Tage", p.avg30)])
-        : p
-          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
-          : !navigator.onLine
-            ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
-            : prices.hasFailed(card.id)
-              ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
-              : h("p", { class: "muted" }, "Preis wird geladen …"),
+        : p?.cardmarketId
+          ? h("p", { class: "muted" }, "In den letzten 30 Tagen keine Verkäufe auf Cardmarket – darum kein Richtwert.")
+          : p
+            ? h("p", { class: "muted" }, "TCGdex hat diese Karte keinem Cardmarket-Produkt zugeordnet – passiert oft bei Namen mit ♀, ♂, ◇ oder ’. Den aktuellen Preis zeigt der Link.")
+            : !navigator.onLine
+              ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
+              : prices.hasFailed(card.id)
+                ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
+                : h("p", { class: "muted" }, "Preis wird geladen …"),
       h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
       h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
     );

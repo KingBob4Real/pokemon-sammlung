@@ -7,6 +7,7 @@ import { TRADE_PRICES, tradeSums } from "../../domain/trade.js";
 import { confirmDialog } from "./ask.js";
 import { cardSearch } from "./cardPicker.js";
 import { cardImg, imageFor } from "./cardTile.js";
+import { startScan } from "./scanSheet.js";
 
 const SIDES = [
   ["give", "Ich gebe", "Karte, die du gibst"],
@@ -105,6 +106,18 @@ export function tradeCalculator(ctx) {
       return found.update;
     });
 
+  // Kamera wie beim Scannen in die Sammlung, nur landet die Karte auf dieser Seite („Nächste Karte scannen“ geht weiter)
+  const scan = (side, label) =>
+    startScan(ctx, {
+      pick: {
+        label,
+        add: (card) => {
+          tradeDraft.add(side, card);
+          draw();
+        },
+      },
+    });
+
   const clear = async () => {
     if (await confirmDialog("Tauschrechner leeren?", { ok: "Leeren", danger: true })) (tradeDraft.clear(), draw());
   };
@@ -118,7 +131,10 @@ export function tradeCalculator(ctx) {
       ...SIDES.flatMap(([side, label, title]) => [
         h("h3", { class: "group-title" }, [h("span", {}, label), h("small", {}, plural(tradeDraft.draft[side].reduce((n, i) => n + i.qty, 0), "Karte", "Karten"))]),
         ...tradeDraft.draft[side].map((it) => row(side, it)),
-        h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: () => pick(side, title) }, "+ Karte")]),
+        h("div", { class: "buttons" }, [
+          h("button", { type: "button", class: "btn btn-ghost", onclick: () => pick(side, title) }, "+ Karte"),
+          h("button", { type: "button", class: "btn btn-ghost", onclick: () => scan(side, label) }, "📷 Scannen"),
+        ]),
       ]),
       ...(empty
         ? []

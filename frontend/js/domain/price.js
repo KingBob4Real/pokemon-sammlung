@@ -45,5 +45,9 @@ export function cardmarketUrl(card, price, language = "Deutsch", minCondition = 
   const filter = `${lang ? `language=${lang}&` : ""}minCondition=${minCondition}`;
   return price?.cardmarketId
     ? `https://www.cardmarket.com/de/Pokemon/Products?idProduct=${encodeURIComponent(price.cardmarketId)}&${filter}`
-    : `https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=${encodeURIComponent(card.name)}&${filter}`;
+    : `https://www.cardmarket.com/de/Pokemon/Products/Search?searchString=${encodeURIComponent(searchName(card.name))}&${filter}`;
 }
+
+// Ohne Cardmarket-Produkt (TCGdex ordnet Namen mit ♀, ♂, ◇, δ, ’ oder „-EX“ oft nicht zu) nach dem Namen suchen –
+// ohne diese Zeichen, sonst findet Cardmarket nichts: „Nidoran♀“ → „Nidoran“, „Farfetch’d“ → „Farfetch'd“
+export const searchName = (name) => name.replace(/[♀♂◇δ★]/g, " ").replace(/’/g, "'").replace(/-(EX|GX)\b/g, " $1").replace(/\s+/g, " ").trim();

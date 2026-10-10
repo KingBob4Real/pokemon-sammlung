@@ -124,6 +124,10 @@ const t = tradeMatches(tim, owned, [card("t1"), card("a"), card("x")]);
 assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim hat doppelt, was mir fehlt (a habe ich schon)");
 assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2]], "ich habe doppelt, was Tim fehlt (b nur einmal)");
 
+// Cardmarket-Suche ohne Produkt: Namen ohne ♀/♂/◇ und mit geradem Apostroph, sonst findet Cardmarket nichts
+const { searchName } = await import("../js/domain/price.js");
+assert.deepEqual(["Nidoran♀", "Tapu Koko ◇", "Farfetch’d", "Heatran-EX", "Glurak-ex"].map(searchName), ["Nidoran", "Tapu Koko", "Farfetch'd", "Heatran EX", "Glurak-ex"]);
+
 // Tauschrechner: Summen je Preisart, eigener Preis zählt vor jedem Richtwert, fehlende Werte werden mitgezählt
 const { tradeSums } = await import("../js/domain/trade.js");
 const priceOf = (id) => ({ g1: { low: 10, avg1: 12, avg7: 15, avg30: 20 }, g2: { low: 1, avg1: null, avg7: 2, avg30: 2 } })[id] ?? null;
