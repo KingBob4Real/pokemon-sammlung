@@ -2,6 +2,7 @@ import { h } from "../../core/dom.js";
 import { fmtEur, plural } from "../../core/format.js";
 import { orderOf, positionBetween } from "../../domain/sorting.js";
 import { links } from "../router.js";
+import { ask, confirmDialog } from "../components/ask.js";
 import { cardTile, tileCard } from "../components/cardTile.js";
 import { enableReorder } from "../components/reorder.js";
 import { useSelection } from "../components/selection.js";
@@ -38,14 +39,14 @@ export function render(main, ctx, listId) {
   const canReorder = sortKey === "order" && filter === "all" && !selecting && items.length > 1;
   const shown = items.filter((i) => filter === "all" || (filter === "owned") === collection.has(i.card.id));
 
-  const rename = () => {
-    const name = prompt("Neuer Name der Liste:", list.name);
+  const rename = async () => {
+    const name = await ask("Neuer Name der Liste", { value: list.name, ok: "Speichern" });
     if (!name || !name.trim()) return;
     lists.rename(listId, name);
     ctx.render();
   };
-  const remove = () => {
-    if (!confirm(`Liste „${list.name}“ löschen? Die Karten bleiben in deiner Sammlung.`)) return;
+  const remove = async () => {
+    if (!(await confirmDialog(`Liste „${list.name}“ löschen? Die Karten bleiben in deiner Sammlung.`, { ok: "Löschen", danger: true }))) return;
     lists.remove(listId);
     location.hash = links.lists;
   };

@@ -2,9 +2,10 @@ import { h } from "../../core/dom.js";
 import { deliverFile } from "../../core/files.js";
 import { describeError } from "../../core/errors.js";
 import { fmtDateTime, plural } from "../../core/format.js";
+import { confirmDialog } from "../components/ask.js";
 import { panel } from "../components/widgets.js";
 
-// Ansicht „Mehr“: Sync einrichten, Sicherung, alte Checkliste übernehmen, Hinweise zu Preisen
+// Ansicht „Mehr“: Konto & Sync-Stand, Sicherung, unter „Erweitert“ Sync-Schlüssel und alte Checkliste, Hinweise zu Preisen
 export function render(main, ctx) {
   const { sync, backup, legacyImport, updates } = ctx;
   ctx.setTitle("Mehr");
@@ -15,15 +16,14 @@ export function render(main, ctx) {
   const keyNote = h("p", { class: "field-note", role: "alert" });
   const showKey = () => (key.type = key.type === "password" ? "text" : "password");
   const copyKey = () => navigator.clipboard?.writeText(key.value).then(() => (status.textContent = "Schlüssel kopiert."), () => {});
-  const save = () => {
+  const save = async () => {
     // anderer Schlüssel = andere Person → Daten dieses Geräts gehören nicht dazu
     if (sync.isOtherKey(key.value) && !ctx.store.isEmpty) {
       const unsaved = sync.pendingCount ? `
 
 Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen und gehen dabei verloren.` : "";
-      if (!confirm(`Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden durch die der neuen Person ersetzt (im Backend bleibt alles erhalten).${unsaved}
-
-Weiter?`)) return;
+      const question = `Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden durch die der neuen Person ersetzt (im Backend bleibt alles erhalten).${unsaved}`;
+      if (!(await confirmDialog(question, { ok: "Schlüssel wechseln", danger: true }))) return;
     }
     keyNote.textContent = "";
     sync.configure(key.value).then((problem) => {
@@ -60,8 +60,15 @@ Weiter?`)) return;
   };
 
   main.append(
-    accountPanel(ctx),
-    panel("Sync zwischen Geräten", [
+    accountPanel(ctx, status),
+    panel("Sicherung", [
+      h("p", {}, "Alle Daten als Datei sichern oder eine Sicherung zurückholen. Import nimmt auch die Export-Datei der alten Checkliste."),
+      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"), h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file])]),
+    ]),
+    // Selten gebraucht: Notfall-Zugang per Schlüssel und die einmalige Übernahme – zugeklappt
+    h("details", { class: "panel advanced" }, [
+      h("summary", {}, h("h2", {}, "Erweitert")),
+      h("h3", {}, "Sync-Schlüssel"),
       h("p", {}, "Anmelden geht oben unter „Wer sammelt?“ per Antippen. Hier nur, falls du lieber deinen Sync-Schlüssel nutzt – er gilt immer, auch wenn du dein Passwort vergessen hast."),
       h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
       keyNote,
@@ -69,13 +76,7 @@ Weiter?`)) return;
         h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
         h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
       ]),
-      status,
-    ]),
-    panel("Sicherung", [
-      h("p", {}, "Alle Daten als Datei sichern oder eine Sicherung zurückholen. Import nimmt auch die Export-Datei der alten Checkliste."),
-      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"), h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file])]),
-    ]),
-    panel("Alte Checkliste übernehmen", [
+      h("h3", {}, "Alte Checkliste übernehmen"),
       h("p", {}, "Legt für jede Gruppe der alten Checkliste eine Liste an und übernimmt abgehakte Karten samt „Mein Preis“ als Kaufpreis in die Sammlung. Mehrfach ausführen ist ok, es entsteht nichts doppelt."),
       legacy
         ? h("button", { type: "button", class: "btn", onclick: importLegacy }, `Aus diesem Browser übernehmen (${legacy.owned.length} abgehakt)`)
@@ -125,8 +126,8 @@ function syncStatusText(sync) {
   }
 }
 
-// „Wer sammelt?“: wer angemeldet ist, Person wechseln, Name und Passwort
-function accountPanel(ctx) {
+// „Wer sammelt?“: wer angemeldet ist, Sync-Stand (status), Person wechseln, Name und Passwort
+function accountPanel(ctx, status) {
   const { profiles, sync } = ctx;
   const me = profiles.people.find((p) => p.id === profiles.active);
   const switchButton = h("button", { type: "button", class: "btn", onclick: ctx.openProfiles }, "Person wechseln");
@@ -160,6 +161,7 @@ function accountPanel(ctx) {
 
   return panel("Wer sammelt?", [
     h("p", {}, `Angemeldet als ${me.name}.`),
+    status,
     h("div", { class: "buttons" }, [switchButton]),
     h("label", { class: "label" }, ["Dein Name", h("div", { class: "toolbar tight" }, [name, renameButton])]),
     h("h3", { class: "label" }, "Passwort"),

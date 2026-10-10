@@ -3,7 +3,7 @@ import { cardTile } from "../components/cardTile.js";
 import { searchPanel } from "../components/searchPanel.js";
 import { useSelection } from "../components/selection.js";
 
-// Ansicht „Suche“: alle Karten (Deutsch + Englisch) nach Name/Nummer, dazu passende Sets; ohne Eingabe die Liste aller Sets.
+// Ansicht „Suche“: alle Karten (Deutsch + Englisch) nach Name/Nummer, dazu passende Sets; ohne Eingabe „Meine Sets“ und alle Sets.
 // „Auswählen“ markiert mehrere Karten (auch über mehrere Suchen) für „Hinzufügen …“ (Sammlung oder Liste).
 export function render(main, ctx) {
   ctx.setTitle("Suche");

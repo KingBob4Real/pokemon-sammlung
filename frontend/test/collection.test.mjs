@@ -80,4 +80,48 @@ await loaded;
 assert.equal(priceService.value("2014xy-1"), 2.83);
 assert.equal(priceService.get("2014xy-1").dexId, 13);
 
+// A1: Haken ab (Anzahl 1 → 0) liefert „Rückgängig“, das den alten Eintrag genau zurückholt – Zustand, Kaufpreis, Ordner,
+// hinzugefügt am; Haken dran liefert nichts (bleibt still)
+const ordnerA1 = collection.createSection("Ordner A1");
+const d = card("d");
+assert.equal(collection.toggle(d), null, "Hinzufügen per Haken: kein Rückgängig");
+collection.update("d", { cond: "Excellent", paid: 4.2, lang: "Englisch" });
+collection.setSection([d], ordnerA1);
+const beforeD = collection.entry("d");
+const undoD = collection.toggle(d);
+assert.equal(collection.has("d"), false, "abgehakt");
+undoD();
+assert.deepEqual(collection.entry("d"), beforeD, "Rückgängig: alter Eintrag samt Ordner zurück");
+
+// A3: Schnellfilter
+const { QUICK_FILTERS } = await import("../js/domain/sorting.js");
+const worthOf = { a: 2, c: null, d: 1 };
+const quick = (key) => collection.entries().filter((e) => QUICK_FILTERS[key].test(e, (id) => worthOf[id] ?? null)).map((e) => e.card.id).sort();
+assert.deepEqual(quick("all"), ["a", "b", "c", "d"]);
+assert.deepEqual(quick("dupes"), ["a"], "Doppelte: Anzahl > 1");
+assert.deepEqual(quick("unpaid"), ["b", "c"], "ohne Kaufpreis");
+assert.deepEqual(quick("noprice"), ["b", "c"], "ohne Preis (auch noch nicht geladen)");
+
+// C1: Set-Zähler (verschiedene Karten je Set) und „Fehlende als Liste“ – zweimal ausführen ergibt nichts doppelt
+const { ListService } = await import("../js/services/listService.js");
+const lists = new ListService(collection.store);
+const inSet = (id) => ({ ...card(id), set: "sv1" });
+collection.setQuantity(inSet("sv1-1"), 3);
+collection.setQuantity(inSet("sv1-2"), 1);
+collection.setQuantity(inSet("sv1-3"), 0); // Anzahl 0 zählt nicht
+assert.deepEqual([collection.countBySet().get("sv1"), collection.countBySet().get("x")], [2, 4], "je Set verschiedene Karten in der Sammlung");
+const missing = [inSet("sv1-3"), inSet("sv1-4")];
+const first = lists.fill(" Karmesin & Purpur ", missing);
+assert.deepEqual([lists.all().map((l) => l.name), first.added], [["Karmesin & Purpur"], 2], "Liste mit Set-Namen angelegt");
+const again = lists.fill("Karmesin & Purpur", [...missing, inSet("sv1-5")]);
+assert.deepEqual([again.id, again.added, lists.items(first.id).length], [first.id, 1, 3], "vorhandene Liste ergänzt, nichts doppelt");
+
+// D: Tauschen – Abgleich per Karten-ID, die Sprache zählt nicht
+const { tradeMatches } = await import("../js/domain/trade.js");
+const tim = { duplicates: [{ card: card("t1"), qty: 2, cond: "Mint", lang: "Englisch" }, { card: card("a"), qty: 3, cond: "Mint", lang: "Deutsch" }], missing: [card("a"), card("b")] };
+const owned = [{ card: card("a"), qty: 2, cond: "Near Mint", lang: "Deutsch" }, { card: card("b"), qty: 1, cond: "Near Mint", lang: "Deutsch" }];
+const t = tradeMatches(tim, owned, [card("t1"), card("a"), card("x")]);
+assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim hat doppelt, was mir fehlt (a habe ich schon)");
+assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2]], "ich habe doppelt, was Tim fehlt (b nur einmal)");
+
 console.log("Sammlung ok");

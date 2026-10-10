@@ -22,6 +22,19 @@ export function toPrice(card) {
 // Ø 7 Tage 60 €, Ø 30 Tage 80 €)
 export const marketValue = (price) => (price ? price.avg7 ?? price.avg30 : null);
 
+// Gestiegen / Gefallen: Karten mit dem größten Unterschied Ø 7 Tage gegen Ø 30 Tage (in €, pro Stück).
+// entries: [{ card }], priceOf(cardId) → Preis → { up, down } mit je höchstens n Einträgen { entry, price, diff }
+export function movers(entries, priceOf, n = 5) {
+  const all = entries.flatMap((entry) => {
+    const price = priceOf(entry.card.id);
+    return price?.avg7 != null && price.avg30 != null && price.avg7 !== price.avg30 ? [{ entry, price, diff: price.avg7 - price.avg30 }] : [];
+  });
+  return {
+    up: all.filter((m) => m.diff > 0).sort((a, b) => b.diff - a.diff).slice(0, n),
+    down: all.filter((m) => m.diff < 0).sort((a, b) => a.diff - b.diff).slice(0, n),
+  };
+}
+
 // Link mit Filter „Sprache der Karte, ab Excellent“ – zeigt den echten Preis für genau solche Karten
 export function cardmarketUrl(card, price, language = "Deutsch") {
   const lang = CARDMARKET_LANGUAGES[language];

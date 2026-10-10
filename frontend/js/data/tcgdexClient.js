@@ -50,13 +50,8 @@ export class TcgdexClient {
     }
   }
 
-  // Deutsche Daten, sonst englische (manche Karten gibt es auf Deutsch nicht vollständig); mit lang genau diese Sprache
-  async card(cardId, lang = null) {
-    if (lang) return this.#get(`/${lang}/cards/${encodeURIComponent(cardId)}`);
-    try {
-      return await this.#get(`/de/cards/${encodeURIComponent(cardId)}`);
-    } catch {
-      return await this.#get(`/en/cards/${encodeURIComponent(cardId)}`);
-    }
+  // Volle Karte (mit Preisen) in genau dieser Sprache; fehlt sie dort: Fehler mit status 404
+  card(cardId, lang) {
+    return this.#get(`/${lang}/cards/${encodeURIComponent(cardId)}`);
   }
 }

@@ -176,7 +176,7 @@ function scanFlow(body, ctx, file, listId) {
     }
     if (!live()) return;
     const { cards, sure } = result;
-    if (sure) confirm(cards[0], rec, cards.length > 1 ? () => choose(cards, rec) : null);
+    if (sure) confirmCard(cards[0], rec, cards.length > 1 ? () => choose(cards, rec) : null);
     else if (cards.length) choose(cards, rec);
     else search(rec, "Karte nicht erkannt");
   }
@@ -204,7 +204,7 @@ function scanFlow(body, ctx, file, listId) {
   }
 
   function choose(cards, rec) {
-    const { grid, update } = choiceGrid(ctx, cards, (card) => confirm(card, rec, () => choose(cards, rec)));
+    const { grid, update } = choiceGrid(ctx, cards, (card) => confirmCard(card, rec, () => choose(cards, rec)));
     show(
       h("h2", {}, "Welche Karte ist es?"),
       h("p", { class: "muted" }, "Mehrere Karten passen – tippe die richtige an."),
@@ -217,7 +217,7 @@ function scanFlow(body, ctx, file, listId) {
   // Nichts (Passendes) gefunden: Suche, vorausgefüllt mit dem Gelesenen
   function search(rec, title) {
     const read = [rec?.name, rec?.number && (rec.total ? `${rec.number}/${rec.total}` : rec.number), rec?.setCode].filter(Boolean).join(" · ");
-    const found = cardSearch(ctx, { query: rec?.name || rec?.number || "", onPick: (card) => confirm(card, rec, () => search(rec, title)), live });
+    const found = cardSearch(ctx, { query: rec?.name || rec?.number || "", onPick: (card) => confirmCard(card, rec, () => search(rec, title)), live });
     show(
       h("h2", {}, title),
       read ? h("p", { class: "muted" }, `Gelesen: ${read}`) : null,
@@ -228,7 +228,7 @@ function scanFlow(body, ctx, file, listId) {
   }
 
   // Bestätigung: Karte mit Preisen, Angaben wählen, „In Sammlung“. back: zurück zur Auswahl
-  function confirm(card, rec, back) {
+  function confirmCard(card, rec, back) {
     const entry = collection.entry(card.id);
     const owned = collection.quantity(card.id);
     let qty = 1;

@@ -1,4 +1,4 @@
-import { numCmp } from "../core/format.js";
+import { numCmp, positive } from "../core/format.js";
 
 // Eigene Reihenfolge: gesetzte Position (Drag & Drop), sonst Zeitpunkt des Hinzufügens
 export const orderOf = (entry) => entry.position ?? entry.added ?? entry.created ?? 0;
@@ -27,6 +27,14 @@ export function createSorters({ valueOf, setOrder, dexOf }) {
     pokedex: { label: "Pokédex (Entwicklung)", compare: (a, b) => dex(a) - dex(b) || a.card.name.localeCompare(b.card.name, "de") || bySet(a, b) },
   };
 }
+
+// Schnellfilter der Sammlung (und jedes Ordners). Einträge wie oben, dazu qty und paid; valueOf(cardId) → Marktwert oder null
+export const QUICK_FILTERS = {
+  all: { label: "Alle", test: () => true },
+  dupes: { label: "Doppelte", test: (e) => e.qty > 1 },
+  unpaid: { label: "Ohne Kaufpreis", test: (e) => positive(e.paid) == null },
+  noprice: { label: "Ohne Preis", test: (e, valueOf) => valueOf(e.card.id) == null }, // wie „x ohne Preis“ bei den Kennzahlen
+};
 
 // Sortierungen im Set. Einträge haben { card, i } – i = Stelle im Katalog, der schon nach Nummer sortiert (numCmp).
 // Karten ohne Preis stehen beim Wert immer am Ende.

@@ -1,12 +1,15 @@
 import { h } from "../../core/dom.js";
 import { fmtEur, fmtSigned, norm, plural } from "../../core/format.js";
-import { orderOf, positionBetween } from "../../domain/sorting.js";
+import { orderOf, positionBetween, QUICK_FILTERS } from "../../domain/sorting.js";
 import { COLLECTION_TARGET, links } from "../router.js";
+import { ask, confirmDialog } from "../components/ask.js";
+import { NEW_FOLDER, NEW_FOLDER_HINT } from "../components/cardSheet.js";
 import { cardTile, tileCard } from "../components/cardTile.js";
 import { enableReorder } from "../components/reorder.js";
 import { scanButton } from "../components/scanSheet.js";
 import { useSelection } from "../components/selection.js";
-import { backLink, emptyState, sortSelect, stat } from "../components/widgets.js";
+import { backLink, emptyState, segmented, sortSelect, stat } from "../components/widgets.js";
+import { openWorthSheet, worthHint } from "../components/worthSheet.js";
 
 const SORT_KEYS = ["newest", "order", "set", "pokedex", "value", "name"];
 const GROUPS = [
@@ -17,7 +20,6 @@ const GROUPS = [
 ];
 const NO_FOLDER = "ohne"; // #ordner/ohne = Karten ohne Ordner
 const CONFIRM_FROM = 10; // ab so vielen Karten vor dem Löschen nachfragen
-const NEW_FOLDER = "Name des neuen Ordners, z. B. „Ordner 1“ oder „Tauschkarten“:";
 
 // Ansicht „Sammlung“ oder ein Ordner (#ordner/<id>): oben Suchen + „Auswählen“ (wie in der Suche), Kennzahlen; in der
 // Sammlung Karten hinzufügen/scannen und die Ordner-Übersicht. Dann sortieren (auch eigene Reihenfolge per Ziehen),
@@ -44,14 +46,30 @@ export function render(main, ctx, folderId = "") {
   const stats = h("div", { class: "stats" });
   const scan = inFolder ? null : scanButton(ctx);
   const filter = h("input", { type: "search", class: "field", placeholder: inFolder ? "Im Ordner suchen …" : "In der Sammlung suchen …", "aria-label": "Karten filtern", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
+  // Schnellfilter (Doppelte, ohne Kaufpreis, ohne Preis) – wirkt mit dem Textfilter zusammen, bleibt wie dieser erhalten
+  const quick = QUICK_FILTERS[session.collectionQuick] ? session.collectionQuick : "all";
+  const quickRow = segmented(
+    Object.entries(QUICK_FILTERS).map(([k, f]) => [k, f.label]),
+    quick,
+    (k) => ((session.collectionQuick = k), ctx.render()),
+    "Schnellfilter"
+  );
 
   if (inFolder) main.append(folderHead(ctx, folder));
   // „Auswählen“ ganz oben, ohne Scrollen zu sehen – wie in der Suche
-  if (entries.length) main.append(h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]));
+  if (entries.length) main.append(h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]), h("div", { class: "toolbar" }, [quickRow]));
   main.append(stats);
   if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
   const overview = inFolder || !all.length ? null : folderOverview(ctx, folders, all, valueOf);
   if (overview) main.append(...overview.elements);
+  if (!inFolder) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn btn-ghost", href: links.trade }, "⇄ Tauschen mit den anderen")]));
+
+  // Welche Karten gerade passen (Text- und Schnellfilter); die Kennzahlen gelten für genau diese
+  const texts = new Map(entries.map((e) => [e.card.id, norm(`${e.card.name} ${e.card.num} ${e.card.setName}`)]));
+  const terms = () => norm(filter.value).split(/\s+/).filter(Boolean);
+  const matches = (e, t = terms()) => QUICK_FILTERS[quick].test(e, valueOf) && t.every((w) => texts.get(e.card.id).includes(w));
+  const filtered = () => quick !== "all" || terms().length > 0;
+  let applyFilter = () => {}; // blendet Kacheln aus, sobald es sie gibt (unten)
 
   // Pokédex-Sortierung braucht die Kartendetails – sind sie nachgeladen, einmal neu sortieren
   let waitingForDex = sortKey === "pokedex" && entries.some((e) => !prices.get(e.card.id));
@@ -62,10 +80,16 @@ export function render(main, ctx, folderId = "") {
       waitingForDex = false;
       return ctx.render();
     }
-    const s = collection.summary(valueOf, entries);
+    applyFilter(); // „Ohne Preis“ ändert sich, während Preise nachladen
+    const t = terms();
+    const s = collection.summary(valueOf, entries.filter((e) => matches(e, t)));
+    // Wertverlauf nur für die ganze Sammlung – ein Ordner oder Filter hat keinen
+    const history = inFolder || filtered() ? null : ctx.history;
     stats.replaceChildren(
-      stat("Karten", String(s.count), `${s.distinct} verschiedene`),
-      stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket Ø 7 Tage"),
+      stat(quick !== "all" ? QUICK_FILTERS[quick].label : t.length ? "Gefunden" : "Karten", String(s.count), `${s.distinct} verschiedene`),
+      history?.series().length
+        ? stat("Marktwert", fmtEur(s.worth), worthHint(history, s.unknown), () => openWorthSheet(ctx))
+        : stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket Ø 7 Tage"),
       stat("Bezahlt", s.paid ? fmtEur(s.paid) : "–", "deine Kaufpreise"),
       stat("Gewinn/Verlust", s.diffCount ? fmtSigned(s.diff) : "–", s.diffCount ? `bei ${plural(s.diffCount, "Karte", "Karten")} mit Kaufpreis` : "Kaufpreise eintragen")
     );
@@ -125,29 +149,39 @@ export function render(main, ctx, folderId = "") {
     : [];
   const dispose = () => drops.forEach((stop) => stop());
 
-  const applyFilter = () => {
-    session.collectionFilter = filter.value;
-    const terms = norm(filter.value).split(/\s+/).filter(Boolean);
+  // Kachel → Eintrag über die Karte (nach dem Ziehen stimmt die Reihenfolge im Raster nicht mehr mit entries überein)
+  const byId = new Map(entries.map((e) => [e.card.id, e]));
+  const nothing = emptyState("Keine Karte passt zu diesem Filter.");
+  main.append(nothing);
+  applyFilter = () => {
+    const t = terms();
+    let shown = 0;
     for (const b of blocks) {
       let any = false;
-      b.entries.forEach((e, i) => {
-        const show = terms.every((t) => norm(`${e.card.name} ${e.card.num} ${e.card.setName}`).includes(t));
-        b.grid.children[i].hidden = !show;
+      for (const tile of b.grid.children) {
+        const show = matches(byId.get(tileCard(tile).id), t);
+        tile.hidden = !show;
         any ||= show;
-      });
-      if (b.head) b.head.hidden = terms.length > 0 && !any;
+        shown += show;
+      }
+      if (b.head) b.head.hidden = !any;
     }
+    nothing.hidden = shown > 0;
   };
-  filter.addEventListener("input", applyFilter);
+  filter.addEventListener("input", () => {
+    session.collectionFilter = filter.value;
+    refresh();
+  });
   applyFilter();
   prices.request(entries.map((e) => e.card.id));
   if (!selection.active) return { refresh, dispose };
 
   // Auswahl: „In Ordner …“ (Ordner, neuer Ordner, Liste), im Ordner „Aus dem Ordner nehmen“, „Löschen“ (mit „Rückgängig“)
-  const remove = (chosen, stop) => {
+  const remove = async (chosen, stop) => {
     const cards = chosen();
     if (!cards.length) return ctx.notify("Erst Karten antippen.", { type: "info" });
-    if (cards.length >= CONFIRM_FROM && !confirm(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung löschen? Mit „Rückgängig“ holst du sie zurück.`)) return;
+    const question = `${plural(cards.length, "Karte", "Karten")} aus der Sammlung löschen? Mit „Rückgängig“ holst du sie zurück.`;
+    if (cards.length >= CONFIRM_FROM && !(await confirmDialog(question, { ok: "Löschen", danger: true }))) return;
     const undo = collection.removeAll(cards);
     stop();
     ctx.notify(`${plural(cards.length, "Karte", "Karten")} aus der Sammlung gelöscht.`, {
@@ -158,8 +192,8 @@ export function render(main, ctx, folderId = "") {
     });
   };
   const inFolderTo = (id, name) => (cards) => (collection.setSection(cards, id), { message: id ? `in „${name}“` : "ohne Ordner", href: id ? links.folder(id) : null });
-  const createAndPut = (cards) => {
-    const name = prompt(NEW_FOLDER) || "";
+  const createAndPut = async (cards) => {
+    const name = (await ask(NEW_FOLDER, NEW_FOLDER_HINT)) || "";
     const id = collection.createSection(name);
     return id ? inFolderTo(id, name.trim())(cards) : null;
   };
@@ -195,14 +229,14 @@ export function render(main, ctx, folderId = "") {
 // Kopf eines Ordners: zurück zur Sammlung, Umbenennen, Löschen (die Karten bleiben in der Sammlung, nur ohne Ordner)
 function folderHead(ctx, folder) {
   const { collection } = ctx;
-  const rename = () => {
-    const name = prompt("Neuer Name des Ordners:", folder.name);
+  const rename = async () => {
+    const name = await ask("Neuer Name des Ordners", { value: folder.name, ok: "Speichern" });
     if (!name || !name.trim()) return;
     collection.renameSection(folder.id, name);
     ctx.render();
   };
-  const remove = () => {
-    if (!confirm(`Ordner „${folder.name}“ löschen? Die Karten bleiben in der Sammlung, nur ohne Ordner.`)) return;
+  const remove = async () => {
+    if (!(await confirmDialog(`Ordner „${folder.name}“ löschen? Die Karten bleiben in der Sammlung, nur ohne Ordner.`, { ok: "Löschen", danger: true }))) return;
     collection.removeSection(folder.id);
     location.hash = "#sammlung";
   };
@@ -228,8 +262,8 @@ function folderOverview(ctx, folders, all, valueOf) {
     const hint = h("small");
     return { own, hint, el: h("a", { class: "row set-row", href }, [h("b", {}, name), hint]) };
   });
-  const create = () => {
-    const id = collection.createSection(prompt(NEW_FOLDER) || "");
+  const create = async () => {
+    const id = collection.createSection((await ask(NEW_FOLDER, NEW_FOLDER_HINT)) || "");
     if (id) location.hash = links.folder(id);
   };
   return {

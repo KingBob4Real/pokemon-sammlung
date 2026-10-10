@@ -1,6 +1,36 @@
 import { h, ICONS } from "../../core/dom.js";
-import { fmtEur } from "../../core/format.js";
+import { fmtEur, objOr } from "../../core/format.js";
 import { cardImage, cardNumber } from "../../domain/card.js";
+
+// Bild-Gedächtnis: Für Karten ohne TCGdex-Bild probiert die App sonst bei jeder Anzeige die ganze Ersatzkette (bis zu
+// 5 Adressen, app.js #onImageError) – Fehlschläge speichert der Service Worker nicht. Gemerkt: „Karten-ID|Größe“ →
+// [Adresse, die geklappt hat, oder "" = keine, Zeitpunkt]; nach ttl wird neu probiert, damit TCGdex-Nachträge ankommen.
+// ponytail: eine Map und ein Speicher-Schlüssel für alle Personen, nur Karten, die Ersatz brauchten (wenige hundert).
+let images = new Map();
+let memory = { ttl: 0, save: () => {} };
+
+export function useImageMemory(storage, key, ttl, now = Date.now()) {
+  images = new Map(Object.entries(objOr(storage.get(key, {}))).filter(([, v]) => Array.isArray(v) && now - v[1] < ttl));
+  memory = { ttl, save: () => storage.set(key, Object.fromEntries(images)) };
+}
+
+// Adresse fürs Bild: die gemerkte, null (gemerkt: keine → Platzhalter) oder die von TCGdex
+export function imageFor(card, size, now = Date.now()) {
+  const known = images.get(`${card.id}|${size}`);
+  return known && now - known[1] < memory.ttl ? known[0] || null : cardImage(card, size);
+}
+
+export function rememberImage(key, src, now = Date.now()) {
+  images.set(key, [src, now]);
+  memory.save();
+}
+
+// <img> mit Gedächtnis: data-img = Schlüssel; startet es mit gemerktem Ersatz, steht in data-first die TCGdex-Adresse,
+// damit die Ersatzkette von vorn läuft, falls der Ersatz nicht mehr lädt
+export function cardImg(card, size, src, attrs) {
+  const first = cardImage(card, size);
+  return h("img", { src, ...attrs, crossorigin: "anonymous", "data-img": `${card.id}|${size}`, "data-first": src !== first ? first : null });
+}
 
 /**
  * Kartenkachel in drei Arten:
@@ -11,7 +41,7 @@ import { cardImage, cardNumber } from "../../domain/card.js";
 const tileCards = new WeakMap();
 
 export function cardTile(card, { mode = "default" } = {}) {
-  const img = cardImage(card, "low");
+  const img = imageFor(card, "low");
   const pick = mode === "pick";
   const el = h("article", { class: "tile", "data-pick": pick }, [
     h(
@@ -23,7 +53,7 @@ export function cardTile(card, { mode = "default" } = {}) {
         "aria-label": pick ? `${card.name} ${cardNumber(card)} auswählen` : `${card.name} ${cardNumber(card)} anzeigen`,
       },
       [
-        img ? h("img", { src: img, alt: "", loading: "lazy", decoding: "async", crossorigin: "anonymous", draggable: "false" }) : null,
+        img ? cardImg(card, "low", img, { alt: "", loading: "lazy", decoding: "async", draggable: "false" }) : null,
         h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
       ]
     ),
