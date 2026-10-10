@@ -72,7 +72,7 @@ recordWorth();
 // Karten ohne Bild (deutsches fehlt) bekommen das englische, sobald bekannt ist, zu welcher Serie ihr Set gehört
 sets.ready.then(() => store.fixCards((card) => withEnglishImage(card, sets.info(card.set)?.serie)) && app.render());
 
-profiles.refresh(); // Namen und Schlösser aktuell halten
+profiles.refreshIfOlder(24 * 60 * 60 * 1000); // Namen und Schlösser: einmal am Tag reicht, die Personenauswahl lädt beim Öffnen frisch
 
 // Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
 // Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates

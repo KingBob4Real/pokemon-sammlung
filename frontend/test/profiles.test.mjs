@@ -27,6 +27,15 @@ const fresh = () => new ProfileService(storage, "ps.profiles", keysOf, api, "htt
 let profiles = fresh();
 assert.equal(await profiles.refresh(), true);
 assert.deepEqual(profiles.people.map((p) => p.name), ["Lukas", "Lucas"], "Personen kommen vom Backend");
+// Beim Start nur einmal am Tag nachfragen; zwei Anfragen gleichzeitig = eine
+let peopleCalls = 0;
+const askPeople = api.people;
+api.people = async () => (peopleCalls++, askPeople());
+await fresh().refreshIfOlder(24 * 3600e3);
+await fresh().refreshIfOlder(24 * 3600e3, Date.now() + 25 * 3600e3);
+await Promise.all([profiles.refresh(), profiles.refresh()]);
+assert.equal(peopleCalls, 2, "frisch: keine Anfrage; nach 25 h: eine; gleichzeitig: eine");
+api.people = askPeople;
 assert.deepEqual(await profiles.choose("owner"), { firstLogin: true }, "Antippen genügt, erster Login");
 assert.equal(profiles.slot, "", "erste Person nutzt die bisherigen Speicher-Namen");
 assert.equal(storage.get("ps.sync").key, "token-owner-1", "Sitzung statt Sync-Schlüssel gespeichert");

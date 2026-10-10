@@ -12,6 +12,7 @@ const notFound = (e) => (e?.status === 404 ? null : Promise.reject(e));
  */
 export class PriceService extends EventTarget {
   #queue = new Set();
+  #loading = new Set(); // gerade unterwegs – nicht ein zweites Mal anfragen (z. B. Rechner und Tauschliste gleichzeitig)
   #running = false;
   #failed = new Set(); // Karten, deren Preis zuletzt nicht geladen werden konnte
 
@@ -52,7 +53,7 @@ export class PriceService extends EventTarget {
       this.#failed.delete(id); // neuer Versuch
       const p = this.prices[id];
       // ponytail: p.low fehlt = gespeichert vor dem Tauschrechner → einmal neu laden (alter Wert bleibt bis dahin sichtbar)
-      if (!p || p.low === undefined || Date.now() - p.at > this.ttlMs) this.#queue.add(id);
+      if (!this.#loading.has(id) && (!p || p.low === undefined || Date.now() - p.at > this.ttlMs)) this.#queue.add(id);
     }
     this.resume();
   }
@@ -68,6 +69,7 @@ export class PriceService extends EventTarget {
       while (this.#queue.size) {
         const id = this.#queue.values().next().value;
         this.#queue.delete(id);
+        this.#loading.add(id);
         try {
           this.prices[id] = await this.#fetch(id);
           ok++;
@@ -75,6 +77,7 @@ export class PriceService extends EventTarget {
           this.#failed.add(id); // alter Wert bleibt
           lastError = e;
         }
+        this.#loading.delete(id);
         if (++done % 15 === 0) this.#notify();
       }
     };

@@ -1,10 +1,11 @@
+import { IMAGE_PROXY } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { fmtEur, objOr } from "../../core/format.js";
-import { cardImage, cardNumber } from "../../domain/card.js";
+import { cardImage, cardNumber, imageSources } from "../../domain/card.js";
 
 // Bild-Gedächtnis: Für Karten ohne TCGdex-Bild probiert die App sonst bei jeder Anzeige die ganze Ersatzkette (bis zu
 // 5 Adressen, app.js #onImageError) – Fehlschläge speichert der Service Worker nicht. Gemerkt: „Karten-ID|Größe“ →
-// [Adresse, die geklappt hat, oder "" = keine, Zeitpunkt]; nach ttl wird neu probiert, damit TCGdex-Nachträge ankommen.
+// [Adresse, die geklappt hat, oder "" = keine, Zeitpunkt]; nach ttl (30 Tage) wird neu probiert, damit TCGdex-Nachträge ankommen.
 // ponytail: eine Map und ein Speicher-Schlüssel für alle Personen, nur Karten, die Ersatz brauchten (wenige hundert).
 let images = new Map();
 let memory = { ttl: 0, save: () => {} };
@@ -14,10 +15,23 @@ export function useImageMemory(storage, key, ttl, now = Date.now()) {
   memory = { ttl, save: () => storage.set(key, Object.fromEntries(images)) };
 }
 
-// Adresse fürs Bild: die gemerkte, null (gemerkt: keine → Platzhalter) oder die von TCGdex
+// Adresse fürs Bild: die gemerkte, null (gemerkt: keine → Platzhalter) oder die von TCGdex. Ist nur die andere Größe
+// bekannt, gilt sie mit: „keins“ für beide (alle Quellen haben beide Größen), sonst dieselbe Quelle in dieser Größe –
+// spart beim ersten Öffnen der Kartenansicht die Fehlversuche bei TCGdex.
 export function imageFor(card, size, now = Date.now()) {
-  const known = images.get(`${card.id}|${size}`);
-  return known && now - known[1] < memory.ttl ? known[0] || null : cardImage(card, size);
+  const known = (s) => {
+    const v = images.get(`${card.id}|${s}`);
+    return v && now - v[1] < memory.ttl ? v[0] : undefined;
+  };
+  const own = known(size);
+  if (own !== undefined) return own || null;
+  const otherSize = size === "low" ? "high" : "low";
+  const other = known(otherSize);
+  if (other === "") return null;
+  const first = cardImage(card, size);
+  if (!other || !first) return first;
+  const index = imageSources(cardImage(card, otherSize), IMAGE_PROXY).indexOf(other);
+  return index > 0 ? imageSources(first, IMAGE_PROXY)[index] : first;
 }
 
 export function rememberImage(key, src, now = Date.now()) {

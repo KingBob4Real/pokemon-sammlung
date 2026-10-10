@@ -90,7 +90,7 @@ Safari gibt der Domain etwa 5 MB `localStorage` für alle Personen zusammen. Gem
 | `ps.[<person>.]entities.v1` (+ `dirty`, `rev`) | Sammlung, Listen, Ordner einer Person | ~330 B je Sammlungs-Eintrag, ~300 B je Listen-Eintrag, ~110 B je gelöschtem (Export: 37 KB bei 115 Einträgen, davon 7 gelöscht) | gelöschte Einträge bleiben (siehe unten) |
 | `ps.prices.v4` | Preise, alle Personen | ~150 B je Karte (456 Karten: 69 KB) | beim Speichern alles älter als 30 Tage raus |
 | `ps.sets.v4` | Set-Liste | ~23 KB | wird wöchentlich ersetzt |
-| `ps.images.v1` | Bild-Ersatz: Karte + Größe → Adresse oder „keine“ | ~100 B je Karte, die Ersatz brauchte | nach 7 Tagen wird neu probiert |
+| `ps.images.v1` | Bild-Ersatz: Karte + Größe → Adresse oder „keine“ | ~100 B je Karte, die Ersatz brauchte | nach 30 Tagen wird neu probiert; die große Größe nutzt gleich die Quelle der kleinen |
 | `ps.[<person>.]trade.v1` | Tauschrechner | wenige KB | „Leeren“ im Rechner |
 | `ps.[<person>.]history.v1` | Wertverlauf | ~45 B je Tag, 2 Jahre ≈ 33 KB | älter als 2 Jahre raus |
 | `ps.prices.v1–v3`, `ps.sets.v1–v3` | frühere Fassungen | je so groß wie die damaligen Preise bzw. Sets | werden beim Start gelöscht (`OLD_KEYS` in `config.js`) |
@@ -142,7 +142,7 @@ Doppeltes Kürzel: nur `30C` (`30th-c` Klassische Sammlung und `30th` „30 Jahr
 | `sections` | Ordner der Sammlung (Name, Position); in `collection` dazu `section` (Ordner) und `position` (eigene Reihenfolge) |
 | `sessions` | angemeldete Geräte (Hash der Sitzung → Person); dazu in `users`: Passwort-Hash (PBKDF2), Fehlversuche |
 
-Sammlung, Listen und Listeneinträge gehören je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen, seinem letzten Stand und dem Schlüssel der Person und bekommt alles Neue dieser Person zurück. Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstellung (Time Travel).
+Sammlung, Listen und Listeneinträge gehören je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen, seinem letzten Stand und dem Schlüssel der Person und bekommt alles Neue dieser Person zurück (gelesen werden nur geänderte Zeilen – Index auf Person + Stand –, D1 zählt gelesene Zeilen). Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstellung (Time Travel).
 
 ## Personen & Schlüssel
 

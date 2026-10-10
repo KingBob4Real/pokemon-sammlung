@@ -8,7 +8,8 @@ import { emptyState } from "./widgets.js";
 
 const SEARCH_RESULTS = 30;
 
-// Kacheln zum Antippen; zeigt Anzahl in der Sammlung und Marktwert → { grid, update }
+// Kacheln zum Antippen; zeigt Anzahl in der Sammlung und Marktwert → { grid, update }.
+// Preise nur für Kacheln, die ins Bild kommen – sonst kostete jede Suche bis zu 30–60 Preis-Anfragen.
 export function choiceGrid({ collection, prices }, cards, onPick) {
   const grid = h("div", { class: "grid" }, cards.map((c) => cardTile(c, { mode: "view" })));
   grid.addEventListener("click", (e) => {
@@ -19,7 +20,12 @@ export function choiceGrid({ collection, prices }, cards, onPick) {
     for (const el of grid.children) updateTile(el, { qty: collection.quantity(tileCard(el).id), value: prices.value(tileCard(el).id) });
   };
   update();
-  prices.request(cards.map((c) => c.id));
+  const seen = new IntersectionObserver((entries) => {
+    const visible = entries.filter((e) => e.isIntersecting);
+    for (const e of visible) seen.unobserve(e.target);
+    if (visible.length) prices.request(visible.map((e) => tileCard(e.target).id));
+  }, { rootMargin: "200px" });
+  for (const el of grid.children) seen.observe(el);
   return { grid, update };
 }
 

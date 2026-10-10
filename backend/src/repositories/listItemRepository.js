@@ -15,11 +15,15 @@ const UPSERT = `
     added = excluded.added, position = excluded.position, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > list_items.updated`;
 
-const CHANGED = `
+// Zwei Teile statt „rev > ?1 OR id IN (…)“: so liest die Datenbank nur Geändertes (Index auf Person + Stand) und die
+// gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
+const ROWS = `
   SELECT i.id, i.list_id, i.added, i.position, i.updated, i.deleted, ${CARD_COLUMNS}
-  FROM list_items i LEFT JOIN cards k ON k.id = i.card_id
-  WHERE i.user_id = ?3
-    AND (i.rev > ?1 OR i.id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'listItem'))`;
+  FROM list_items i LEFT JOIN cards k ON k.id = i.card_id`;
+const CHANGED = `
+  ${ROWS} WHERE i.user_id = ?3 AND i.rev > ?1
+  UNION
+  ${ROWS} WHERE i.user_id = ?3 AND i.id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'listItem')`;
 
 // Tauschen: was den anderen Personen fehlt = Karten aus ihren Listen (alle zählen als Wunschliste), die nicht in ihrer
 // Sammlung sind. Gelöschte Listen, Einträge und Sammlungs-Zeilen zählen nicht; Anzahl 0 = nicht vorhanden.

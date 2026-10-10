@@ -17,7 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const PRICE_TTL_MS = DAY_MS;
 export const PRICE_KEEP_MS = 30 * DAY_MS; // älter fliegt beim Speichern raus (services/priceService.js)
 export const SETS_TTL_MS = 7 * DAY_MS;
-export const IMAGE_MEMORY_MS = 7 * DAY_MS; // Bild-Ersatz merken, danach neu probieren (TCGdex reicht Bilder nach)
+export const IMAGE_MEMORY_MS = 30 * DAY_MS; // Bild-Ersatz merken, danach neu probieren (TCGdex reicht selten Bilder nach)
 export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden

@@ -38,9 +38,14 @@ export class ProfileService {
   refresh() {
     this.#refreshing ??= this.api
       .people(this.url)
-      .then(({ people }) => ((this.data.people = people), this.#save(), true), () => false)
+      .then(({ people }) => ((this.data.people = people), (this.data.at = Date.now()), this.#save(), true), () => false)
       .finally(() => (this.#refreshing = null));
     return this.#refreshing;
+  }
+
+  // Beim Start nur, wenn die Liste älter als maxAge ist – die Personenauswahl lädt beim Öffnen ohnehin frisch
+  refreshIfOlder(maxAge, now = Date.now()) {
+    return now - (this.data.at || 0) > maxAge ? this.refresh() : Promise.resolve(true);
   }
 
   #refreshing = null;

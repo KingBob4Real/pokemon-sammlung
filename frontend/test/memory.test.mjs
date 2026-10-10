@@ -58,6 +58,14 @@ assert.deepEqual(Object.keys(mem.get("img")).length, 2, "auf dem Gerät gespeich
 useImageMemory(storage, "img", 7 * DAY, now + 2 * DAY);
 assert.equal(imageFor(card, "low"), "https://backend/img?card=2014xy-1&size=SM", "nach Neustart noch da");
 assert.equal(imageFor(card, "high", now + 2 * DAY), "https://assets.tcgdex.net/en/xy/2014xy/1/high.webp", "abgelaufenes beim Laden verworfen");
+// Große Größe von der kleinen ableiten: dieselbe Quelle, „keins“ für beide
+const { IMAGE_PROXY } = await import("../js/config.js");
+const promo = { id: "mep-33", img: "https://assets.tcgdex.net/en/me/mep/033" };
+rememberImage("mep-33|low", `${IMAGE_PROXY}?set=MEP&n=033&size=SM`);
+assert.equal(imageFor(promo, "high"), `${IMAGE_PROXY}?set=MEP&n=033&size=LG`, "groß gleich bei Limitless statt erst TCGdex probieren");
+const nothing = { id: "xya-24a", img: "https://assets.tcgdex.net/en/xy/xya/24a" };
+rememberImage("xya-24a|low", "");
+assert.equal(imageFor(nothing, "high"), null, "klein gibt es nirgends → groß gleich der Platzhalter");
 
 // C2: Wertverlauf – nur wenn alle Preise der Sammlung frisch sind, einmal pro Tag, höchstens 2 Jahre
 const entries = [{ card: { id: "a" }, qty: 2 }, { card: { id: "b" }, qty: 1 }];
@@ -111,5 +119,14 @@ const sequential = matchSet([...filler((n) => 1000 + n), ...open], [...fillerPro
 assert.deepEqual(Object.fromEntries(sequential), { "s-40": 1040, "s-13": 1013, "s-109": 1109, "s-135": 1135 }, "fortlaufend: Doppeldruck über Startwert + Nummer");
 const scattered = matchSet([...filler((n) => 5000 + n * 7), ...open], [...fillerProducts((n) => 5000 + n * 7), ...cmProducts]);
 assert.deepEqual(Object.fromEntries(scattered), { "s-40": 1040, "s-135": 1135 }, "nicht fortlaufend: Doppeldruck lieber ohne Preis");
+
+// Dieselbe Karte zweimal angefragt, während sie noch lädt (Rechner + Tauschliste): nur eine Anfrage
+let slowCalls = 0;
+const slow = new PriceService({ card: async () => (slowCalls++, await new Promise((r) => setTimeout(r, 20)), { pricing: { cardmarket: { avg7: 1, low: 1 } } }) }, storage, "p3", DAY);
+done = loaded(slow);
+slow.request(["x-1"]);
+slow.request(["x-1"]);
+await done;
+assert.equal(slowCalls, 1, "unterwegs = nicht nochmal");
 
 console.log("Speicher ok");

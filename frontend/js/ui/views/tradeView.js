@@ -69,7 +69,7 @@ export function render(main, ctx) {
     body.replaceChildren(
       ...people.flatMap((p) => {
         const { forMe, forThem } = trade.matches(p);
-        ids.push(...p.offers.map((d) => d.card.id), ...forThem.map((d) => d.card.id));
+        ids.push(...forMe.map((d) => d.card.id), ...forThem.map((d) => d.card.id)); // für die Summen
         return [
           h("h2", { class: "section-title trade-person" }, p.name),
           ...section(`${p.name} bietet an, was dir fehlt`, forMe, `${p.name} bietet gerade nichts an, was in deinen Listen fehlt.`),
@@ -77,7 +77,8 @@ export function render(main, ctx) {
           forMe.length || forThem.length
             ? h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: () => toCalculator(p.name, forThem, forMe) }, "Im Rechner durchrechnen")])
             : "",
-          h("details", { class: "trade-all" }, [
+          // Preise der übrigen Angebote erst beim Aufklappen – sonst kosten 200 Doppelte 200 Anfragen am Tag
+          h("details", { class: "trade-all", ontoggle: (e) => e.target.open && prices.request(p.offers.map((d) => d.card.id)) }, [
             h("summary", {}, `Alles, was ${p.name} anbietet (${p.offers.length})`),
             p.offers.length ? tiles(p.offers) : h("p", { class: "muted pad" }, "Nichts."),
           ]),

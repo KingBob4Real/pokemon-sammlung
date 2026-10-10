@@ -20,11 +20,15 @@ const UPSERT = `
     updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > collection.updated`;
 
-const CHANGED = `
+// Zwei Teile statt „rev > ?1 OR id IN (…)“: so liest die Datenbank nur Geändertes (Index auf Person + Stand) und die
+// gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
+const ROWS = `
   SELECT c.card_id AS id, c.qty, c.condition, c.language, c.paid, c.added, c.section, c.position, c.trade, c.updated, c.deleted, ${CARD_COLUMNS}
-  FROM collection c LEFT JOIN cards k ON k.id = c.card_id
-  WHERE c.user_id = ?3
-    AND (c.rev > ?1 OR c.card_id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'collection'))`;
+  FROM collection c LEFT JOIN cards k ON k.id = c.card_id`;
+const CHANGED = `
+  ${ROWS} WHERE c.user_id = ?3 AND c.rev > ?1
+  UNION
+  ${ROWS} WHERE c.user_id = ?3 AND c.card_id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'collection')`;
 
 // Tauschen: was die anderen anbieten – selbst markiert (trade = 1) oder automatisch, wenn doppelt (trade leer);
 // trade = 0 heißt behalten, auch wenn doppelt. Gelöschte und Anzahl 0 zählen nicht.
