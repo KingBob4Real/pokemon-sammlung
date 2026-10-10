@@ -499,6 +499,17 @@ select.field { padding-right: 8px; }
 .worth-area { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
 .worth-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
 .worth-axis { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Gestiegen & Gefallen als Zeile unter den Kennzahlen */
+.trends { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: -4px 0 14px; padding: 10px 14px; border: 0; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform 0.12s ease; }
+.trends:active { transform: scale(0.985); }
+.trends-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.trends-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.trend { display: flex; justify-content: space-between; gap: 6px; min-width: 0; font-size: 14px; font-weight: 800; }
+.trend span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trend b { flex: none; font-variant-numeric: tabular-nums; }
+.trend.up b { color: var(--accent); }
+.trend.down b { color: #d6336c; }
+.trends-intro { margin-top: 20px; }
 .movers { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .mover { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 60px; padding: 6px 8px; border: 0; border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .mover:active { transform: scale(0.985); }

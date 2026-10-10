@@ -9,7 +9,7 @@ import { enableReorder } from "../components/reorder.js";
 import { scanButton } from "../components/scanSheet.js";
 import { useSelection } from "../components/selection.js";
 import { backLink, emptyState, segmented, sortSelect, stat } from "../components/widgets.js";
-import { openWorthSheet, worthHint } from "../components/worthSheet.js";
+import { openWorthSheet, trendsTeaser, worthHint } from "../components/worthSheet.js";
 
 const SORT_KEYS = ["newest", "order", "set", "pokedex", "value", "name"];
 const GROUPS = [
@@ -58,7 +58,8 @@ export function render(main, ctx, folderId = "") {
   if (inFolder) main.append(folderHead(ctx, folder));
   // „Auswählen“ ganz oben, ohne Scrollen zu sehen – wie in der Suche
   if (entries.length) main.append(h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]), h("div", { class: "toolbar" }, [quickRow]));
-  main.append(stats);
+  const trends = inFolder ? null : h("div"); // Gestiegen & Gefallen – nur für die ganze Sammlung
+  main.append(stats, ...(trends ? [trends] : []));
   if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
   const overview = inFolder || !all.length ? null : folderOverview(ctx, folders, all, valueOf);
   if (overview) main.append(...overview.elements);
@@ -82,12 +83,13 @@ export function render(main, ctx, folderId = "") {
     applyFilter(); // „Ohne Preis“ ändert sich, während Preise nachladen
     const t = terms();
     const s = collection.summary(valueOf, entries.filter((e) => matches(e, t)));
-    // Wertverlauf nur für die ganze Sammlung – ein Ordner oder Filter hat keinen
-    const history = inFolder || filtered() ? null : ctx.history;
+    // Verlauf & Trends nur für die ganze Sammlung – ein Ordner oder Filter hat keinen
+    const whole = !inFolder && !filtered();
+    trends?.replaceChildren(whole ? trendsTeaser(ctx, entries) : "");
     stats.replaceChildren(
       stat(quick !== "all" ? QUICK_FILTERS[quick].label : t.length ? "Gefunden" : "Karten", String(s.count), `${s.distinct} verschiedene`),
-      history?.series().length
-        ? stat("Marktwert", fmtEur(s.worth), worthHint(history, s.unknown), () => openWorthSheet(ctx))
+      whole
+        ? stat("Marktwert", fmtEur(s.worth), worthHint(ctx.history, s.unknown), () => openWorthSheet(ctx))
         : stat("Marktwert", fmtEur(s.worth), s.unknown ? `${s.unknown} ohne Preis` : "Cardmarket Ø 7 Tage"),
       stat("Bezahlt", s.paid ? fmtEur(s.paid) : "–", "deine Kaufpreise"),
       stat("Gewinn/Verlust", s.diffCount ? fmtSigned(s.diff) : "–", s.diffCount ? `bei ${plural(s.diffCount, "Karte", "Karten")} mit Kaufpreis` : "Kaufpreise eintragen")

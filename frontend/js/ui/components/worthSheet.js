@@ -9,7 +9,7 @@ const shortDay = (day) => `${day.slice(8, 10)}.${day.slice(5, 7)}.`; // „2026-
 // Unter „Marktwert“ in der Sammlung: Änderung seit 7 und 30 Tagen (services/historyService.js)
 export function worthHint(history, unknown) {
   const [d7, d30] = [history.change(7), history.change(30)];
-  const change = d7 == null ? "Verlauf ansehen" : `7 T: ${fmtSigned(d7)} · 30 T: ${d30 == null ? "–" : fmtSigned(d30)}`;
+  const change = d7 == null ? "Verlauf & Trends" : `7 T: ${fmtSigned(d7)} · 30 T: ${d30 == null ? "–" : fmtSigned(d30)}`;
   return unknown ? `${change} · ${unknown} ohne Preis` : change;
 }
 
@@ -36,15 +36,30 @@ function chart(series) {
   ]);
 }
 
+// Zeile unter den Kennzahlen der Sammlung: größter Gewinner und Verlierer (Ø 7 gegen Ø 30 Tage), Antippen öffnet die Liste.
+// → Element oder "" (noch keine Werte)
+export function trendsTeaser(ctx, entries) {
+  const { up, down } = movers(entries, (id) => ctx.prices.get(id), 1);
+  if (!up.length && !down.length) return "";
+  const item = (m, arrow, cls) =>
+    h("span", { class: `trend ${cls}` }, m ? [h("span", {}, `${arrow} ${m.entry.card.name}`), h("b", {}, fmtSigned(m.diff))] : [h("span", {}, `${arrow} –`)]);
+  return h("button", { type: "button", class: "trends", onclick: () => openWorthSheet(ctx, { trends: true }) }, [
+    h("span", { class: "trends-head" }, [h("span", {}, "Gestiegen & Gefallen"), h("span", {}, "Ø 7 gegen Ø 30 Tage ›")]),
+    h("span", { class: "trends-row" }, [item(up[0], "▲", "up"), item(down[0], "▼", "down")]),
+  ]);
+}
+
 /**
  * „Wert deiner Sammlung“ (Antippen von „Marktwert“): Verlauf, Änderung seit 7/30 Tagen und Gestiegen/Gefallen –
  * die 5 Karten mit dem größten Unterschied Ø 7 Tage gegen Ø 30 Tage; Antippen öffnet die Karte.
+ *   trends – gleich zu Gestiegen/Gefallen scrollen
  */
-export function openWorthSheet(ctx) {
+export function openWorthSheet(ctx, { trends = false } = {}) {
   ctx.openSheet((body, sheet) => {
     const { history, collection, prices } = sheet;
     const series = history.series();
-    const last = series.at(-1);
+    // noch kein Tageswert gespeichert (Preise laden noch): heutiger Stand aus den geladenen Preisen
+    const last = series.at(-1) ?? { day: null, worth: collection.summary((id) => prices.value(id)).worth };
     const { up, down } = movers(collection.entries(), (id) => prices.get(id));
     const cell = (label, value) => h("div", {}, [h("span", {}, label), h("b", {}, value)]);
     const change = (days) => {
@@ -68,15 +83,19 @@ export function openWorthSheet(ctx) {
       ]),
       h("div", { class: "prices" }, [
         h("div", { class: "price-grid three" }, [
-          cell(`Stand ${shortDay(last.day)}`, fmtEur(last.worth)),
+          cell(last.day ? `Stand ${shortDay(last.day)}` : "Heute", fmtEur(last.worth)),
           cell("Seit 7 Tagen", change(7)),
           cell("Seit 30 Tagen", change(30)),
         ]),
-        series.length > 1 ? chart(series) : h("p", { class: "muted" }, "Ab morgen siehst du hier eine Kurve."),
+        series.length > 1 ? chart(series) : h("p", { class: "muted" }, series.length ? "Ab morgen siehst du hier eine Kurve." : "Der Verlauf beginnt, sobald heute alle Preise geladen sind."),
+      ]),
+      h("div", { class: "sheet-head trends-intro" }, [
+        h("h2", {}, "Gestiegen & Gefallen"),
+        h("p", { class: "muted" }, "Cardmarket-Durchschnitt der letzten 7 Tage gegen den der letzten 30 Tage, pro Stück. Sortiert nach Euro, die Prozente beziehen sich auf Ø 30 Tage. Bei Karten mit wenigen Verkäufen schwankt Ø 7 Tage stärker."),
       ]),
       list("Gestiegen", up, "Gerade keine Karte über ihrem 30-Tage-Schnitt."),
-      list("Gefallen", down, "Gerade keine Karte unter ihrem 30-Tage-Schnitt."),
-      h("p", { class: "muted small" }, "Gestiegen/Gefallen: Ø 7 Tage gegen Ø 30 Tage bei Cardmarket, pro Stück.")
+      list("Gefallen", down, "Gerade keine Karte unter ihrem 30-Tage-Schnitt.")
     );
   });
+  if (trends) document.querySelector("#sheetBody .trends-intro")?.scrollIntoView({ block: "start" });
 }
