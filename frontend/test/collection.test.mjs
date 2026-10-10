@@ -80,4 +80,80 @@ await loaded;
 assert.equal(priceService.value("2014xy-1"), 2.83);
 assert.equal(priceService.get("2014xy-1").dexId, 13);
 
+// A1: Haken ab (Anzahl 1 → 0) liefert „Rückgängig“, das den alten Eintrag genau zurückholt – Zustand, Kaufpreis, Ordner,
+// hinzugefügt am; Haken dran liefert nichts (bleibt still)
+const ordnerA1 = collection.createSection("Ordner A1");
+const d = card("d");
+assert.equal(collection.toggle(d), null, "Hinzufügen per Haken: kein Rückgängig");
+collection.update("d", { cond: "Excellent", paid: 4.2, lang: "Englisch" });
+collection.setSection([d], ordnerA1);
+const beforeD = collection.entry("d");
+const undoD = collection.toggle(d);
+assert.equal(collection.has("d"), false, "abgehakt");
+undoD();
+assert.deepEqual(collection.entry("d"), beforeD, "Rückgängig: alter Eintrag samt Ordner zurück");
+
+// A3: Schnellfilter
+const { QUICK_FILTERS } = await import("../js/domain/sorting.js");
+const worthOf = { a: 2, c: null, d: 1 };
+const quick = (key) => collection.entries().filter((e) => QUICK_FILTERS[key].test(e, (id) => worthOf[id] ?? null)).map((e) => e.card.id).sort();
+assert.deepEqual(quick("all"), ["a", "b", "c", "d"]);
+assert.deepEqual(quick("dupes"), ["a"], "Doppelte: Anzahl > 1");
+assert.deepEqual(quick("unpaid"), ["b", "c"], "ohne Kaufpreis");
+assert.deepEqual(quick("noprice"), ["b", "c"], "ohne Preis (auch noch nicht geladen)");
+
+// C1: Set-Zähler (verschiedene Karten je Set) und „Fehlende als Liste“ – zweimal ausführen ergibt nichts doppelt
+const { ListService } = await import("../js/services/listService.js");
+const lists = new ListService(collection.store);
+const inSet = (id) => ({ ...card(id), set: "sv1" });
+collection.setQuantity(inSet("sv1-1"), 3);
+collection.setQuantity(inSet("sv1-2"), 1);
+collection.setQuantity(inSet("sv1-3"), 0); // Anzahl 0 zählt nicht
+assert.deepEqual([collection.countBySet().get("sv1"), collection.countBySet().get("x")], [2, 4], "je Set verschiedene Karten in der Sammlung");
+const missing = [inSet("sv1-3"), inSet("sv1-4")];
+const first = lists.fill(" Karmesin & Purpur ", missing);
+assert.deepEqual([lists.all().map((l) => l.name), first.added], [["Karmesin & Purpur"], 2], "Liste mit Set-Namen angelegt");
+const again = lists.fill("Karmesin & Purpur", [...missing, inSet("sv1-5")]);
+assert.deepEqual([again.id, again.added, lists.items(first.id).length], [first.id, 1, 3], "vorhandene Liste ergänzt, nichts doppelt");
+
+// D: Tauschen – Abgleich per Karten-ID, die Sprache zählt nicht
+const { tradeMatches } = await import("../js/domain/trade.js");
+const tim = { offers: [{ card: card("t1"), qty: 2, cond: "Mint", lang: "Englisch" }, { card: card("a"), qty: 3, cond: "Mint", lang: "Deutsch" }], missing: [card("a"), card("b"), card("c")] };
+const owned = [{ card: card("a"), qty: 2, cond: "Near Mint", lang: "Deutsch" }, { card: card("b"), qty: 1, cond: "Near Mint", lang: "Deutsch" }, { card: card("c"), qty: 1, trade: true }];
+const t = tradeMatches(tim, owned, [card("t1"), card("a"), card("x")]);
+assert.deepEqual(t.forMe.map((d) => d.card.id), ["t1"], "Tim bietet an, was mir fehlt (a habe ich schon)");
+assert.deepEqual(t.forThem.map((d) => [d.card.id, d.qty]), [["a", 2], ["c", 1]], "ich biete an, was Tim fehlt: a doppelt, c auf „ja“ (b nur einmal)");
+const { isOffered } = await import("../js/domain/trade.js");
+assert.deepEqual([{ qty: 2 }, { qty: 2, trade: false }, { qty: 1 }, { qty: 1, trade: true }, { qty: 0, trade: true }].map(isOffered), [true, false, false, true, false], "Tauschen: wenn doppelt / nein / ja");
+collection.setTrade([card("a")], false);
+assert.equal(collection.entry("a").trade, false, "Tauschen bleibt am Eintrag");
+
+// Cardmarket-Suche ohne Produkt: Namen ohne ♀/♂/◇ und mit geradem Apostroph, sonst findet Cardmarket nichts
+const { searchName } = await import("../js/domain/price.js");
+assert.deepEqual(["Nidoran♀", "Tapu Koko ◇", "Farfetch’d", "Heatran-EX", "Glurak-ex"].map(searchName), ["Nidoran", "Tapu Koko", "Farfetch'd", "Heatran EX", "Glurak-ex"]);
+
+// Tauschrechner: Summen je Preisart, eigener Preis zählt vor jedem Richtwert, fehlende Werte werden mitgezählt
+const { tradeSums } = await import("../js/domain/trade.js");
+const priceOf = (id) => ({ g1: { low: 10, avg1: 12, avg7: 15, avg30: 20 }, g2: { low: 1, avg1: null, avg7: 2, avg30: 2 } })[id] ?? null;
+const sums = tradeSums([{ card: card("g1"), qty: 2, own: null }, { card: card("g2"), qty: 1, own: null }, { card: card("g3"), qty: 1, own: 5 }], priceOf);
+assert.deepEqual(sums.low, { sum: 26, unknown: 0 }, "2 × 10 + 1 + eigener Preis 5");
+assert.deepEqual(sums.avg1, { sum: 29, unknown: 1 }, "Ø 1 Tag fehlt bei g2");
+assert.deepEqual(sums.avg30, { sum: 47, unknown: 0 });
+
+// Entwurf: auf dem Gerät gemerkt; nochmal hinzufügen = eine mehr; was ich gebe, startet mit Sprache/Zustand aus meiner Sammlung
+const { TradeDraftService } = await import("../js/services/tradeDraftService.js");
+const tradeOf = () => new TradeDraftService(storage, "trade", collection);
+const draft = tradeOf();
+draft.add("give", card("a"));
+draft.add("give", card("a"));
+draft.add("get", card("t1"));
+draft.change("get", "t1", { own: 7.5, lang: "Englisch" });
+const reloaded = tradeOf().draft;
+assert.deepEqual(reloaded.give.map((i) => [i.card.id, i.qty, i.cond]), [["a", 2, "Mint"]], "a doppelt, Zustand aus der Sammlung (Mint statt Near Mint)");
+assert.deepEqual([reloaded.get[0].own, reloaded.get[0].lang], [7.5, "Englisch"], "nach Neustart noch da");
+draft.change("give", "a", { qty: 0 });
+assert.equal(draft.draft.give.length, 0, "Anzahl 0 nimmt die Karte raus");
+draft.fill([{ card: card("a"), qty: 2, cond: "Mint", lang: "Deutsch" }], [{ card: card("t1"), qty: 3, cond: "Good", lang: "Englisch" }]);
+assert.deepEqual([draft.draft.give[0].qty, draft.draft.get[0].cond], [1, "Good"], "Vorschlag: je ein Exemplar");
+
 console.log("Sammlung ok");

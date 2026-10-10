@@ -2,8 +2,9 @@ import { CONDITIONS, LANGUAGES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
 import { fmtEur, plural } from "../../core/format.js";
-import { cardImage, cardNumber } from "../../domain/card.js";
+import { cardNumber } from "../../domain/card.js";
 import { cardSearch, choiceGrid } from "./cardPicker.js";
+import { imageFor } from "./cardTile.js";
 
 /**
  * Serien- und Seiten-Scan: viele Karten sammeln, ohne jedes Mal ein neues Foto zu machen, am Ende alle auf einmal
@@ -135,7 +136,7 @@ function itemRow(ctx, item, onResolve = null) {
   const b = batchOf(ctx);
   const { card } = item;
   // gefundenes Bild pro Karte merken – sonst ginge die Suche nach der Bildquelle bei jedem Neuzeichnen von vorn los (Flackern)
-  const src = (card && ((item.srcOf === card.id && item.src) || cardImage(card, "low"))) || item.preview;
+  const src = (card && ((item.srcOf === card.id && item.src) || imageFor(card, "low"))) || item.preview;
   const title = card?.name || item.rec?.name || "Karte";
   const value = card ? ctx.prices.value(card.id) : null;
   const step = (d) => {

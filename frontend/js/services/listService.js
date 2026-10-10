@@ -83,6 +83,16 @@ export class ListService {
     });
   }
 
+  // Liste mit diesem Namen (sonst neu) um die Karten ergänzen – nochmal ausführen ergibt nichts doppelt. → { id, added }
+  fill(name, cards) {
+    const n = cleanName(name);
+    const id = this.all().find((l) => l.name === n)?.id ?? this.create(n);
+    if (!id) return { id: null, added: 0 };
+    const added = cards.filter((c) => !this.contains(id, c.id)).length;
+    this.addCards(id, cards);
+    return { id, added };
+  }
+
   removeCards(listId, cards) {
     this.store.batch(() => {
       for (const card of cards) this.store.put("listItem", itemId(listId, card.id), null);

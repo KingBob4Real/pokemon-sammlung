@@ -86,7 +86,12 @@ export function mergeSets(en, de, serieOf, pocketSerie) {
     }
     const d = german.get(s.id);
     const count = (d || s).cardCount;
-    list.push({ id: s.id, name: d?.name || s.name, alt: d && d.name !== s.name ? s.name : null, en: !d, serie: serieOf[s.id] || null, total: count?.total ?? null, official: count?.official ?? null });
+    // Kartenzahl für „Meine Sets“ und die Set-Ansicht („x von y“): die deutschen Karten plus die, die TCGdex nur auf
+    // Englisch hat (MEP: 80 deutsch, 112 englisch → 112). ponytail: größere Zahl statt Vereinigung – gleich, solange
+    // Deutsch eine Teilmenge von Englisch ist (alle 205 Sets, geprüft 10.10.2026). Bei 6 Sets (Jumbo, MFB, SM-Trainer-Kit …)
+    // listet TCGdex weniger Karten, als das Set hat – gezählt wird das Set.
+    const total = Math.max(d?.cardCount?.total ?? 0, s.cardCount?.total ?? 0) || null;
+    list.push({ id: s.id, name: d?.name || s.name, alt: d && d.name !== s.name ? s.name : null, en: !d, serie: serieOf[s.id] || null, total, official: count?.official ?? null });
   }
   return { list, pocket };
 }

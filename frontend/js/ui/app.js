@@ -2,10 +2,10 @@ import { IMAGE_PROXY } from "../config.js";
 import { $, h } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
-import { nextImage } from "../domain/card.js";
+import { cardNumber, nextImage } from "../domain/card.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { avatarColor, chosenThisSession, initial, showProfiles } from "./components/profilePicker.js";
-import { tileCard, updateTile } from "./components/cardTile.js";
+import { rememberImage, tileCard, updateTile } from "./components/cardTile.js";
 import { isDragging } from "./components/reorder.js";
 import { Toaster } from "./components/toast.js";
 import { emptyState } from "./components/widgets.js";
@@ -17,9 +17,10 @@ import * as listsView from "./views/listsView.js";
 import * as moreView from "./views/moreView.js";
 import * as searchView from "./views/searchView.js";
 import * as setView from "./views/setView.js";
+import * as tradeView from "./views/tradeView.js";
 
 // Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
-const VIEWS = { sammlung: collectionView, ordner: collectionView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
+const VIEWS = { sammlung: collectionView, ordner: collectionView, tauschen: tradeView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", offline: "Offline", busy: "Sync …", error: "Sync-Problem", pending: "Nicht synchron", ok: "Synchron" };
 const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
 const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
@@ -41,6 +42,7 @@ export class App {
   #viewPick = null; // Ansichten mit Auswahl-Kacheln bekommen das Antippen hierüber
   #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
+  #sheetNav = null; // { prev, next } der offenen Kartenansicht
   #rerenderTimer = null;
   #shownOnce = new Set(); // Hinweise, die pro Sitzung nur einmal kommen sollen
 
@@ -57,6 +59,7 @@ export class App {
         search: { query: "", results: null },
         add: { query: "", results: null },
         collectionFilter: "",
+        collectionQuick: "all", // Schnellfilter der Sammlung (domain/sorting.js: QUICK_FILTERS)
         selection: { where: null, cards: new Map() }, // Mehrfach-Auswahl (components/selection.js)
       },
       setTitle: (text) => this.setTitle(text),
@@ -86,8 +89,7 @@ export class App {
     });
     this.main.addEventListener("click", (e) => this.#onTileClick(e));
     document.addEventListener("error", (e) => this.#onImageError(e), true);
-    // Kartenbilder weich einblenden, sobald sie da sind
-    document.addEventListener("load", (e) => e.target instanceof HTMLImageElement && e.target.closest(".tile-art, .sheet-art") && e.target.classList.add("loaded"), true);
+    document.addEventListener("load", (e) => this.#onImageLoad(e), true);
     this.dialog.addEventListener("click", (e) => e.target === this.dialog && this.closeSheet());
     this.dialog.addEventListener("cancel", (e) => {
       e.preventDefault(); // Escape: auch mit Animation schließen
@@ -95,8 +97,21 @@ export class App {
     });
     this.dialog.addEventListener("close", () => {
       this.#sheetRefresh = null;
+      this.#sheetNav = null;
       this.refresh();
     });
+    // Blättern in der Kartenansicht: nur deutlich waagerechtes Wischen zählt, senkrechtes Scrollen bleibt unberührt
+    const typing = (el) => el.closest("input, select, textarea");
+    let touch = null;
+    this.dialog.addEventListener("touchstart", (e) => (touch = e.touches.length === 1 && !typing(e.target) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null), { passive: true });
+    this.dialog.addEventListener("touchend", (e) => {
+      const t = e.changedTouches[0];
+      if (!touch || !t) return;
+      const [dx, dy] = [t.clientX - touch.x, t.clientY - touch.y];
+      touch = null;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > 2 * Math.abs(dy)) this.#turn(dx < 0 ? 1 : -1);
+    });
+    this.dialog.addEventListener("keydown", (e) => (e.key === "ArrowLeft" || e.key === "ArrowRight") && !typing(e.target) && this.#turn(e.key === "ArrowRight" ? 1 : -1));
     store.addEventListener("change", () => sync.schedule());
     store.addEventListener("remote", () => this.#onRemoteChange());
     store.addEventListener("storage-error", () => this.#onStorageError());
@@ -173,16 +188,37 @@ export class App {
     }
   }
 
+  // Kartenansicht. Steht die Karte unter den sichtbaren Kacheln, blättern ‹ ›, Wischen und Pfeiltasten in genau
+  // deren Reihenfolge – so geht es in jeder Ansicht (Filter und Sortierung inklusive), ohne sie anzufassen.
   openCard(card) {
-    this.openSheet((body, ctx) => renderCardSheet(body, card, ctx));
+    const cards = [...this.main.querySelectorAll(".tile")].filter((el) => !el.closest("[hidden], details:not([open])")).map(tileCard);
+    this.#showCard(card, cards, 0);
   }
 
-  openSheet(render) {
+  #showCard(card, cards, dir) {
+    const i = cards.findIndex((c) => c.id === card.id);
+    const to = (d) => (i >= 0 && cards[i + d] ? () => this.#showCard(cards[i + d], cards, d) : null);
+    const nav = { prev: to(-1), next: to(1) };
+    this.openSheet((body, ctx) => renderCardSheet(body, card, { ...ctx, ...nav }), nav);
+    if (!dir) return;
     const body = $("#sheetBody");
+    body.classList.remove("turn-next", "turn-prev");
+    void body.offsetWidth;
+    body.classList.add(dir > 0 ? "turn-next" : "turn-prev");
+  }
+
+  // nav: { prev, next } zum Blättern (nur Kartenansicht)
+  openSheet(render, nav = null) {
+    const body = $("#sheetBody");
+    this.#sheetNav = nav;
     this.#sheetRefresh = render(body, { ...this.ctx, close: () => this.closeSheet() }) || null;
     this.dialog.classList.remove("closing");
     if (!this.dialog.open) this.dialog.showModal();
     body.scrollTop = 0;
+  }
+
+  #turn(dir) {
+    (dir > 0 ? this.#sheetNav?.next : this.#sheetNav?.prev)?.();
   }
 
   // Kartenansicht mit kurzer Animation schließen
@@ -201,7 +237,7 @@ export class App {
   afterChange(structural) {
     this.refresh();
     const { view } = currentRoute();
-    const filtered = view === "sammlung" || view === "ordner" || (view === "liste" && this.ctx.prefs.get("listFilter") !== "all");
+    const filtered = view === "sammlung" || view === "ordner" || view === "tauschen" || (view === "liste" && this.ctx.prefs.get("listFilter") !== "all");
     if (filtered || (structural && (view === "liste" || view === "listen"))) {
       clearTimeout(this.#rerenderTimer);
       this.#rerenderTimer = setTimeout(() => this.render(), RERENDER_DELAY_MS);
@@ -223,29 +259,49 @@ export class App {
     if (button.hasAttribute("data-open")) return this.openCard(card);
     // Mehrere Exemplare? Dann nicht per Haken auf 0 setzen, sondern die Anzahl in der Kartenansicht ändern
     if (this.services.collection.quantity(card.id) > 1) return this.openCard(card);
-    this.services.collection.toggle(card);
+    const undo = this.services.collection.toggle(card);
     navigator.vibrate?.(12);
     replay(tile, "just-changed");
     this.afterChange(false);
+    // Abhaken wie überall mit „Rückgängig“ (holt Zustand, Kaufpreis und Ordner zurück); Hinzufügen bleibt still
+    if (undo) {
+      this.toast.show(`${card.name} ${cardNumber(card)} aus der Sammlung entfernt.`, {
+        type: "success",
+        force: true,
+        action: { label: "Rückgängig", run: () => (undo(), this.afterChange(false)) },
+      });
+    }
   }
 
   // Bild fehlt → nächste Quelle (TCGdex deutsch → englisch → Limitless → pokemontcg.io, domain/card.js), sonst Platzhalter.
-  // Am Bild gemerkt: womit es gestartet ist und was schon probiert wurde.
+  // Am Bild gemerkt: womit es gestartet ist und was schon probiert wurde. Gibt es gar keins, merkt sich das
+  // das Bild-Gedächtnis (components/cardTile.js) – beim nächsten Mal gleich der Platzhalter.
   #onImageError(e) {
     const img = e.target;
-    const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art, .batch-art");
+    const box = img instanceof HTMLImageElement && img.closest(".tile-art, .sheet-art, .batch-art, .mover-art");
     if (!box) return;
     img.dataset.first ??= img.src;
     const tried = `${img.dataset.tried ?? ""} ${img.src}`.trim();
     img.dataset.tried = tried;
     const next = nextImage(img.dataset.first, tried.split(" "), IMAGE_PROXY);
     if (next) img.src = next;
-    else box.classList.add("no-img");
+    else {
+      box.classList.add("no-img");
+      if (img.dataset.img) rememberImage(img.dataset.img, "");
+    }
   }
 
-  // Sync hat Neues gebracht. Suche/Set/Mehr nicht neu aufbauen (Eingaben gingen verloren), nur aktualisieren.
+  // Bild geladen: weich einblenden; kam es erst über die Ersatzkette, die Adresse fürs nächste Mal merken
+  #onImageLoad(e) {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    if (img.closest(".tile-art, .sheet-art")) img.classList.add("loaded");
+    if (img.dataset.tried && img.dataset.img) rememberImage(img.dataset.img, img.src);
+  }
+
+  // Sync hat Neues gebracht. Suche/Set/Mehr/Tauschen nicht neu aufbauen (Eingaben gingen verloren), nur aktualisieren.
   #onRemoteChange() {
-    if (["suche", "set", "mehr", "hinzufuegen"].includes(currentRoute().view)) this.refresh();
+    if (["suche", "set", "mehr", "hinzufuegen", "tauschen"].includes(currentRoute().view)) this.refresh();
     else this.render();
   }
 

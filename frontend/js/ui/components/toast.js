@@ -32,10 +32,13 @@ export class Toaster {
           },
         }, action.label)
       : null;
+    // ohne Knopf nicht null übergeben – replaceChildren macht daraus den Text „null“
     this.#el.replaceChildren(
-      h("span", { class: "toast-text" }, message),
-      button,
-      h("button", { type: "button", class: "toast-close", "aria-label": "Hinweis schließen", html: ICONS.close, onclick: () => this.hide() })
+      ...[
+        h("span", { class: "toast-text" }, message),
+        button,
+        h("button", { type: "button", class: "toast-close", "aria-label": "Hinweis schließen", html: ICONS.close, onclick: () => this.hide() }),
+      ].filter(Boolean)
     );
     this.#el.dataset.type = type;
     this.#el.setAttribute("role", type === "error" ? "alert" : "status");

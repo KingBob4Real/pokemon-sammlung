@@ -13,11 +13,13 @@ const UPSERT = `
     updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > lists.updated`;
 
+// Zwei Teile statt „rev > ?1 OR id IN (…)“: so liest die Datenbank nur Geändertes (Index auf Person + Stand) und die
+// gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
+const ROWS = `SELECT id, name, created, position, updated, deleted FROM lists`;
 const CHANGED = `
-  SELECT id, name, created, position, updated, deleted
-  FROM lists
-  WHERE user_id = ?3
-    AND (rev > ?1 OR id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'list'))`;
+  ${ROWS} WHERE user_id = ?3 AND rev > ?1
+  UNION
+  ${ROWS} WHERE user_id = ?3 AND id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'list')`;
 
 export class ListRepository {
   type = "list";

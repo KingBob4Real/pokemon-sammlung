@@ -1,7 +1,7 @@
 // Einstieg des Cloudflare Workers: setzt die Teile zusammen (Composition Root).
 //   http/          Router, Antworten, Schlüssel-Prüfung
 //   controllers/   HTTP ↔ Service
-//   services/      Abgleich-Logik, Karten-Scanner, Anmelden
+//   services/      Abgleich-Logik, Karten-Scanner, Anmelden, Tauschen
 //   repositories/  SQL pro Tabelle
 //   validation/    Prüfung eingehender Daten
 import { LIMITLESS_IMAGES, SCAN_MAX_TOKENS, SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL, TCGDEX_API, TCGPLAYER_IMAGES } from "./config.js";
@@ -23,6 +23,7 @@ import { UserRepository } from "./repositories/userRepository.js";
 import { AuthService } from "./services/authService.js";
 import { ScanService } from "./services/scanService.js";
 import { SyncService } from "./services/syncService.js";
+import { TradeService } from "./services/tradeService.js";
 
 // Zahl aus wrangler.toml ([vars]); fehlt sie oder ist sie ungültig, gilt der Wert aus config.js
 const count = (value, fallback) => (parseInt(value, 10) >= 0 ? parseInt(value, 10) : fallback);
@@ -30,12 +31,10 @@ const count = (value, fallback) => (parseInt(value, 10) >= 0 ? parseInt(value, 1
 export function createApp(env) {
   const db = env.DB;
   const users = new UserRepository(db);
-  const syncService = new SyncService(db, new RevisionRepository(db), new CardRepository(db), [
-    new CollectionRepository(db),
-    new ListRepository(db),
-    new ListItemRepository(db),
-    new SectionRepository(db),
-  ]);
+  const collection = new CollectionRepository(db);
+  const listItems = new ListItemRepository(db);
+  const syncService = new SyncService(db, new RevisionRepository(db), new CardRepository(db), [collection, new ListRepository(db), listItems, new SectionRepository(db)]);
+  const tradeService = new TradeService(users, collection, listItems);
   const syncController = new SyncController(syncService);
   const scanService = new ScanService(env.AI, new ScanUsageRepository(db), {
     model: SCAN_MODEL,
@@ -52,6 +51,8 @@ export function createApp(env) {
     .post("/sync", requireUser(users, (request, user) => syncController.sync(request, user)))
     .post("/scan", requireUser(users, (request, user) => scanController.scan(request, user)))
     .get("/scan/usage", requireUser(users, (request, user) => scanController.usage(user)))
+    // Tauschen: Doppelte und fehlende Karten der anderen Personen (nur lesen, nur angemeldet)
+    .get("/trade", requireUser(users, async (request, user) => json(await tradeService.forUser(user))))
     // Kartenbilder, die es nur bei Limitless oder TCGplayer gibt (ohne Schlüssel – <img> schickt keinen mit)
     .get("/img", (request) => imageController.image(request))
     // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden per Antippen oder mit Passwort

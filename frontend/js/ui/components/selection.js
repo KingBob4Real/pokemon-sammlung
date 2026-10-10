@@ -1,6 +1,7 @@
 import { h } from "../../core/dom.js";
 import { plural } from "../../core/format.js";
 import { COLLECTION_TARGET, links } from "../router.js";
+import { ask } from "./ask.js";
 import { setPicked, tileCard } from "./cardTile.js";
 
 /**
@@ -87,7 +88,7 @@ function actionMenu(ctx, chosen, { except, menu, groups }, stop) {
   const targets = [
     except === COLLECTION_TARGET ? null : ["Zur Sammlung", (cards) => (collection.markOwned(cards), { message: "in der Sammlung", href: "#sammlung" })],
     ...lists.all().filter((l) => l.id !== except).map((l) => [`Zu „${l.name}“`, (cards) => toList(l.id, cards)]),
-    ["Neue Liste …", (cards) => toList(lists.create(prompt("Name der neuen Liste:") || ""), cards)],
+    ["Neue Liste …", async (cards) => toList(lists.create((await ask("Name der neuen Liste", { placeholder: "z. B. Wunschliste", ok: "Anlegen" })) || ""), cards)],
   ].filter(Boolean);
 
   const runs = new Map();
@@ -98,13 +99,13 @@ function actionMenu(ctx, chosen, { except, menu, groups }, stop) {
   };
   const all = groups.length ? [...groups, { label: "Listen", items: targets }].map((g) => h("optgroup", { label: g.label }, g.items.map(option))) : targets.map(option);
   const select = h("select", { class: "btn", "aria-label": `Ausgewählte Karten: ${menu}` }, [h("option", { value: "" }, menu), ...all]);
-  select.addEventListener("change", () => {
+  select.addEventListener("change", async () => {
     const run = runs.get(select.value);
     select.value = "";
     if (!run) return;
     const cards = chosen();
     if (!cards.length) return ctx.notify("Erst Karten antippen.", { type: "info" });
-    const result = run(cards);
+    const result = await run(cards); // „Neue Liste …“/„+ Neuer Ordner …“ fragen erst nach dem Namen
     if (!result) return;
     stop();
     ctx.notify(`${plural(cards.length, "Karte", "Karten")} ${result.message}.`, {

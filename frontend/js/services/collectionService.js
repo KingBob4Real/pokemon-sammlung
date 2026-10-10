@@ -47,8 +47,11 @@ export class CollectionService {
     });
   }
 
+  // Haken: rein (Anzahl 1) oder raus → beim Rausnehmen die Funktion für „Rückgängig“, sonst null
   toggle(card) {
-    this.setQuantity(card, this.has(card.id) ? 0 : 1);
+    if (this.has(card.id)) return this.removeAll([card]);
+    this.setQuantity(card, 1);
+    return null;
   }
 
   // Mehrere Karten als vorhanden markieren (Anzahl mindestens 1)
@@ -69,6 +72,13 @@ export class CollectionService {
       this.store.batch(() => {
         for (const [id, entry] of before) if (entry) this.store.put("collection", id, entry);
       });
+  }
+
+  // Verschiedene Karten je Set → Map(Set-ID → Anzahl). Für „Meine Sets“ und „x von y“ in der Set-Ansicht (gleiche Quelle)
+  countBySet() {
+    const counts = new Map();
+    for (const e of this.entries()) counts.set(e.card.set, (counts.get(e.card.set) || 0) + 1);
+    return counts;
   }
 
   update(cardId, patch) {
@@ -114,6 +124,16 @@ export class CollectionService {
     this.store.batch(() => {
       for (const { id: cardId, data } of this.store.all("collection")) if (data.section === id) this.store.put("collection", cardId, { ...data, section: null });
       this.store.put("section", id, null);
+    });
+  }
+
+  // Tauschen: true = anbieten, false = behalten, null = automatisch (wenn doppelt) – siehe domain/trade.js
+  setTrade(cards, trade) {
+    this.store.batch(() => {
+      for (const card of cards) {
+        const e = this.entry(card.id);
+        if (e) this.store.put("collection", card.id, { ...e, trade });
+      }
     });
   }
 

@@ -18,14 +18,15 @@ let picker = null; // unsichtbares Datei-Feld: Foto-App oder Mediathek, falls di
  * ganze Ordnerseite (Liste in scanBatch.js). Läuft im Dialog, Meldungen stehen deshalb dort statt unten als Hinweis.
  * Jeder Fehler hat einen Ausweg: Nochmal, manuell suchen, schließen.
  *   listId – beim Scannen aus einer Liste ist diese Liste schon angehakt
+ *   pick   – { label, add(card) }: Karte nicht in die Sammlung, sondern z. B. in den Tauschrechner (nur Einzeln)
  */
-export function startScan(ctx, { listId = null } = {}) {
+export function startScan(ctx, { listId = null, pick = null } = {}) {
   if (!navigator.onLine) return ctx.notify("Zum Scannen braucht es Internet.", { type: "info" });
   if (!ctx.scanner.ready) {
     return ctx.notify("Zum Scannen bitte erst unter „Mehr“ den Sync-Schlüssel eintragen.", { type: "info", action: { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } });
   }
-  if (!navigator.mediaDevices?.getUserMedia) return pickPhoto((file) => singleFromFile(ctx, file, listId));
-  ctx.openSheet((body, sheet) => cameraStep(body, sheet, listId));
+  if (!navigator.mediaDevices?.getUserMedia) return pickPhoto((file) => singleFromFile(ctx, file, listId, pick));
+  ctx.openSheet((body, sheet) => cameraStep(body, sheet, listId, pick));
 }
 
 // Foto über die Foto-App oder aus der Mediathek (muss direkt aus einem Antippen kommen). onFile(file) nur, wenn eins gewählt wurde.
@@ -39,7 +40,7 @@ function pickPhoto(onFile) {
   picker.click();
 }
 
-const singleFromFile = (ctx, file, listId) => ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId));
+const singleFromFile = (ctx, file, listId, pick = null) => ctx.openSheet((body, sheet) => scanFlow(body, sheet, file, listId, pick));
 
 // Ganze Seite aus der Mediathek: volle Auflösung, Seite mittig im Foto (formatfüllend fotografieren)
 async function pageFromFile(ctx, file, layout) {
@@ -57,26 +58,28 @@ async function pageFromFile(ctx, file, layout) {
 
 // Live-Kamera im Dialog. Einzeln: nach dem Foto geht es mit dem Erkennen weiter. Serie/Seite: Kamera bleibt an,
 // die Karten sammeln sich in der Liste darüber; „Fertig“ → prüfen und alle in die Sammlung.
-function cameraStep(body, ctx, listId) {
+// pick: nur Einzeln (Serie und Seite speichern über die Prüfliste in die Sammlung)
+function cameraStep(body, ctx, listId, pick = null) {
   const batch = batchOf(ctx);
   let redraw = null;
   const tray = batchTray(ctx, { onDone: () => review() });
   const saved = ctx.prefs.get("scanMode");
   const camera = cameraView({
-    mode: batch.items.length && saved === "single" ? "series" : saved, // offene Liste → weiter sammeln
+    mode: pick ? "single" : batch.items.length && saved === "single" ? "series" : saved, // offene Liste → weiter sammeln
+    modes: pick ? ["single"] : undefined,
     layout: ctx.prefs.get("scanLayout"),
-    tray: tray.el,
-    onPhoto: (file) => (redraw = scanFlow(body, ctx, file, listId)),
+    tray: pick ? null : tray.el,
+    onPhoto: (file) => (redraw = scanFlow(body, ctx, file, listId, pick)),
     onShot: (blob, { auto }) => addShots(ctx, [blob], { auto }),
     onPage: (blobs) => addShots(ctx, blobs, { page: true }),
-    onMode: (mode, layout) => (ctx.prefs.set("scanMode", mode), ctx.prefs.set("scanLayout", layout)),
+    onMode: (mode, layout) => pick || (ctx.prefs.set("scanMode", mode), ctx.prefs.set("scanLayout", layout)),
     onCancel: ctx.close,
     onPick: (mode, layout) =>
       pickPhoto((file) => {
         if (mode === "series") return addShots(ctx, [file]);
         if (mode === "page") return pageFromFile(ctx, file, layout);
         camera.stop();
-        singleFromFile(ctx, file, listId);
+        singleFromFile(ctx, file, listId, pick);
       }),
     onUnavailable: (e) => {
       if (!camera.el.isConnected) return;
@@ -88,7 +91,7 @@ function cameraStep(body, ctx, listId) {
           denied ? "Erlaube den Zugriff in den Einstellungen (Safari → Kamera) – oder nimm das Foto mit der Foto-App auf." : "Nimm das Foto stattdessen mit der Foto-App auf."
         ),
         h("div", { class: "buttons" }, [
-          h("button", { type: "button", class: "btn", onclick: () => pickPhoto((file) => singleFromFile(ctx, file, listId)) }, "Foto aufnehmen"),
+          h("button", { type: "button", class: "btn", onclick: () => pickPhoto((file) => singleFromFile(ctx, file, listId, pick)) }, "Foto aufnehmen"),
           batch.items.length ? h("button", { type: "button", class: "btn btn-ghost", onclick: () => review() }, "Scan-Liste ansehen") : null,
           h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Schließen"),
         ])
@@ -131,7 +134,7 @@ export function scanButton(ctx, options) {
 }
 
 // Ablauf im Dialog. Gibt die Funktion zurück, die nach dem Laden von Preisen neu zeichnet.
-function scanFlow(body, ctx, file, listId) {
+function scanFlow(body, ctx, file, listId, pick = null) {
   const { scanner, collection, lists, prices } = ctx;
   const closeButton = h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close });
   let redraw = null;
@@ -144,7 +147,7 @@ function scanFlow(body, ctx, file, listId) {
   };
   const button = (label, run, cls = "btn") => h("button", { type: "button", class: cls, onclick: run }, label);
   const ghost = (label, run) => button(label, run, "btn btn-ghost");
-  const scanAgain = () => (navigator.onLine ? startScan(ctx, { listId }) : failed(new Error("offline")));
+  const scanAgain = () => (navigator.onLine ? startScan(ctx, { listId, pick }) : failed(new Error("offline")));
   const manualSearch = (rec) => () => search(rec, "Karte suchen");
 
   function busy(title) {
@@ -227,8 +230,22 @@ function scanFlow(body, ctx, file, listId) {
     redraw = found.update;
   }
 
+  // Tauschrechner: Karte mit Preisen zeigen, dann auf die Seite legen. back: zurück zur Auswahl
+  function confirmPick(card, rec, back) {
+    const head = cardHead(card, prices);
+    head.elements[0].classList.add("small");
+    const take = () => (pick.add(card), done(card, `Liegt jetzt bei „${pick.label}“.`));
+    show(
+      back ? h("button", { type: "button", class: "back", onclick: back }, "‹ Andere Karte wählen") : null,
+      ...head.elements,
+      h("div", { class: "buttons" }, [ghost("Falsche Karte? Manuell suchen", manualSearch(rec))]),
+      h("div", { class: "scan-bar" }, [button(`Zu „${pick.label}“`, take, "btn btn-big")])
+    );
+    redraw = head.drawPrices;
+  }
+
   // Bestätigung: Karte mit Preisen, Angaben wählen, „In Sammlung“. back: zurück zur Auswahl
-  function confirm(card, rec, back) {
+  function confirmCard(card, rec, back) {
     const entry = collection.entry(card.id);
     const owned = collection.quantity(card.id);
     let qty = 1;
@@ -270,7 +287,7 @@ function scanFlow(body, ctx, file, listId) {
       });
       ctx.afterChange(structural);
       navigator.vibrate?.(15);
-      done(card, owned + qty);
+      done(card, `Jetzt ${owned + qty}× in der Sammlung.`);
     };
 
     show(
@@ -297,17 +314,18 @@ function scanFlow(body, ctx, file, listId) {
     redraw = () => (head.drawPrices(), drawTakePrice());
   }
 
-  function done(card, total) {
+  function done(card, text) {
     show(
       h("div", { class: "scan-done" }, [
         h("span", { class: "scan-done-icon", html: ICONS.check }),
         h("h2", {}, `${card.name} ${cardNumber(card)} hinzugefügt`),
-        h("p", { class: "muted" }, `Jetzt ${total}× in der Sammlung.`),
+        h("p", { class: "muted" }, text),
       ]),
       h("div", { class: "scan-bar" }, [button("📷 Nächste Karte scannen", scanAgain, "btn btn-big"), ghost("Fertig", ctx.close)])
     );
   }
 
+  const confirm = pick ? confirmPick : confirmCard;
   recognize();
   return () => redraw?.();
 }

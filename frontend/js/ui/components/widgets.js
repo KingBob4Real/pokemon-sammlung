@@ -2,7 +2,9 @@ import { h } from "../../core/dom.js";
 
 // Kleine wiederverwendbare Bausteine der Oberfläche.
 
-export const stat = (label, value, hint) => h("div", { class: "stat" }, [h("span", {}, label), h("b", {}, value), hint ? h("small", {}, hint) : null]);
+// Kennzahl; mit onclick zum Antippen (z. B. Marktwert → Verlauf)
+export const stat = (label, value, hint, onclick = null) =>
+  h(onclick ? "button" : "div", { class: onclick ? "stat stat-button" : "stat", type: onclick ? "button" : null, onclick }, [h("span", {}, label), h("b", {}, value), hint ? h("small", {}, hint) : null]);
 
 export const emptyState = (title, text) => h("div", { class: "empty" }, [h("b", {}, title), text ? h("p", {}, text) : null]);
 

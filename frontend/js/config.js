@@ -15,7 +15,9 @@ export const CARDMARKET_MIN_CONDITION = 3; // Excellent
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const PRICE_TTL_MS = DAY_MS;
+export const PRICE_KEEP_MS = 30 * DAY_MS; // älter fliegt beim Speichern raus (services/priceService.js)
 export const SETS_TTL_MS = 7 * DAY_MS;
+export const IMAGE_MEMORY_MS = 30 * DAY_MS; // Bild-Ersatz merken, danach neu probieren (TCGdex reicht selten Bilder nach)
 export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
@@ -23,8 +25,8 @@ export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
 export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
 
-// Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel und Einstellungen gehören ihr allein,
-// Preise und Sets teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
+// Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel, Einstellungen und Wertverlauf gehören ihr allein,
+// Preise, Sets und Bild-Ersatz teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
 export function storageKeys(profile = "") {
   const own = profile ? `${P}${profile}.` : P;
   return {
@@ -33,13 +35,19 @@ export function storageKeys(profile = "") {
     rev: `${own}rev.v1`,
     sync: `${own}sync.v1`,
     prefs: `${own}prefs.v1`,
+    history: `${own}history.v1`, // Wertverlauf der Sammlung (services/historyService.js)
+    trade: `${own}trade.v1`, // Tauschrechner: was ich gebe / bekomme (services/tradeDraftService.js)
     prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
-    sets: `${P}sets.v3`, // v3: deutsche + englische Sets, Serie für jedes Set (englische Ersatzbilder)
+    sets: `${P}sets.v4`, // v4: Kartenzahl = Deutsch oder Englisch, was mehr hat (v3: deutsche + englische Sets, Serie je Set)
+    images: `${P}images.v1`, // Karten-ID + Größe → Bild-Adresse, die geklappt hat, oder "" (ui/components/cardTile.js)
     // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
     legacyOwned: "pkc.owned.v1",
     legacyPrices: "pkc.ownPrices.v1",
   };
 }
+
+// Frühere Fassungen von Preisen und Sets – wurden beim Hochzählen nie gelöscht und belegen sonst für immer Platz
+export const OLD_KEYS = ["prices.v1", "prices.v2", "prices.v3", "sets.v1", "sets.v2", "sets.v3"].map((k) => P + k);
 
 export const ENTITY_TYPES = ["collection", "list", "listItem", "section"];
 export const CONDITIONS = ["Mint", "Near Mint", "Excellent", "Good", "Light Played", "Played", "Poor"];

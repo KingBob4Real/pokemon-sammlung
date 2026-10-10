@@ -17,4 +17,11 @@ export const storage = {
       return false; // Speicher voll oder gesperrt
     }
   },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* gesperrt: dann bleibt es eben */
+    }
+  },
 };

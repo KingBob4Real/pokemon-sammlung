@@ -1,8 +1,15 @@
 import { CARDMARKET_LANGUAGES, CONDITIONS, LANGUAGES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
-import { cardImage, cardNumber } from "../../domain/card.js";
+import { cardNumber } from "../../domain/card.js";
 import { cardmarketUrl } from "../../domain/price.js";
+import { TRADE_CHOICES } from "../../domain/trade.js";
+import { ask } from "./ask.js";
+import { cardImg, imageFor } from "./cardTile.js";
+
+// Auch für „+ Neuer Ordner“ in der Sammlung (collectionView.js)
+export const NEW_FOLDER = "Name des neuen Ordners";
+export const NEW_FOLDER_HINT = { placeholder: "z. B. Ordner 1 oder Tauschkarten", ok: "Anlegen" };
 
 /**
  * Kopf der Kartenansicht: Bild, Name, Nummer & Set, Seltenheit, Cardmarket-Preise.
@@ -19,21 +26,23 @@ export function cardHead(card, prices, language = () => "Deutsch") {
     priceBox.replaceChildren(
       p && (p.avg7 || p.avg30)
         ? h("div", { class: "price-grid" }, [cell("Ø 7 Tage · zählt", p.avg7), cell("Ø 30 Tage", p.avg30)])
-        : p
-          ? h("p", { class: "muted" }, "Für diese Karte gibt es keinen Cardmarket-Richtwert.")
-          : !navigator.onLine
-            ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
-            : prices.hasFailed(card.id)
-              ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
-              : h("p", { class: "muted" }, "Preis wird geladen …"),
-      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}`),
+        : p?.cardmarketId
+          ? h("p", { class: "muted" }, "In den letzten 30 Tagen keine Verkäufe auf Cardmarket – darum kein Richtwert.")
+          : p
+            ? h("p", { class: "muted" }, "TCGdex hat diese Karte keinem Cardmarket-Produkt zugeordnet – passiert oft bei Namen mit ♀, ♂, ◇ oder ’. Den aktuellen Preis zeigt der Link.")
+            : !navigator.onLine
+              ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
+              : prices.hasFailed(card.id)
+                ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
+                : h("p", { class: "muted" }, "Preis wird geladen …"),
+      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}${p?.extra ? " · aus Cardmarkets Preisliste (TCGdex ordnet diese Karte nicht zu)" : ""}`),
       h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
     );
   };
-  const image = cardImage(card, "high");
+  const image = imageFor(card, "high");
   const elements = [
     h("div", { class: image ? "sheet-art" : "sheet-art no-img" }, [
-      image ? h("img", { src: image, alt: `${card.name} ${cardNumber(card)}`, crossorigin: "anonymous" }) : null,
+      image ? cardImg(card, "high", image, { alt: `${card.name} ${cardNumber(card)}` }) : null,
       h("span", { class: "tile-ph" }, [card.name, h("br"), cardNumber(card)]),
     ]),
     h("h2", {}, card.name),
@@ -65,10 +74,10 @@ export function renderCardSheet(body, card, ctx) {
     ...collection.sections().map((s) => h("option", { value: s.id, selected: entry?.section === s.id }, s.name)),
     h("option", { value: "+" }, "+ Neuer Ordner …"),
   ]);
-  section.addEventListener("change", () => {
+  section.addEventListener("change", async () => {
     let id = section.value || null;
     if (id === "+") {
-      id = collection.createSection(prompt("Name des neuen Ordners, z. B. „Ordner 1“ oder „Tauschkarten“:") || "");
+      id = collection.createSection((await ask(NEW_FOLDER, NEW_FOLDER_HINT)) || "");
       if (!id) return (section.value = collection.entry(card.id)?.section || "");
       section.insertBefore(h("option", { value: id }, collection.sections().find((s) => s.id === id).name), section.lastChild);
       section.value = id;
@@ -76,7 +85,13 @@ export function renderCardSheet(body, card, ctx) {
     collection.setSection([card], id);
     ctx.afterChange(false);
   });
-  const fields = [cond, lang, paid, section];
+  // Tauschen: im Reiter „Tauschen“ anbieten – automatisch, wenn doppelt, oder selbst festgelegt
+  const trade = h("select", { class: "field" }, TRADE_CHOICES.map(([value, text]) => h("option", { value: String(value), selected: (entry?.trade ?? null) === value }, text)));
+  trade.addEventListener("change", () => {
+    collection.setTrade([card], JSON.parse(trade.value));
+    ctx.afterChange(false);
+  });
+  const fields = [cond, lang, paid, section, trade];
   // Ganz raus aus der Sammlung – mit „Rückgängig“ (Zustand & Kaufpreis bleiben ohnehin gespeichert)
   const removeAll = () => {
     const undo = collection.removeAll([card]);
@@ -143,9 +158,13 @@ export function renderCardSheet(body, card, ctx) {
   };
 
   const head = cardHead(card, prices, () => collection.entry(card.id)?.lang || "Deutsch");
+  // ‹ › neben dem Bild: vorige/nächste Karte der Ansicht (ctx.prev/next von app.js; am Ende ausgeblendet)
+  const [art, ...info] = head.elements;
+  const turn = (cls, label, go) => h("button", { type: "button", class: `sheet-nav ${cls}`, "aria-label": label, disabled: !go, onclick: () => go?.() }, cls === "prev" ? "‹" : "›");
   body.replaceChildren(
     h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close }),
-    ...head.elements,
+    ctx.prev || ctx.next ? h("div", { class: "sheet-stage" }, [art, turn("prev", "Vorige Karte", ctx.prev), turn("next", "Nächste Karte", ctx.next)]) : art,
+    ...info,
     h("section", { class: "sheet-part" }, [
       h("h3", {}, "In meiner Sammlung"),
       h("div", { class: "stepper" }, [
@@ -157,6 +176,7 @@ export function renderCardSheet(body, card, ctx) {
       h("label", { class: "label" }, ["Sprache", lang]),
       h("label", { class: "label" }, ["Kaufpreis pro Stück", paid]),
       h("label", { class: "label" }, ["Ordner", section]),
+      h("label", { class: "label" }, ["Tauschen", trade]),
       h("div", { class: "buttons" }, [remove]),
     ]),
     h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), listBox])

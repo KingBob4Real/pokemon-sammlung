@@ -119,7 +119,7 @@ main {
   bottom: 0;
   z-index: 30;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   padding: 4px 8px env(safe-area-inset-bottom, 0px);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   -webkit-backdrop-filter: blur(12px);
@@ -201,7 +201,8 @@ select.field { padding-right: 8px; }
 .segmented {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr; /* so viele Spalten wie Knöpfe */
   gap: 4px;
   padding: 4px;
   border-radius: 99px;
@@ -216,6 +217,7 @@ select.field { padding-right: 8px; }
   background: transparent;
   font-weight: 800;
   font-size: clamp(12.5px, 3.6vw, 14px);
+  line-height: 1.1; /* „Ohne Kaufpreis“ darf am Handy zweizeilig sein */
   color: var(--muted);
   cursor: pointer;
 }
@@ -237,6 +239,9 @@ select.field { padding-right: 8px; }
 .stat span { font-size: 12px; font-weight: 800; color: var(--muted); }
 .stat b { font-family: var(--font-head); font-size: 24px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .stat small { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
+.stat-button { border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform 0.12s ease; }
+.stat-button:active { transform: scale(0.98); }
+.stat-button small::after { content: " ›"; font-weight: 800; }
 
 /* ===== Kartenraster ===== */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px 12px; }
@@ -338,6 +343,15 @@ select.field { padding-right: 8px; }
 .progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
 
 .section-title { font-size: 20px; font-weight: 600; margin: 4px 2px 10px; }
+/* Ordner in der Sammlung: eine Zeile zum Wischen, bis an den Bildschirmrand */
+.folder-strip { display: flex; gap: 8px; margin: 0 -16px 16px; padding: 2px 16px 6px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 16px; scrollbar-width: none; }
+.folder-strip::-webkit-scrollbar { display: none; }
+.folder-chip { flex: none; display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 120px; max-width: 200px; min-height: 56px; padding: 8px 14px; border: 0; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: left; text-decoration: none; scroll-snap-align: start; cursor: pointer; }
+.folder-chip b { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; }
+.folder-chip small { font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.folder-chip small:empty { display: none; }
+.folder-chip.new { background: transparent; box-shadow: inset 0 0 0 2px var(--line); }
+.folder-chip:active { transform: scale(0.97); }
 .set-row { flex-direction: row; align-items: center; gap: 12px; padding: 10px 14px; }
 .set-row b { flex: 1; font-size: 15px; }
 .set-row small { flex: none; }
@@ -365,6 +379,14 @@ select.field { padding-right: 8px; }
   box-shadow: var(--shadow);
 }
 .panel h2 { font-size: 19px; font-weight: 600; margin-bottom: 6px; }
+/* „Erweitert“ unter Mehr: natives <details>, zugeklappt */
+.advanced summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -8px 0; list-style: none; cursor: pointer; }
+.advanced summary::-webkit-details-marker { display: none; }
+.advanced summary h2 { margin: 0; }
+.advanced summary::after { content: "›"; font-size: 26px; font-weight: 800; color: var(--muted); transition: transform 0.2s ease; }
+.advanced[open] summary { margin-bottom: 4px; }
+.advanced[open] summary::after { transform: rotate(90deg); }
+.advanced h3 { margin: 16px 0 2px; font-size: 16px; font-weight: 600; }
 .panel p { margin: 6px 0; font-size: 14px; }
 .label { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .field-note { margin: 6px 2px 0; font-size: 13px; font-weight: 800; color: #d6336c; }
@@ -422,9 +444,44 @@ select.field { padding-right: 8px; }
   background: var(--surface-2);
 }
 .sheet-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* ‹ › zum Blättern: am Handy auf dem Bildrand, im breiten Fenster daneben */
+.sheet-stage { position: relative; }
+.sheet-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-top: -22px;
+  padding: 0 0 4px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+.sheet-nav.prev { left: 0; }
+.sheet-nav.next { right: 0; }
+.sheet-nav:disabled { visibility: hidden; }
 .sheet h2 { font-size: 24px; font-weight: 600; }
 .sheet > .sheet-inner > p { margin: 2px 0; font-size: 14px; font-weight: 700; }
 .sheet h3 { font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+
+/* ===== Rückfrage (statt prompt/confirm) ===== */
+.ask { width: min(100% - 32px, 420px); margin: auto; padding: 0; border: 0; border-radius: 20px; background: var(--surface); color: var(--text); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+.ask::backdrop { background: rgba(10, 10, 14, 0.55); }
+.ask-inner { padding: 18px 16px 14px; }
+.ask-text { margin: 0 0 12px; font-size: 16px; font-weight: 800; white-space: pre-line; }
+.ask .buttons { margin-bottom: 0; }
+.ask .buttons .btn { flex: 1 1 0; }
+.btn.btn-danger { background: #d6336c; color: #fff; }
+.ask[open] { animation: fade-in 0.15s ease; }
 
 .prices { margin: 12px 0; padding: 12px 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .prices p { margin: 4px 0; font-size: 13px; }
@@ -432,6 +489,40 @@ select.field { padding-right: 8px; }
 .price-grid div { display: flex; flex-direction: column; }
 .price-grid span { font-size: 11.5px; font-weight: 800; color: var(--muted); }
 .price-grid b { font-family: var(--font-head); font-size: 19px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.price-grid.three { grid-template-columns: repeat(3, 1fr); }
+
+/* ===== Wert deiner Sammlung (Verlauf, Gestiegen/Gefallen) ===== */
+.sheet-head { padding-right: 52px; } /* nicht unter den Schließen-Knopf */
+.sheet-head p { margin: 6px 0 0; font-size: 14px; }
+.worth-chart { margin: 12px 0 0; }
+.worth-svg { display: block; width: 100%; height: 130px; }
+.worth-area { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+.worth-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.worth-axis { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Gestiegen & Gefallen als Zeile unter den Kennzahlen */
+.trends { display: flex; flex-direction: column; gap: 4px; width: 100%; margin: -4px 0 14px; padding: 10px 14px; border: 0; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform 0.12s ease; }
+.trends:active { transform: scale(0.985); }
+.trends-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.trends-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.trend { display: flex; justify-content: space-between; gap: 6px; min-width: 0; font-size: 14px; font-weight: 800; }
+.trend span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.trend b { flex: none; font-variant-numeric: tabular-nums; }
+.trend.up b { color: var(--accent); }
+.trend.down b { color: #d6336c; }
+.trends-intro { margin-top: 20px; }
+.movers { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.mover { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 60px; padding: 6px 8px; border: 0; border-radius: 12px; background: var(--surface-2); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.mover:active { transform: scale(0.985); }
+.mover-art { position: relative; width: 40px; aspect-ratio: 63 / 88; overflow: hidden; border-radius: 4px; background: var(--line); }
+.mover-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mover-info { display: flex; flex-direction: column; min-width: 0; }
+.mover-info > * { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.mover-info small { font-size: 12px; color: var(--muted); }
+.mover-diff { display: flex; flex-direction: column; align-items: flex-end; font-weight: 800; font-variant-numeric: tabular-nums; }
+.mover-diff small { font-size: 12px; }
+.mover-diff.up { color: var(--accent); }
+.mover-diff.down { color: #d6336c; }
+
 .btn.cm { width: 100%; margin-top: 8px; font-size: 14px; background: var(--red); color: #fff; }
 
 .sheet-part { margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
@@ -462,6 +553,35 @@ select.field { padding-right: 8px; }
   font-weight: 600;
 }
 .group-title small { flex: none; font-family: var(--font-body); font-size: 13px; font-weight: 800; color: var(--muted); }
+h3.group-title { font-size: 17px; }
+
+/* ===== Tauschen ===== */
+.trade-person { margin-top: 26px; font-size: 24px; }
+.trade-person:first-child { margin-top: 4px; }
+.trade-others { margin-top: 24px; }
+.trade-calc .group-title { margin-top: 16px; }
+.trade-item { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; margin-top: 8px; padding: 10px; border-radius: 14px; background: var(--surface-2); }
+.trade-item-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.trade-prices { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; font-variant-numeric: tabular-nums; }
+.trade-prices span { display: flex; flex-direction: column; }
+.trade-prices small { font-size: 11px; font-weight: 800; color: var(--muted); }
+.trade-prices b { font-size: 14px; }
+.trade-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; margin-top: 8px; }
+.trade-fields .field { min-height: 40px; padding: 6px 10px; }
+.trade-fields .link-button { justify-self: start; min-height: 40px; }
+.trade-qty { flex: none; display: flex; align-items: center; }
+.trade-qty button { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; color: inherit; font: inherit; font-size: 22px; font-weight: 800; cursor: pointer; }
+.trade-qty output { min-width: 16px; text-align: center; font-weight: 800; }
+.trade-sum { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.trade-sum th, .trade-sum td { padding: 6px 4px; text-align: right; border-bottom: 1px solid var(--line); }
+.trade-sum th:first-child { text-align: left; }
+.trade-sum thead th { font-size: 12px; color: var(--muted); }
+.trade-sum td small { color: var(--muted); }
+.trade-sum .up { color: var(--accent); font-weight: 800; }
+.trade-sum .down { color: #d6336c; font-weight: 800; }
+.trade-all { margin: 16px 0 8px; }
+.trade-all summary { display: flex; align-items: center; min-height: 44px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.trade-all[open] summary { margin-bottom: 8px; }
 .buttons + .toolbar, .stats + .buttons { margin-top: 0; }
 .stats + .buttons { margin-bottom: 14px; }
 
@@ -775,6 +895,11 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 .sheet[open]::backdrop { animation: fade-in 0.25s ease; }
 .scan-done-icon { animation: pop 0.4s var(--ease-out); }
 .sheet.closing { animation: sheet-out 0.18s ease-in forwards; }
+/* Blättern: neue Karte schiebt sich aus der Wischrichtung herein */
+@keyframes turn-next { from { opacity: 0; transform: translateX(28px); } }
+@keyframes turn-prev { from { opacity: 0; transform: translateX(-28px); } }
+.sheet-inner.turn-next { animation: turn-next 0.2s var(--ease-out); }
+.sheet-inner.turn-prev { animation: turn-prev 0.2s var(--ease-out); }
 .sheet.closing::backdrop { animation: fade-out 0.18s ease-in forwards; }
 /* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */
 .action-bar { animation: rise 0.25s var(--ease-out); }

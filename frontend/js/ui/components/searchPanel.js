@@ -1,13 +1,14 @@
 import { SEARCH_LIMIT } from "../../config.js";
 import { h } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
+import { searchable } from "../../services/catalogService.js";
 import { progressBar, trackFirstImages } from "./progressBar.js";
 import { emptyState, note } from "./widgets.js";
 
-const TYPING_PAUSE_MS = 250;
+const TYPING_PAUSE_MS = 400; // am Handy tippt man langsamer – sonst sucht jede Pause zwischen zwei Buchstaben
 
 /**
- * Suchfeld + Ergebnisse (passende Sets und Karten); ohne Eingabe die Liste aller Sets.
+ * Suchfeld + Ergebnisse (passende Sets und Karten); ohne Eingabe „Meine Sets“ (mit Fortschritt) und alle Sets.
  * Wird von „Suche“ und „Karten zur Liste hinzufügen“ benutzt.
  *   session  – { query, results }, bleibt beim Wechseln der Ansicht erhalten
  *   tile     – card → Kachel-Element
@@ -59,6 +60,11 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
       return showSets();
     }
     if (session.results?.query === query) return; // schon angezeigt
+    if (!searchable(query)) {
+      session.results = null;
+      bar.done();
+      return box.replaceChildren(note("Noch ein Zeichen mehr – gesucht wird ab 2 Buchstaben oder mit Nummer."));
+    }
     bar.busy();
     box.replaceChildren(note("Suche läuft …"));
     try {
@@ -82,9 +88,27 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
     if (!box.isConnected || session.results) return;
     if (!sets.loaded) return box.replaceChildren(emptyState("Sets brauchen beim ersten Mal Internet."));
     box.replaceChildren(
+      ...mySets(),
       h("h2", { class: "section-title" }, "Sets durchstöbern"),
       h("div", { class: "rows" }, [...sets.all()].reverse().map(setRow))
     );
+  }
+
+  // „Meine Sets“: jedes Set mit mindestens einer Karte in der Sammlung, Fortschritt wie bei den Listen, am weitesten
+  // zuerst. Offline gezählt – dieselbe Quelle wie „x von y“ in der Set-Ansicht (setCardsPanel.js).
+  function mySets() {
+    const mine = [...ctx.collection.countBySet()]
+      .map(([id, have]) => ({ s: sets.info(id), have }))
+      .filter((m) => m.s)
+      .map((m) => ({ ...m, total: Math.max(m.s.total || 0, m.have) }))
+      .sort((a, b) => b.have / b.total - a.have / a.total || b.have - a.have);
+    if (!mine.length) return [];
+    const row = ({ s, have, total }) =>
+      h("a", { class: "row", href: setHref(s.id) }, [
+        h("div", { class: "row-head" }, [h("b", {}, s.name), h("span", { class: "count" }, `${have}/${total}`)]),
+        h("div", { class: "progress", "aria-hidden": "true" }, [h("i", { style: `width: ${(have / total) * 100}%` })]),
+      ]);
+    return [h("h2", { class: "section-title" }, "Meine Sets"), h("div", { class: "rows" }, mine.map(row))];
   }
 
   function showResults() {
