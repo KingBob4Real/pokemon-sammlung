@@ -1,7 +1,8 @@
 // Kurzer Test des Backends: node test/smoke.mjs <URL> <SCHLÜSSEL> [SCHLÜSSEL EINER ZWEITEN PERSON]
 // Nutzt eine feste Test-Karte und Test-Liste; am Ende ist die Karte auf Anzahl 0 und die Liste gelöscht,
 // in der App ist also nichts davon zu sehen. Mit zweitem Schlüssel wird geprüft, dass die andere Person
-// diese Daten nicht sieht (dabei wird für sie nichts geschrieben). Am Ende ein Scan (zählt 1× zum Tageslimit).
+// diese Daten nicht sieht, und Tauschen (GET /trade) zwischen beiden – dafür bekommt sie kurz eine Test-Liste, die am
+// Ende wieder gelöscht ist. Am Ende ein Scan (zählt 1× zum Tageslimit).
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { parseImageRequest } from "../src/validation/imageValidator.js";
@@ -89,6 +90,38 @@ if (otherKey) {
   assert.equal(other.status, 200, "zweite Person kommt rein");
   assert.notEqual(other.body.user, start.body.user, "zweite Person ist eine andere");
   assert.ok(!other.body.changes.some((c) => c.id === card.id || c.id === "smoke-list" || c.id === item.id), "zweite Person sieht diese Daten nicht");
+}
+
+// Tauschen: A hat eine Karte doppelt, B hat sie in einer Liste und nicht in der Sammlung → beide sehen es richtig
+const trade = async (k) => {
+  const r = await fetch(`${base}/trade`, k ? { headers: { Authorization: `Bearer ${k}` } } : {});
+  return { status: r.status, body: await r.json() };
+};
+assert.equal((await trade()).status, 401, "Tauschen ohne Schlüssel: kein Zugriff");
+if (otherKey) {
+  const tradeCard = { id: "smoke-trade-1", name: "Smoke-Tausch", num: "2", set: "smoke", setName: "Test", total: null, img: null };
+  const tt = Date.now();
+  const owned = (qty, updated) => ({ type: "collection", id: tradeCard.id, updated, deleted: 0, data: { qty, cond: "Mint", lang: "Englisch", paid: null, added: tt, section: null, position: null, card: tradeCard } });
+  const wishList = { type: "list", id: "smoke-trade-list", updated: tt, deleted: 0, data: { name: "Smoke-Wünsche", created: tt } };
+  const wish = { type: "listItem", id: `smoke-trade-list:${tradeCard.id}`, updated: tt, deleted: 0, data: { list: "smoke-trade-list", card: tradeCard, added: tt } };
+  const gone = (e, updated) => ({ ...e, updated, deleted: 1, data: null });
+  const [meA, meB] = [start.body.userId, (await call({ since: 0, changes: [wishList, wish] }, otherKey)).body.userId];
+  await call({ since: 0, changes: [owned(2, tt)] });
+  const person = (res, id) => res.body.people.find((p) => p.id === id);
+  const forA = await trade(key);
+  assert.equal(forA.status, 200, "Tauschen mit Schlüssel");
+  assert.ok(!person(forA, meA), "die eigene Person steht nicht drin");
+  assert.deepEqual(person(forA, meB).missing.find((c) => c.id === tradeCard.id), tradeCard, "A sieht: B fehlt die Karte");
+  const forB = await trade(otherKey);
+  assert.deepEqual(person(forB, meA).duplicates.find((d) => d.card.id === tradeCard.id), { card: tradeCard, qty: 2, cond: "Mint", lang: "Englisch" }, "B sieht: A hat sie doppelt, mit Zustand und Sprache");
+  // B hat sie inzwischen → fehlt nicht mehr; gelöschte Liste und gelöschte Karte zählen nicht
+  await call({ since: 0, changes: [owned(1, tt)] }, otherKey);
+  assert.ok(!person(await trade(key), meB).missing.some((c) => c.id === tradeCard.id), "in Bs Sammlung → fehlt B nicht mehr");
+  await call({ since: 0, changes: [gone(owned(1, tt), tt + 1), gone(wishList, tt + 1)] }, otherKey);
+  assert.ok(!person(await trade(key), meB).missing.some((c) => c.id === tradeCard.id), "Karte aus gelöschter Liste fehlt nicht");
+  await call({ since: 0, changes: [gone(owned(2, tt), tt + 1)] });
+  assert.ok(!person(await trade(otherKey), meA).duplicates.some((d) => d.card.id === tradeCard.id), "gelöschte Karte ist nicht mehr doppelt");
+  await call({ since: 0, changes: [gone(wish, tt + 1)] }, otherKey);
 }
 
 // Abteilung + Karte darin mit eigener Position

@@ -25,11 +25,23 @@ const CHANGED = `
   WHERE c.user_id = ?3
     AND (c.rev > ?1 OR c.card_id IN (SELECT value ->> 'id' FROM json_each(?2) WHERE value ->> 'type' = 'collection'))`;
 
+// Tauschen: Karten, die die anderen Personen doppelt haben (Anzahl > 1, nicht gelöscht)
+const DUPLICATES = `
+  SELECT c.user_id, c.qty, c.condition, c.language, ${CARD_COLUMNS}
+  FROM collection c JOIN cards k ON k.id = c.card_id
+  WHERE c.user_id != ?1 AND c.deleted = 0 AND c.qty > 1`;
+
 export class CollectionRepository {
   type = "collection";
 
   constructor(db) {
     this.db = db;
+  }
+
+  // → [{ userId, card, qty, cond, lang }] aller außer exceptUserId
+  async duplicates(exceptUserId) {
+    const { results } = await this.db.prepare(DUPLICATES).bind(exceptUserId).all();
+    return results.map((r) => ({ userId: r.user_id, card: cardFromRow(r), qty: r.qty, cond: r.condition, lang: r.language }));
   }
 
   upsert(changesJson, userId) {
