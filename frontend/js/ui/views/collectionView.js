@@ -62,7 +62,6 @@ export function render(main, ctx, folderId = "") {
   if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
   const overview = inFolder || !all.length ? null : folderOverview(ctx, folders, all, valueOf);
   if (overview) main.append(...overview.elements);
-  if (!inFolder) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn btn-ghost", href: links.trade }, "⇄ Tauschen mit den anderen")]));
 
   // Welche Karten gerade passen (Text- und Schnellfilter); die Kennzahlen gelten für genau diese
   const texts = new Map(entries.map((e) => [e.card.id, norm(`${e.card.name} ${e.card.num} ${e.card.setName}`)]));

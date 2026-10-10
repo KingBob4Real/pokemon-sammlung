@@ -1,19 +1,17 @@
 import { h } from "../../core/dom.js";
 import { describeError } from "../../core/errors.js";
 import { fmtDateTime, fmtEur, plural } from "../../core/format.js";
-import { links } from "../router.js";
 import { cardTile } from "../components/cardTile.js";
-import { backLink, emptyState, note } from "../components/widgets.js";
+import { emptyState, note } from "../components/widgets.js";
 
 const FRESH_MS = 60_000; // so lange gilt die letzte Antwort, ohne neu zu fragen (z. B. beim Neuzeichnen nach dem Abhaken)
 
-// Ansicht „Tauschen“ (#tauschen): pro Person „Tim hat doppelt, was dir fehlt“ und „Du hast doppelt, was Tim fehlt“,
+// Reiter „Tauschen“ (#tauschen): pro Person „Tim hat doppelt, was dir fehlt“ und „Du hast doppelt, was Tim fehlt“,
 // je mit Anzahl und Marktwert (fair?), darunter aufklappbar alle Doppelten. Antippen öffnet die Karte.
 // Braucht Internet; die letzte Antwort bleibt im Speicher (services/tradeService.js).
 export function render(main, ctx) {
   const { trade, sync, prices } = ctx;
   ctx.setTitle("Tauschen");
-  main.append(h("div", { class: "list-head" }, [backLink(links.collection, "Sammlung")]));
   if (!sync.enabled) {
     main.append(
       emptyState("Zum Tauschen musst du angemeldet sein.", "Dann siehst du, wer doppelt hat, was dir fehlt – und umgekehrt."),

@@ -1,7 +1,7 @@
 // Adressen in der App → Ansicht und Reiter unten.
 // #sammlung · #ordner/<id|ohne> · #tauschen · #listen · #liste/<id> · #suche · #set/<id> · #mehr
 // #hinzufuegen/<sammlung|listId>[/<setId>] – Karten per Antippen zur Sammlung oder Liste hinzufügen
-const VIEW_TAB = { sammlung: "sammlung", ordner: "sammlung", tauschen: "sammlung", listen: "listen", liste: "listen", hinzufuegen: "listen", suche: "suche", set: "suche", mehr: "mehr" };
+const VIEW_TAB = { sammlung: "sammlung", ordner: "sammlung", tauschen: "tauschen", listen: "listen", liste: "listen", hinzufuegen: "listen", suche: "suche", set: "suche", mehr: "mehr" };
 export const COLLECTION_TARGET = "sammlung";
 
 export function currentRoute() {
@@ -14,7 +14,6 @@ export function currentRoute() {
 }
 
 export const links = {
-  collection: "#sammlung",
   trade: "#tauschen",
   folder: (id) => `#ordner/${encodeURIComponent(id)}`, // „ohne“ = Karten ohne Ordner
   lists: "#listen",
