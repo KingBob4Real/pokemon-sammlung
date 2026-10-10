@@ -58,7 +58,7 @@ const call = async (body, k = key) => {
 
 const t = Date.now();
 const card = { id: "smoke-test-1", name: "Smoke-Test", num: "1", set: "smoke", setName: "Test", total: null, img: null };
-const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, section: null, position: null, card } });
+const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, section: null, position: null, trade: null, card } });
 const find = (res, type, id) => res.body.changes.find((c) => c.type === type && c.id === id);
 
 assert.equal((await fetch(base)).status, 200, "Backend antwortet");
@@ -101,7 +101,7 @@ assert.equal((await trade()).status, 401, "Tauschen ohne Schlüssel: kein Zugrif
 if (otherKey) {
   const tradeCard = { id: "smoke-trade-1", name: "Smoke-Tausch", num: "2", set: "smoke", setName: "Test", total: null, img: null };
   const tt = Date.now();
-  const owned = (qty, updated) => ({ type: "collection", id: tradeCard.id, updated, deleted: 0, data: { qty, cond: "Mint", lang: "Englisch", paid: null, added: tt, section: null, position: null, card: tradeCard } });
+  const owned = (qty, updated, trade = null, c = tradeCard) => ({ type: "collection", id: c.id, updated, deleted: 0, data: { qty, cond: "Mint", lang: "Englisch", paid: null, added: tt, section: null, position: null, trade, card: c } });
   const wishList = { type: "list", id: "smoke-trade-list", updated: tt, deleted: 0, data: { name: "Smoke-Wünsche", created: tt } };
   const wish = { type: "listItem", id: `smoke-trade-list:${tradeCard.id}`, updated: tt, deleted: 0, data: { list: "smoke-trade-list", card: tradeCard, added: tt } };
   const gone = (e, updated) => ({ ...e, updated, deleted: 1, data: null });
@@ -113,14 +113,23 @@ if (otherKey) {
   assert.ok(!person(forA, meA), "die eigene Person steht nicht drin");
   assert.deepEqual(person(forA, meB).missing.find((c) => c.id === tradeCard.id), tradeCard, "A sieht: B fehlt die Karte");
   const forB = await trade(otherKey);
-  assert.deepEqual(person(forB, meA).duplicates.find((d) => d.card.id === tradeCard.id), { card: tradeCard, qty: 2, cond: "Mint", lang: "Englisch" }, "B sieht: A hat sie doppelt, mit Zustand und Sprache");
+  assert.deepEqual(person(forB, meA).offers.find((d) => d.card.id === tradeCard.id), { card: tradeCard, qty: 2, cond: "Mint", lang: "Englisch" }, "B sieht: A hat sie doppelt, mit Zustand und Sprache");
+  // Tauschen pro Karte: „ja“ bietet auch eine einzelne an, „nein“ behält auch eine doppelte
+  const single = { ...tradeCard, id: "smoke-trade-2", num: "3" };
+  await call({ since: 0, changes: [owned(1, tt, true, single), owned(2, tt + 1, false)] });
+  const offersA = person(await trade(otherKey), meA).offers.map((d) => d.card.id);
+  assert.ok(offersA.includes(single.id), "„Tauschen: ja“ – auch eine einzelne Karte wird angeboten");
+  assert.ok(!offersA.includes(tradeCard.id), "„Tauschen: nein“ – doppelt, aber nicht angeboten");
+  const back = (await call({ since: 0, changes: [] })).body.changes.find((c) => c.id === single.id);
+  assert.equal(back.data.trade, true, "Tauschen kommt beim Sync zurück");
+  await call({ since: 0, changes: [owned(2, tt + 2), gone(owned(1, tt, true, single), tt + 1)] });
   // B hat sie inzwischen → fehlt nicht mehr; gelöschte Liste und gelöschte Karte zählen nicht
   await call({ since: 0, changes: [owned(1, tt)] }, otherKey);
   assert.ok(!person(await trade(key), meB).missing.some((c) => c.id === tradeCard.id), "in Bs Sammlung → fehlt B nicht mehr");
   await call({ since: 0, changes: [gone(owned(1, tt), tt + 1), gone(wishList, tt + 1)] }, otherKey);
   assert.ok(!person(await trade(key), meB).missing.some((c) => c.id === tradeCard.id), "Karte aus gelöschter Liste fehlt nicht");
-  await call({ since: 0, changes: [gone(owned(2, tt), tt + 1)] });
-  assert.ok(!person(await trade(otherKey), meA).duplicates.some((d) => d.card.id === tradeCard.id), "gelöschte Karte ist nicht mehr doppelt");
+  await call({ since: 0, changes: [gone(owned(2, tt), tt + 3)] });
+  assert.ok(!person(await trade(otherKey), meA).offers.some((d) => d.card.id === tradeCard.id), "gelöschte Karte ist nicht mehr doppelt");
   await call({ since: 0, changes: [gone(wish, tt + 1)] }, otherKey);
 }
 
