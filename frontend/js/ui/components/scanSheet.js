@@ -321,7 +321,7 @@ function scanFlow(body, ctx, file, listId, pick = null) {
         h("h2", {}, `${card.name} ${cardNumber(card)} hinzugefügt`),
         h("p", { class: "muted" }, text),
       ]),
-      h("div", { class: "scan-bar" }, [button("📷 Nächste Karte scannen", scanAgain, "btn btn-big"), ghost("Fertig", ctx.close)])
+      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: scanAgain, html: `${ICONS.camera}Nächste Karte scannen` }), ghost("Fertig", ctx.close)])
     );
   }
 

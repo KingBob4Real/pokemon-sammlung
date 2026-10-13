@@ -16,6 +16,16 @@ export function h(tag, attrs = {}, children = []) {
   return el;
 }
 
+// Kurzes Ticken beim Abhaken. iPhone kennt navigator.vibrate nicht – dort tickt ein angetippter Schalter (iOS 18+).
+// ponytail: Trick über <input switch>, ersetzen, sobald Safari eine Vibrations-Schnittstelle hat
+export function haptic() {
+  if (navigator.vibrate) return navigator.vibrate(12);
+  const label = h("label", { hidden: true }, [h("input", { type: "checkbox", switch: true })]);
+  document.body.append(label);
+  label.click();
+  label.remove();
+}
+
 export const ICONS = {
   check:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',

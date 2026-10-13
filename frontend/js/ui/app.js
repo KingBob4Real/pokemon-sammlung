@@ -1,5 +1,5 @@
 import { IMAGE_PROXY } from "../config.js";
-import { $, h } from "../core/dom.js";
+import { $, h, haptic } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
 import { cardNumber, nextImage } from "../domain/card.js";
@@ -43,6 +43,7 @@ export class App {
   #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
   #sheetNav = null; // { prev, next } der offenen Kartenansicht
+  #sheetCard = null; // id der Karte in der Kartenansicht (für den Rückflug zur Kachel)
   #rerenderTimer = null;
   #shownOnce = new Set(); // Hinweise, die pro Sitzung nur einmal kommen sollen
 
@@ -100,12 +101,43 @@ export class App {
       this.#sheetNav = null;
       this.refresh();
     });
-    // Blättern in der Kartenansicht: nur deutlich waagerechtes Wischen zählt, senkrechtes Scrollen bleibt unberührt
+    // Blättern in der Kartenansicht: nur deutlich waagerechtes Wischen zählt, senkrechtes Scrollen bleibt unberührt.
+    // Ganz oben nach unten ziehen = Sheet folgt dem Finger und schließt (nicht in der Kamera, nicht in Eingabefeldern).
     const typing = (el) => el.closest("input, select, textarea");
+    const sheetBody = $("#sheetBody");
     let touch = null;
-    this.dialog.addEventListener("touchstart", (e) => (touch = e.touches.length === 1 && !typing(e.target) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null), { passive: true });
+    this.dialog.addEventListener(
+      "touchstart",
+      (e) => {
+        const t = e.touches[0];
+        touch = e.touches.length === 1 && !typing(e.target) ? { x: t.clientX, y: t.clientY, at: e.timeStamp, pull: sheetBody.scrollTop <= 0 && !e.target.closest(".camera"), dy: 0 } : null;
+      },
+      { passive: true }
+    );
+    this.dialog.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!touch?.pull) return;
+        const [dx, dy] = [e.touches[0].clientX - touch.x, e.touches[0].clientY - touch.y];
+        if (!touch.dragging) {
+          if (Math.abs(dx) > 10 || dy < -10) touch.pull = false; // waagerecht = blättern, nach oben = scrollen
+          if (!touch.pull || dy < 10) return;
+          touch.dragging = true;
+        }
+        e.preventDefault();
+        touch.dy = Math.max(0, dy);
+        this.dialog.style.transform = `translateY(${touch.dy}px)`;
+      },
+      { passive: false }
+    );
     this.dialog.addEventListener("touchend", (e) => {
       const t = e.changedTouches[0];
+      if (touch?.dragging) {
+        const flick = touch.dy > 40 && touch.dy / (e.timeStamp - touch.at) > 0.6; // schnell nach unten geschnippt
+        this.#drop(touch.dy > 120 || flick);
+        touch = null;
+        return;
+      }
       if (!touch || !t) return;
       const [dx, dy] = [t.clientX - touch.x, t.clientY - touch.y];
       touch = null;
@@ -166,10 +198,12 @@ export class App {
     this.#viewRefresh = view.refresh || null;
     this.#viewPick = view.onPick || null;
     this.#viewDispose = view.dispose || null;
-    for (const a of document.querySelectorAll(".tabs a")) {
+    const tabs = [...document.querySelectorAll(".tabs a")];
+    for (const a of tabs) {
       if (a.dataset.tab === route.tab) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     }
+    $(".tabs").style.setProperty("--tab", tabs.findIndex((a) => a.dataset.tab === route.tab)); // Kapsel gleitet hin (CSS)
     this.refresh();
   }
 
@@ -190,9 +224,12 @@ export class App {
 
   // Kartenansicht. Steht die Karte unter den sichtbaren Kacheln, blättern ‹ ›, Wischen und Pfeiltasten in genau
   // deren Reihenfolge – so geht es in jeder Ansicht (Filter und Sortierung inklusive), ohne sie anzufassen.
-  openCard(card) {
+  // from = angetippte Kachel: ihr Bild fliegt in die Kartenansicht.
+  openCard(card, from = null) {
     const cards = [...this.main.querySelectorAll(".tile")].filter((el) => !el.closest("[hidden], details:not([open])")).map(tileCard);
-    this.#showCard(card, cards, 0);
+    const art = !this.dialog.open && from?.querySelector(".tile-art");
+    if (!art) return this.#showCard(card, cards, 0);
+    this.#morph(art, () => this.#showCard(card, cards, 0), () => $("#sheetBody .sheet-art"));
   }
 
   #showCard(card, cards, dir) {
@@ -200,6 +237,7 @@ export class App {
     const to = (d) => (i >= 0 && cards[i + d] ? () => this.#showCard(cards[i + d], cards, d) : null);
     const nav = { prev: to(-1), next: to(1) };
     this.openSheet((body, ctx) => renderCardSheet(body, card, { ...ctx, ...nav }), nav);
+    this.#sheetCard = card.id;
     if (!dir) return;
     const body = $("#sheetBody");
     body.classList.remove("turn-next", "turn-prev");
@@ -211,6 +249,7 @@ export class App {
   openSheet(render, nav = null) {
     const body = $("#sheetBody");
     this.#sheetNav = nav;
+    this.#sheetCard = null;
     this.#sheetRefresh = render(body, { ...this.ctx, close: () => this.closeSheet() }) || null;
     this.dialog.classList.remove("closing");
     if (!this.dialog.open) this.dialog.showModal();
@@ -218,18 +257,58 @@ export class App {
   }
 
   #turn(dir) {
+    if (!this.dialog.open || this.dialog.classList.contains("dropping")) return;
     (dir > 0 ? this.#sheetNav?.next : this.#sheetNav?.prev)?.();
   }
 
-  // Kartenansicht mit kurzer Animation schließen
+  // Kartenansicht mit kurzer Animation schließen – ist die Kachel der Karte zu sehen, fliegt die Karte dorthin zurück
   closeSheet() {
     if (!this.dialog.open || this.dialog.classList.contains("closing")) return;
     if (reducedMotion()) return this.dialog.close();
+    const art = $("#sheetBody .sheet-art");
+    const tileArt = this.#sheetCard && [...this.main.querySelectorAll(".tile")].find((el) => tileCard(el)?.id === this.#sheetCard)?.querySelector(".tile-art");
+    const box = tileArt?.getBoundingClientRect();
+    if (art && document.startViewTransition && box?.bottom > 0 && box.top < innerHeight) return this.#morph(art, () => this.dialog.close(), () => tileArt);
     this.dialog.classList.add("closing");
     setTimeout(() => {
       this.dialog.classList.remove("closing");
       this.dialog.close();
     }, SHEET_CLOSE_MS);
+  }
+
+  // View Transition: from fliegt an die Stelle von to() (gemeinsamer Name „card“), alles andere blendet über.
+  // Ohne Unterstützung im Browser oder bei „Bewegung reduzieren“ einfach update().
+  #morph(from, update, to) {
+    if (!document.startViewTransition || reducedMotion()) return update();
+    let target = null;
+    from.style.viewTransitionName = "card";
+    this.dialog.classList.add("morph"); // eigene Sheet-Animation aus, solange die Karte fliegt
+    document
+      .startViewTransition(() => {
+        from.style.viewTransitionName = "";
+        update();
+        target = to();
+        if (target) target.style.viewTransitionName = "card";
+      })
+      .finished.finally(() => {
+        this.dialog.classList.remove("morph");
+        if (target) target.style.viewTransitionName = "";
+      });
+  }
+
+  // Sheet nach unten gezogen und losgelassen: weit genug → gleitet hinaus, sonst federt es zurück
+  #drop(close) {
+    const d = this.dialog;
+    d.style.transition = close ? "transform 0.22s ease-in" : "transform 0.45s var(--spring)";
+    d.style.transform = close ? "translateY(100%)" : "";
+    d.classList.toggle("dropping", close);
+    setTimeout(() => {
+      d.style.transition = "";
+      if (!close) return;
+      d.classList.remove("dropping");
+      d.close();
+      d.style.transform = "";
+    }, close ? 220 : 450);
   }
 
   // Nach einer Änderung: Ansicht neu aufbauen, wenn dadurch Karten dazukommen oder wegfallen.
@@ -256,11 +335,11 @@ export class App {
     if (tile.hasAttribute("data-pick")) return this.#viewPick?.(card, tile);
     const button = e.target.closest("[data-open], [data-toggle]");
     if (!button) return;
-    if (button.hasAttribute("data-open")) return this.openCard(card);
+    if (button.hasAttribute("data-open")) return this.openCard(card, tile);
     // Mehrere Exemplare? Dann nicht per Haken auf 0 setzen, sondern die Anzahl in der Kartenansicht ändern
-    if (this.services.collection.quantity(card.id) > 1) return this.openCard(card);
+    if (this.services.collection.quantity(card.id) > 1) return this.openCard(card, tile);
     const undo = this.services.collection.toggle(card);
-    navigator.vibrate?.(12);
+    haptic();
     replay(tile, "just-changed");
     this.afterChange(false);
     // Abhaken wie überall mit „Rückgängig“ (holt Zustand, Kaufpreis und Ordner zurück); Hinzufügen bleibt still

@@ -45,7 +45,7 @@ html:has(dialog[open]) { overflow: hidden; }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.45;
@@ -121,6 +121,9 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
   text-decoration: none;
   background: rgba(0, 0, 0, 0.18);
 }
+/* Kopf-Knöpfe sind 36px hoch – Tippfläche unsichtbar auf 44px vergrößern */
+.sync-dot, .who { position: relative; }
+.sync-dot::before, .who::before { content: ""; position: absolute; inset: -4px; }
 .sync-dot i { width: 9px; height: 9px; border-radius: 50%; background: #c9ccd3; }
 .sync-dot[data-state="ok"] i { background: #6ee07c; }
 .sync-dot[data-state="pending"] i, .sync-dot[data-state="busy"] i { background: #ffd23f; }
@@ -130,44 +133,64 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 22px 16px calc(var(--tabs-h) + 24px + env(safe-area-inset-bottom, 0px)); /* oben Platz für den Pokéball-Knopf */
+  padding: 22px 16px calc(var(--tabs-top) + 24px); /* oben Platz für den Pokéball-Knopf */
 }
 
-/* ===== Leiste unten ===== */
+/* ===== Leiste unten: schwebende Glas-Kapsel (wie iOS 26), die Markierung gleitet mit Feder zum Reiter ===== */
+:root {
+  /* Abstand der Leiste zum unteren Rand: über dem Home-Balken, ohne Home-Balken 10px */
+  --tabs-bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) - 8px));
+  --tabs-top: calc(var(--tabs-bottom) + var(--tabs-h)); /* Oberkante der Leiste, von unten gemessen */
+  --spring: linear(0, 0.14, 0.421, 0.699, 0.905, 1.026, 1.077, 1.082, 1.063, 1.039, 1.018, 1.003, 0.996, 0.993, 0.994, 0.995, 0.997, 0.999, 1, 1, 1);
+}
 .tabs {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--tabs-bottom);
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 4px 8px env(safe-area-inset-bottom, 0px);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
+  width: min(100% - 24px, 520px);
+  height: var(--tabs-h);
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 12px 32px -12px rgba(31, 33, 40, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
+@media (prefers-color-scheme: dark) {
+  .tabs { border-color: rgba(255, 255, 255, 0.09); box-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
+}
+.tab-pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc((100% - 12px) / 5);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--red) 13%, transparent);
+  transform: translateX(calc(var(--tab, 0) * 100%));
+  transition: transform 0.55s var(--spring);
+}
+@media (prefers-color-scheme: dark) { .tab-pill { background: color-mix(in srgb, var(--red) 26%, transparent); } }
 .tabs a {
+  position: relative; /* über der Kapsel */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: var(--tabs-h);
-  font-size: 12px;
+  gap: 1px;
+  font-size: 11.5px;
   font-weight: 800;
   text-decoration: none;
   color: var(--muted);
 }
-/* aktiver Bereich: Symbol in einer roten Pille */
-.tabs a svg { box-sizing: content-box; padding: 4px 18px; border-radius: 99px; transition: background-color 0.2s ease; }
 .tabs a[aria-current="page"] { color: var(--red-strong); }
-.tabs a[aria-current="page"] svg { background: color-mix(in srgb, var(--red) 14%, transparent); }
-@media (prefers-color-scheme: dark) {
-  .tabs a[aria-current="page"] { color: #ff8a80; }
-  .tabs a[aria-current="page"] svg { background: color-mix(in srgb, var(--red) 24%, transparent); }
-}
+@media (prefers-color-scheme: dark) { .tabs a[aria-current="page"] { color: #ff8a80; } }
 
 /* ===== Bedienelemente ===== */
 .btn {
@@ -228,7 +251,7 @@ select.field { padding-right: 8px; }
 .toolbar .btn { flex: none; }
 .toolbar.tight { margin: 0; }
 .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
-.buttons .btn { flex: 1 1 160px; }
+.buttons .btn { flex: 1 1 140px; } /* zwei Knöpfe passen am Handy nebeneinander */
 
 .segmented {
   flex: 1;
@@ -299,6 +322,10 @@ select.field { padding-right: 8px; }
   transition: transform 0.2s var(--ease-out), box-shadow 0.25s ease;
 }
 .tile-art:active { transform: scale(0.97); }
+/* Lade-Schimmer, bis das Kartenbild da ist */
+@keyframes shimmer { to { background-position: -200% 0; } }
+.tile-art:not(.no-img) { background: linear-gradient(100deg, var(--surface-2) 40%, color-mix(in srgb, var(--surface-2), var(--text) 7%) 50%, var(--surface-2) 60%) 0 0 / 200% 100%; animation: shimmer 1.3s linear infinite; }
+.tile-art:has(img.loaded) { animation: none; }
 /* Holo-Glanz: Regenbogenstreifen, der beim Überfahren über die Karte gleitet (nur mit Maus) */
 .tile-art::after {
   content: "";
@@ -472,15 +499,19 @@ select.field { padding-right: 8px; }
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
 .sheet::backdrop { background: rgba(10, 10, 14, 0.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
-@media (max-width: 559px) {
-  .sheet { max-width: none; max-height: none; height: 100%; border-radius: 0; }
-}
 .sheet-inner {
   position: relative;
   max-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+/* Handy: Bottom Sheet – unten angedockt, oben rund mit Griff, die Ansicht dahinter bleibt oben sichtbar.
+   Ganz oben nach unten ziehen schließt (app.js). */
+@media (max-width: 559px) {
+  .sheet { max-width: none; max-height: none; height: calc(100% - env(safe-area-inset-top, 0px) - 12px); margin: auto 0 0; border-radius: 26px 26px 0 0; overflow: hidden; }
+  .sheet::before { content: ""; position: absolute; top: 8px; left: 50%; z-index: 3; width: 38px; height: 5px; margin-left: -19px; border-radius: 99px; background: color-mix(in srgb, var(--text) 25%, transparent); }
+  .sheet-inner { height: 100%; max-height: none; padding-top: 22px; }
 }
 .sheet-close {
   position: sticky;
@@ -507,10 +538,27 @@ select.field { padding-right: 8px; }
   margin: 0 auto 14px;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--surface-2);
+  background: var(--surface-2) center / cover no-repeat; /* Bild: kleines Kachelbild als Platzhalter (cardSheet.js) */
   box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.5);
+  transition: transform 0.6s var(--spring);
 }
 .sheet-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Holo: Neigung und Lichtreflex folgen Maus bzw. Handy-Lage (components/holo.js setzt --tx/--ty von −1 bis 1) */
+.sheet-art.tilt { transform: perspective(900px) rotateY(calc(var(--tx) * 9deg)) rotateX(calc(var(--ty) * -9deg)); transition: transform 0.12s linear; }
+.sheet-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(farthest-corner circle at calc(50% + var(--tx, 0) * 45%) calc(50% + var(--ty, 0) * 45%), rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.15) 25%, transparent 50%),
+    linear-gradient(115deg, transparent 15%, hsl(50 100% 60% / 0.35) 30%, hsl(330 100% 65% / 0.3) 42%, hsl(200 100% 60% / 0.35) 54%, hsl(140 90% 55% / 0.3) 66%, transparent 80%) calc(50% + var(--tx, 0) * 40%) calc(50% + var(--ty, 0) * 40%) / 220% 220%;
+  mix-blend-mode: hard-light; /* Regenbogenfolie + Lichtfleck, auf hellen wie dunklen Karten sichtbar */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.sheet-art.tilt::before { opacity: 0.85; }
 /* Holo-Glanz: einmal quer über die Karte, sobald sie aufgeht (und bei jedem Blättern) */
 .sheet-art::after {
   content: "";
@@ -695,7 +743,7 @@ h3.group-title { font-size: 17px; }
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--tabs-h) + 14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabs-top) + 10px);
   z-index: 25;
   display: flex;
   flex-wrap: wrap;
@@ -716,7 +764,7 @@ h3.group-title { font-size: 17px; }
 /* „Hinzufügen …“ ist ein eingebautes Auswahlmenü, sieht aber aus wie die Knöpfe daneben */
 .action-bar select.btn { -webkit-appearance: none; appearance: none; flex: 1 1 120px; width: 120px; min-width: 0; text-align: center; text-align-last: center; }
 .action-bar .btn-ghost { color: #fff; background: transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
-main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 200px + env(safe-area-inset-bottom, 0px)); } /* Leiste im Ordner: bis zu 3 Zeilen */
+main.has-action-bar { padding-bottom: calc(var(--tabs-top) + 200px); } /* Leiste im Ordner: bis zu 3 Zeilen */
 
 /* ===== Umsortieren (gedrückt halten und ziehen) ===== */
 /* iPhone: kein Kontextmenü, keine Textauswahl, kein Bild-Ziehen beim langen Drücken */
@@ -919,7 +967,7 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--tabs-h) + 14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabs-top) + 10px);
   z-index: 70;
   display: flex;
   align-items: center;
@@ -946,7 +994,7 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
 .toast-close { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; color: #fff; background: transparent; cursor: pointer; }
 .toast-close svg { width: 18px; height: 18px; }
 /* über der Aktionsleiste, wenn eine da ist */
-body:has(main.has-action-bar) .toast { bottom: calc(var(--tabs-h) + 96px + env(safe-area-inset-bottom, 0px)); }
+body:has(main.has-action-bar) .toast { bottom: calc(var(--tabs-top) + 92px); }
 .buttons.center { justify-content: center; }
 .buttons.center .btn { flex: 0 1 auto; }
 .link-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: var(--focus); text-decoration: underline; cursor: pointer; }
@@ -981,7 +1029,17 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 @keyframes turn-prev { from { opacity: 0; transform: translateX(-28px); } }
 .sheet-inner.turn-next { animation: turn-next 0.2s var(--ease-out); }
 .sheet-inner.turn-prev { animation: turn-prev 0.2s var(--ease-out); }
-.sheet.closing::backdrop { animation: fade-out 0.18s ease-in forwards; }
+.sheet.closing::backdrop, .sheet.dropping::backdrop { animation: fade-out 0.2s ease-in forwards; }
+/* Handy: Bottom Sheet fährt von ganz unten herein und hinaus */
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes sheet-down { to { transform: translateY(100%); } }
+@media (max-width: 559px) {
+  .sheet[open] { animation: sheet-up 0.4s cubic-bezier(0.2, 0.9, 0.25, 1); }
+  .sheet.closing { animation: sheet-down 0.18s ease-in forwards; }
+}
+/* Kachel ↔ Kartenansicht: die Karte fliegt (app.js #morph), solange ruht die eigene Sheet-Animation */
+.sheet.morph[open], .sheet.morph[open]::backdrop { animation: none; }
+::view-transition-group(card) { animation-duration: 0.5s; animation-timing-function: var(--spring); }
 /* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */
 .action-bar { animation: rise 0.25s var(--ease-out); }
 .reorder-placeholder { animation: fade-in 0.15s ease; }
@@ -994,4 +1052,5 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+  .sheet-art.tilt { transform: none; }
 }

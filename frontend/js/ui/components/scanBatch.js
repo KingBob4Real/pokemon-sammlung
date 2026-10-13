@@ -233,7 +233,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
             h("label", { class: "label" }, ["Liste", list]),
             h("p", { class: "muted batch-hint" }, "Zustand und Sprache gelten für Karten, die neu in die Sammlung kommen – bei vorhandenen erhöht sich nur die Anzahl."),
           ]),
-      h("div", { class: "scan-bar" }, [save, h("button", { type: "button", class: "btn btn-ghost", onclick: onScanMore }, "📷 Weiter scannen")])
+      h("div", { class: "scan-bar" }, [save, h("button", { type: "button", class: "btn btn-ghost", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` })])
     );
     redraw = draw;
     draw();
@@ -293,7 +293,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
         h("h2", {}, `${plural(count, "Karte", "Karten")} ${pick ? `bei „${pick.label}“` : "in der Sammlung"}`),
         b.items.length ? h("p", { class: "muted" }, `${plural(b.items.length, "ungeklärte Karte bleibt", "ungeklärte Karten bleiben")} in der Scan-Liste.`) : null,
       ]),
-      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: onScanMore }, "📷 Weiter scannen"), h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig")])
+      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` }), h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig")])
     );
   }
 

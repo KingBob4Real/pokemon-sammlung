@@ -133,7 +133,7 @@ export function tradeCalculator(ctx) {
         ...tradeDraft.draft[side].map((it) => row(side, it)),
         h("div", { class: "buttons" }, [
           h("button", { type: "button", class: "btn btn-ghost", onclick: () => pick(side, title) }, "+ Karte"),
-          h("button", { type: "button", class: "btn btn-ghost", onclick: () => scan(side, label) }, "📷 Scannen"),
+          h("button", { type: "button", class: "btn btn-ghost", onclick: () => scan(side, label), html: `${ICONS.camera}Scannen` }),
         ]),
       ]),
       ...(empty
