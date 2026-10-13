@@ -498,7 +498,7 @@ select.field { padding-right: 8px; }
   color: var(--text);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
-.sheet::backdrop { background: rgba(10, 10, 14, 0.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.sheet::backdrop { background: rgba(10, 10, 14, 0.7); } /* ohne Unschärfe: die kostet am iPhone bei jeder Animation */
 .sheet-inner {
   position: relative;
   max-height: 100dvh;
@@ -1037,9 +1037,19 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
   .sheet[open] { animation: sheet-up 0.4s cubic-bezier(0.2, 0.9, 0.25, 1); }
   .sheet.closing { animation: sheet-down 0.18s ease-in forwards; }
 }
-/* Kachel ↔ Kartenansicht: die Karte fliegt (app.js #morph), solange ruht die eigene Sheet-Animation */
-.sheet.morph[open], .sheet.morph[open]::backdrop { animation: none; }
-::view-transition-group(card) { animation-duration: 0.5s; animation-timing-function: var(--spring); }
+/* Kachel ↔ Kartenansicht (app.js #fly): ein Abbild der Karte fliegt (nur transform), das Sheet steht still und
+   blendet nur Hintergrund und Inhalt ein bzw. aus – so hat der Flug ein festes Ziel und läuft flüssig */
+.flyer { position: fixed; z-index: 10; border-radius: 16px; background: center / cover no-repeat; box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.5); transform-origin: 0 0; pointer-events: none; will-change: transform; }
+@keyframes sheet-bg-in { from { background-color: transparent; box-shadow: none; } }
+@keyframes sheet-bg-out { to { background-color: transparent; box-shadow: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(16px); } }
+.sheet.hero[open] { animation: sheet-bg-in 0.3s ease both; }
+.sheet.hero::before, .sheet.hero .sheet-nav, .sheet.hero .sheet-inner > :not(.sheet-stage, .sheet-art) { animation: rise-in 0.4s 0.1s var(--ease-out) both; }
+.sheet.hero .sheet-art::after { animation-delay: 0.5s; } /* Glanz erst, wenn die Karte gelandet ist */
+.sheet.landed[open]:not(.closing, .hero-out) { animation: none; } /* nach dem Flug: Sheet-Animation nicht neu starten */
+.sheet.hero-out[open] { animation: sheet-bg-out 0.3s ease forwards; }
+.sheet.hero-out::before, .sheet.hero-out .sheet-nav, .sheet.hero-out .sheet-inner > :not(.sheet-stage, .sheet-art) { animation: fade-out 0.15s ease-in forwards; }
+.sheet.hero-out::backdrop { animation: fade-out 0.3s ease-in forwards; }
 /* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */
 .action-bar { animation: rise 0.25s var(--ease-out); }
 .reorder-placeholder { animation: fade-in 0.15s ease; }

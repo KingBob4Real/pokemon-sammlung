@@ -227,9 +227,11 @@ export class App {
   // from = angetippte Kachel: ihr Bild fliegt in die Kartenansicht.
   openCard(card, from = null) {
     const cards = [...this.main.querySelectorAll(".tile")].filter((el) => !el.closest("[hidden], details:not([open])")).map(tileCard);
-    const art = !this.dialog.open && from?.querySelector(".tile-art");
-    if (!art) return this.#showCard(card, cards, 0);
-    this.#morph(art, () => this.#showCard(card, cards, 0), () => $("#sheetBody .sheet-art"));
+    const tileArt = !this.dialog.open && !reducedMotion() && from?.querySelector(".tile-art:not(.no-img)");
+    if (tileArt) this.dialog.classList.add("hero"); // Sheet blendet ein statt hochzufahren, damit das Ziel stillsteht
+    this.#showCard(card, cards, 0);
+    // gelandet: „landed“ statt „hero“ – sonst startete das Hochfahren des Sheets danach noch einmal
+    if (tileArt) this.#fly(tileArt, $("#sheetBody .sheet-art")).then(() => this.dialog.classList.replace("hero", "landed"));
   }
 
   #showCard(card, cards, dir) {
@@ -252,7 +254,10 @@ export class App {
     this.#sheetCard = null;
     this.#sheetRefresh = render(body, { ...this.ctx, close: () => this.closeSheet() }) || null;
     this.dialog.classList.remove("closing");
-    if (!this.dialog.open) this.dialog.showModal();
+    if (!this.dialog.open) {
+      this.dialog.classList.remove("landed"); // vom letzten Flug
+      this.dialog.showModal();
+    }
     body.scrollTop = 0;
   }
 
@@ -263,36 +268,40 @@ export class App {
 
   // Kartenansicht mit kurzer Animation schließen – ist die Kachel der Karte zu sehen, fliegt die Karte dorthin zurück
   closeSheet() {
-    if (!this.dialog.open || this.dialog.classList.contains("closing")) return;
-    if (reducedMotion()) return this.dialog.close();
+    const d = this.dialog;
+    if (!d.open || d.classList.contains("closing") || d.classList.contains("hero-out")) return;
+    if (reducedMotion()) return d.close();
     const art = $("#sheetBody .sheet-art");
-    const tileArt = this.#sheetCard && [...this.main.querySelectorAll(".tile")].find((el) => tileCard(el)?.id === this.#sheetCard)?.querySelector(".tile-art");
-    const box = tileArt?.getBoundingClientRect();
-    if (art && document.startViewTransition && box?.bottom > 0 && box.top < innerHeight) return this.#morph(art, () => this.dialog.close(), () => tileArt);
-    this.dialog.classList.add("closing");
+    const tileArt = this.#sheetCard && [...this.main.querySelectorAll(".tile")].find((el) => tileCard(el)?.id === this.#sheetCard)?.querySelector(".tile-art:not(.no-img)");
+    const seen = (el) => el && el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < innerHeight;
+    if (seen(art) && seen(tileArt)) {
+      d.classList.add("hero-out");
+      return this.#fly(tileArt, art, true).then(() => (d.classList.remove("hero-out"), d.close()));
+    }
+    d.classList.add("closing");
     setTimeout(() => {
       this.dialog.classList.remove("closing");
       this.dialog.close();
     }, SHEET_CLOSE_MS);
   }
 
-  // View Transition: from fliegt an die Stelle von to() (gemeinsamer Name „card“), alles andere blendet über.
-  // Ohne Unterstützung im Browser oder bei „Bewegung reduzieren“ einfach update().
-  #morph(from, update, to) {
-    if (!document.startViewTransition || reducedMotion()) return update();
-    let target = null;
-    from.style.viewTransitionName = "card";
-    this.dialog.classList.add("morph"); // eigene Sheet-Animation aus, solange die Karte fliegt
-    document
-      .startViewTransition(() => {
-        from.style.viewTransitionName = "";
-        update();
-        target = to();
-        if (target) target.style.viewTransitionName = "card";
-      })
-      .finished.finally(() => {
-        this.dialog.classList.remove("morph");
-        if (target) target.style.viewTransitionName = "";
+  // Kachel ↔ großes Bild: ein Abbild der Karte (das schon geladene Kachelbild) fliegt im Dialog von der einen Stelle
+  // zur anderen, das echte große Bild ist solange unsichtbar. Nur transform (FLIP) → läuft auch am iPhone flüssig.
+  #fly(tileArt, art, back = false) {
+    let [from, to] = [tileArt, art].map((el) => el.getBoundingClientRect());
+    if (back) [from, to] = [to, from];
+    const img = tileArt.querySelector("img");
+    const flyer = h("div", { class: "flyer", "aria-hidden": "true" });
+    Object.assign(flyer.style, { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px`, backgroundImage: `url("${img?.currentSrc || img?.src}")` });
+    this.dialog.append(flyer);
+    art.style.visibility = "hidden";
+    const start = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width})`;
+    return flyer
+      .animate([{ transform: start }, { transform: "none" }], { duration: back ? 320 : 460, easing: "cubic-bezier(0.32, 0.72, 0, 1)" })
+      .finished.catch(() => {}) // abgebrochen (z. B. Dialog zu) – trotzdem aufräumen
+      .then(() => {
+        flyer.remove();
+        art.style.visibility = "";
       });
   }
 
