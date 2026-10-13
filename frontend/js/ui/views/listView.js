@@ -72,6 +72,11 @@ export function render(main, ctx, listId) {
     stats.replaceChildren(
       stat("Fortschritt", `${p.have}/${p.total}`, p.total ? `${Math.round((p.have / p.total) * 100)} %` : "leer"),
       stat(
+        "Vorhanden ca.",
+        p.haveKnown ? fmtEur(p.haveValue) : "–",
+        p.have ? `${plural(p.have, "Karte", "Karten")}${p.haveKnown < p.have ? `, ${p.have - p.haveKnown} ohne Preis` : ""}` : "noch keine"
+      ),
+      stat(
         "Fehlt noch ca.",
         p.missingKnown ? fmtEur(p.missingValue) : "–",
         p.missing ? `${plural(p.missing, "Karte", "Karten")}${p.missingKnown < p.missing ? `, ${p.missing - p.missingKnown} ohne Preis` : ""}` : "komplett ✓"

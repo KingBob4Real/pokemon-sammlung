@@ -115,6 +115,10 @@ const first = lists.fill(" Karmesin & Purpur ", missing);
 assert.deepEqual([lists.all().map((l) => l.name), first.added], [["Karmesin & Purpur"], 2], "Liste mit Set-Namen angelegt");
 const again = lists.fill("Karmesin & Purpur", [...missing, inSet("sv1-5")]);
 assert.deepEqual([again.id, again.added, lists.items(first.id).length], [first.id, 1, 3], "vorhandene Liste ergänzt, nichts doppelt");
+lists.addCards(first.id, [inSet("sv1-1"), inSet("sv1-2")]);
+const listWorth = { "sv1-1": 4, "sv1-3": 2.5, "sv1-4": 1 }; // sv1-2 und sv1-5 ohne Preis
+const lp = lists.progress(first.id, (id) => collection.has(id), (id) => listWorth[id] ?? null);
+assert.deepEqual([lp.have, lp.haveKnown, lp.haveValue, lp.missing, lp.missingKnown, lp.missingValue], [2, 1, 4, 3, 2, 3.5], "Listenwert: vorhanden und fehlend getrennt");
 
 // D: Tauschen – Abgleich per Karten-ID, die Sprache zählt nicht
 const { tradeMatches } = await import("../js/domain/trade.js");

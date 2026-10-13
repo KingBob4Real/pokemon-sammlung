@@ -227,6 +227,7 @@ select.field { padding-right: 8px; }
 .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
 .stats:empty { display: none; }
 @media (min-width: 760px) { .stats { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 759px) { .stats > :last-child:nth-child(odd) { grid-column: span 2; } } /* z. B. 3 Kacheln: die letzte über die ganze Breite */
 .stat {
   display: flex;
   flex-direction: column;

@@ -97,7 +97,8 @@ export function render(main, ctx) {
 
 function progressText(p) {
   if (!p.total) return "leer";
-  if (!p.missing) return "komplett ✓";
-  if (!p.missingKnown) return `${plural(p.missing, "Karte fehlt", "Karten fehlen")}`;
-  return `fehlt noch ca. ${fmtEur(p.missingValue)}${p.missingKnown < p.missing ? " + ?" : ""}`;
+  const have = p.haveKnown ? `vorhanden ca. ${fmtEur(p.haveValue)}${p.haveKnown < p.have ? " + ?" : ""} · ` : "";
+  if (!p.missing) return `${have}komplett ✓`;
+  if (!p.missingKnown) return `${have}${plural(p.missing, "Karte fehlt", "Karten fehlen")}`;
+  return `${have}fehlt noch ca. ${fmtEur(p.missingValue)}${p.missingKnown < p.missing ? " + ?" : ""}`;
 }

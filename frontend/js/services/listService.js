@@ -116,17 +116,19 @@ export class ListService {
     if (!this.contains(listId, card.id)) this.store.put("listItem", itemId(listId, card.id), { list: listId, card, added });
   }
 
-  // isOwned(cardId), valueOf(cardId) → Fortschritt und was noch fehlt
+  // isOwned(cardId), valueOf(cardId) → Fortschritt, Wert des Vorhandenen und was noch fehlt
   progress(listId, isOwned, valueOf) {
     const items = this.items(listId);
-    const missing = items.filter((i) => !isOwned(i.card.id)).map((i) => valueOf(i.card.id));
-    const known = missing.filter((v) => v != null);
-    return {
-      total: items.length,
-      have: items.length - missing.length,
-      missing: missing.length,
-      missingKnown: known.length,
-      missingValue: known.reduce((sum, v) => sum + v, 0),
-    };
+    const p = { total: items.length, have: 0, haveKnown: 0, haveValue: 0, missing: 0, missingKnown: 0, missingValue: 0 };
+    for (const i of items) {
+      const k = isOwned(i.card.id) ? "have" : "missing";
+      const v = valueOf(i.card.id);
+      p[k]++;
+      if (v != null) {
+        p[`${k}Known`]++;
+        p[`${k}Value`] += v;
+      }
+    }
+    return p;
   }
 }
