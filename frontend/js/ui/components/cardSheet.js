@@ -6,6 +6,7 @@ import { cardmarketUrl } from "../../domain/price.js";
 import { TRADE_CHOICES } from "../../domain/trade.js";
 import { ask } from "./ask.js";
 import { cardImg, imageFor } from "./cardTile.js";
+import { holo } from "./holo.js";
 
 // Auch für „+ Neuer Ordner“ in der Sammlung (collectionView.js)
 export const NEW_FOLDER = "Name des neuen Ordners";
@@ -40,11 +41,17 @@ export function cardHead(card, prices, language = () => "Deutsch") {
     );
   };
   const image = imageFor(card, "high");
-  const elements = [
+  const art = holo(
     h("div", { class: image ? "sheet-art" : "sheet-art no-img" }, [
       image ? cardImg(card, "high", image, { alt: `${card.name} ${cardNumber(card)}` }) : null,
       h("span", { class: "tile-ph" }, [card.name, h("br"), cardNumber(card)]),
-    ]),
+    ])
+  );
+  // kleines Bild der Kachel (schon geladen) als Platzhalter, bis das große da ist
+  const low = image && imageFor(card, "low");
+  if (low) art.style.backgroundImage = `url("${low}")`;
+  const elements = [
+    art,
     h("h2", {}, card.name),
     h("p", { class: "muted" }, `${cardNumber(card)} · ${card.setName}`),
     rarity,

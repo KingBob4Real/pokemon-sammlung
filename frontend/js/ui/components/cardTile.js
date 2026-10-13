@@ -48,7 +48,7 @@ export function cardImg(card, size, src, attrs) {
 
 /**
  * Kartenkachel in drei Arten:
- *   "default" – Bild antippen = Kartenansicht, Haken = in Sammlung ja/nein
+ *   "default" – Bild antippen = Kartenansicht, Pokéball (rot = in der Sammlung) antippen = Auswahl starten
  *   "view"    – nur Kartenansicht (z. B. in der Sammlung)
  *   "pick"    – ganze Kachel antippen = auswählen (Listen bearbeiten); Zustand über setPicked()
  */
@@ -71,7 +71,7 @@ export function cardTile(card, { mode = "default" } = {}) {
         h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
       ]
     ),
-    mode === "default" ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.check }) : null,
+    mode === "default" ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.ball }) : null,
     pick ? h("span", { class: "tile-pick", "aria-hidden": "true" }) : null,
     h("div", { class: "tile-info" }, [h("b", {}, card.name), h("span", {}, `${cardNumber(card)} · ${card.setName}`), h("span", { class: "tile-value" })]),
   ]);
@@ -91,8 +91,7 @@ export function updateTile(el, { qty, value }) {
   el.classList.toggle("is-owned", qty > 0);
   const check = el.querySelector(".tile-check");
   if (check) {
-    check.setAttribute("aria-pressed", String(qty > 0));
-    check.setAttribute("aria-label", `${card.name}: ${qty > 0 ? "in der Sammlung, antippen zum Entfernen" : "fehlt, antippen zum Hinzufügen"}`);
+    check.setAttribute("aria-label", `${card.name}: ${qty > 0 ? "in der Sammlung" : "fehlt"} – antippen zum Auswählen`);
   }
   el.querySelector(".tile-value").textContent = (qty > 1 ? `${qty}× ` : "") + (value != null ? fmtEur(value) : "");
 }

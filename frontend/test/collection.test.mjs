@@ -151,10 +151,12 @@ const draft = tradeOf();
 draft.add("give", card("a"));
 draft.add("give", card("a"));
 draft.add("get", card("t1"));
+draft.add("get", card("t2"), 3); // Serien-Scan: Anzahl aus der Scan-Liste
 draft.change("get", "t1", { own: 7.5, lang: "Englisch" });
 const reloaded = tradeOf().draft;
 assert.deepEqual(reloaded.give.map((i) => [i.card.id, i.qty, i.cond]), [["a", 2, "Mint"]], "a doppelt, Zustand aus der Sammlung (Mint statt Near Mint)");
 assert.deepEqual([reloaded.get[0].own, reloaded.get[0].lang], [7.5, "Englisch"], "nach Neustart noch da");
+assert.deepEqual(reloaded.get.map((i) => [i.card.id, i.qty]), [["t1", 1], ["t2", 3]], "Serien-Scan legt die Anzahl auf einmal dazu");
 draft.change("give", "a", { qty: 0 });
 assert.equal(draft.draft.give.length, 0, "Anzahl 0 nimmt die Karte raus");
 draft.fill([{ card: card("a"), qty: 2, cond: "Mint", lang: "Deutsch" }], [{ card: card("t1"), qty: 3, cond: "Good", lang: "Englisch" }]);

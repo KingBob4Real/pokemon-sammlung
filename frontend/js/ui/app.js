@@ -1,8 +1,8 @@
 import { IMAGE_PROXY } from "../config.js";
-import { $, h } from "../core/dom.js";
+import { $, h, haptic } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
-import { cardNumber, nextImage } from "../domain/card.js";
+import { nextImage } from "../domain/card.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { avatarColor, chosenThisSession, initial, showProfiles } from "./components/profilePicker.js";
 import { rememberImage, tileCard, updateTile } from "./components/cardTile.js";
@@ -22,7 +22,7 @@ import * as tradeView from "./views/tradeView.js";
 // Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
 const VIEWS = { sammlung: collectionView, ordner: collectionView, tauschen: tradeView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", offline: "Offline", busy: "Sync …", error: "Sync-Problem", pending: "Nicht synchron", ok: "Synchron" };
-const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
+const RERENDER_DELAY_MS = 700; // kurz warten, damit man die Änderung noch sieht
 const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -40,9 +40,11 @@ function replay(el, className) {
 export class App {
   #viewRefresh = null;
   #viewPick = null; // Ansichten mit Auswahl-Kacheln bekommen das Antippen hierüber
+  #viewSelect = null; // Pokéball auf einer Kachel → Auswahl in der Ansicht starten (Suche, Set, Liste)
   #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
   #sheetNav = null; // { prev, next } der offenen Kartenansicht
+  #sheetCard = null; // id der Karte in der Kartenansicht (für den Rückflug zur Kachel)
   #rerenderTimer = null;
   #shownOnce = new Set(); // Hinweise, die pro Sitzung nur einmal kommen sollen
 
@@ -100,12 +102,43 @@ export class App {
       this.#sheetNav = null;
       this.refresh();
     });
-    // Blättern in der Kartenansicht: nur deutlich waagerechtes Wischen zählt, senkrechtes Scrollen bleibt unberührt
+    // Blättern in der Kartenansicht: nur deutlich waagerechtes Wischen zählt, senkrechtes Scrollen bleibt unberührt.
+    // Ganz oben nach unten ziehen = Sheet folgt dem Finger und schließt (nicht in der Kamera, nicht in Eingabefeldern).
     const typing = (el) => el.closest("input, select, textarea");
+    const sheetBody = $("#sheetBody");
     let touch = null;
-    this.dialog.addEventListener("touchstart", (e) => (touch = e.touches.length === 1 && !typing(e.target) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null), { passive: true });
+    this.dialog.addEventListener(
+      "touchstart",
+      (e) => {
+        const t = e.touches[0];
+        touch = e.touches.length === 1 && !typing(e.target) ? { x: t.clientX, y: t.clientY, at: e.timeStamp, pull: sheetBody.scrollTop <= 0 && !e.target.closest(".camera"), dy: 0 } : null;
+      },
+      { passive: true }
+    );
+    this.dialog.addEventListener(
+      "touchmove",
+      (e) => {
+        if (!touch?.pull) return;
+        const [dx, dy] = [e.touches[0].clientX - touch.x, e.touches[0].clientY - touch.y];
+        if (!touch.dragging) {
+          if (Math.abs(dx) > 10 || dy < -10) touch.pull = false; // waagerecht = blättern, nach oben = scrollen
+          if (!touch.pull || dy < 10) return;
+          touch.dragging = true;
+        }
+        e.preventDefault();
+        touch.dy = Math.max(0, dy);
+        this.dialog.style.transform = `translateY(${touch.dy}px)`;
+      },
+      { passive: false }
+    );
     this.dialog.addEventListener("touchend", (e) => {
       const t = e.changedTouches[0];
+      if (touch?.dragging) {
+        const flick = touch.dy > 40 && touch.dy / (e.timeStamp - touch.at) > 0.6; // schnell nach unten geschnippt
+        this.#drop(touch.dy > 120 || flick);
+        touch = null;
+        return;
+      }
       if (!touch || !t) return;
       const [dx, dy] = [t.clientX - touch.x, t.clientY - touch.y];
       touch = null;
@@ -165,11 +198,14 @@ export class App {
     }
     this.#viewRefresh = view.refresh || null;
     this.#viewPick = view.onPick || null;
+    this.#viewSelect = view.select || null;
     this.#viewDispose = view.dispose || null;
-    for (const a of document.querySelectorAll(".tabs a")) {
+    const tabs = [...document.querySelectorAll(".tabs a")];
+    for (const a of tabs) {
       if (a.dataset.tab === route.tab) a.setAttribute("aria-current", "page");
       else a.removeAttribute("aria-current");
     }
+    $(".tabs").style.setProperty("--tab", tabs.findIndex((a) => a.dataset.tab === route.tab)); // Kapsel gleitet hin (CSS)
     this.refresh();
   }
 
@@ -190,9 +226,14 @@ export class App {
 
   // Kartenansicht. Steht die Karte unter den sichtbaren Kacheln, blättern ‹ ›, Wischen und Pfeiltasten in genau
   // deren Reihenfolge – so geht es in jeder Ansicht (Filter und Sortierung inklusive), ohne sie anzufassen.
-  openCard(card) {
+  // from = angetippte Kachel: ihr Bild fliegt in die Kartenansicht.
+  openCard(card, from = null) {
     const cards = [...this.main.querySelectorAll(".tile")].filter((el) => !el.closest("[hidden], details:not([open])")).map(tileCard);
+    const tileArt = !this.dialog.open && !reducedMotion() && from?.querySelector(".tile-art:not(.no-img)");
+    if (tileArt) this.dialog.classList.add("hero"); // Sheet blendet ein statt hochzufahren, damit das Ziel stillsteht
     this.#showCard(card, cards, 0);
+    // gelandet: „landed“ statt „hero“ – sonst startete das Hochfahren des Sheets danach noch einmal
+    if (tileArt) this.#fly(tileArt, $("#sheetBody .sheet-art")).then(() => this.dialog.classList.replace("hero", "landed"));
   }
 
   #showCard(card, cards, dir) {
@@ -200,6 +241,7 @@ export class App {
     const to = (d) => (i >= 0 && cards[i + d] ? () => this.#showCard(cards[i + d], cards, d) : null);
     const nav = { prev: to(-1), next: to(1) };
     this.openSheet((body, ctx) => renderCardSheet(body, card, { ...ctx, ...nav }), nav);
+    this.#sheetCard = card.id;
     if (!dir) return;
     const body = $("#sheetBody");
     body.classList.remove("turn-next", "turn-prev");
@@ -211,25 +253,73 @@ export class App {
   openSheet(render, nav = null) {
     const body = $("#sheetBody");
     this.#sheetNav = nav;
+    this.#sheetCard = null;
     this.#sheetRefresh = render(body, { ...this.ctx, close: () => this.closeSheet() }) || null;
     this.dialog.classList.remove("closing");
-    if (!this.dialog.open) this.dialog.showModal();
+    if (!this.dialog.open) {
+      this.dialog.classList.remove("landed"); // vom letzten Flug
+      this.dialog.showModal();
+    }
     body.scrollTop = 0;
   }
 
   #turn(dir) {
+    if (!this.dialog.open || this.dialog.classList.contains("dropping")) return;
     (dir > 0 ? this.#sheetNav?.next : this.#sheetNav?.prev)?.();
   }
 
-  // Kartenansicht mit kurzer Animation schließen
+  // Kartenansicht mit kurzer Animation schließen – ist die Kachel der Karte zu sehen, fliegt die Karte dorthin zurück
   closeSheet() {
-    if (!this.dialog.open || this.dialog.classList.contains("closing")) return;
-    if (reducedMotion()) return this.dialog.close();
-    this.dialog.classList.add("closing");
+    const d = this.dialog;
+    if (!d.open || d.classList.contains("closing") || d.classList.contains("hero-out")) return;
+    if (reducedMotion()) return d.close();
+    const art = $("#sheetBody .sheet-art");
+    const tileArt = this.#sheetCard && [...this.main.querySelectorAll(".tile")].find((el) => tileCard(el)?.id === this.#sheetCard)?.querySelector(".tile-art:not(.no-img)");
+    const seen = (el) => el && el.getBoundingClientRect().bottom > 0 && el.getBoundingClientRect().top < innerHeight;
+    if (seen(art) && seen(tileArt)) {
+      d.classList.add("hero-out");
+      return this.#fly(tileArt, art, true).then(() => (d.classList.remove("hero-out"), d.close()));
+    }
+    d.classList.add("closing");
     setTimeout(() => {
       this.dialog.classList.remove("closing");
       this.dialog.close();
     }, SHEET_CLOSE_MS);
+  }
+
+  // Kachel ↔ großes Bild: ein Abbild der Karte (das schon geladene Kachelbild) fliegt im Dialog von der einen Stelle
+  // zur anderen, das echte große Bild ist solange unsichtbar. Nur transform (FLIP) → läuft auch am iPhone flüssig.
+  #fly(tileArt, art, back = false) {
+    let [from, to] = [tileArt, art].map((el) => el.getBoundingClientRect());
+    if (back) [from, to] = [to, from];
+    const img = tileArt.querySelector("img");
+    const flyer = h("div", { class: "flyer", "aria-hidden": "true" });
+    Object.assign(flyer.style, { left: `${to.left}px`, top: `${to.top}px`, width: `${to.width}px`, height: `${to.height}px`, backgroundImage: `url("${img?.currentSrc || img?.src}")` });
+    this.dialog.append(flyer);
+    art.style.visibility = "hidden";
+    const start = `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${from.width / to.width})`;
+    return flyer
+      .animate([{ transform: start }, { transform: "none" }], { duration: back ? 320 : 460, easing: "cubic-bezier(0.32, 0.72, 0, 1)" })
+      .finished.catch(() => {}) // abgebrochen (z. B. Dialog zu) – trotzdem aufräumen
+      .then(() => {
+        flyer.remove();
+        art.style.visibility = "";
+      });
+  }
+
+  // Sheet nach unten gezogen und losgelassen: weit genug → gleitet hinaus, sonst federt es zurück
+  #drop(close) {
+    const d = this.dialog;
+    d.style.transition = close ? "transform 0.22s ease-in" : "transform 0.45s var(--spring)";
+    d.style.transform = close ? "translateY(100%)" : "";
+    d.classList.toggle("dropping", close);
+    setTimeout(() => {
+      d.style.transition = "";
+      if (!close) return;
+      d.classList.remove("dropping");
+      d.close();
+      d.style.transform = "";
+    }, close ? 220 : 450);
   }
 
   // Nach einer Änderung: Ansicht neu aufbauen, wenn dadurch Karten dazukommen oder wegfallen.
@@ -256,21 +346,10 @@ export class App {
     if (tile.hasAttribute("data-pick")) return this.#viewPick?.(card, tile);
     const button = e.target.closest("[data-open], [data-toggle]");
     if (!button) return;
-    if (button.hasAttribute("data-open")) return this.openCard(card);
-    // Mehrere Exemplare? Dann nicht per Haken auf 0 setzen, sondern die Anzahl in der Kartenansicht ändern
-    if (this.services.collection.quantity(card.id) > 1) return this.openCard(card);
-    const undo = this.services.collection.toggle(card);
-    navigator.vibrate?.(12);
-    replay(tile, "just-changed");
-    this.afterChange(false);
-    // Abhaken wie überall mit „Rückgängig“ (holt Zustand, Kaufpreis und Ordner zurück); Hinzufügen bleibt still
-    if (undo) {
-      this.toast.show(`${card.name} ${cardNumber(card)} aus der Sammlung entfernt.`, {
-        type: "success",
-        force: true,
-        action: { label: "Rückgängig", run: () => (undo(), this.afterChange(false)) },
-      });
-    }
+    if (button.hasAttribute("data-open")) return this.openCard(card, tile);
+    // Pokéball: nicht gleich in die Sammlung – die Karte wird ausgewählt, unten entscheidet man, was damit passiert
+    haptic();
+    this.#viewSelect?.(card);
   }
 
   // Bild fehlt → nächste Quelle (TCGdex deutsch → englisch → Limitless → pokemontcg.io, domain/card.js), sonst Platzhalter.

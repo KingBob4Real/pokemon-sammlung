@@ -106,13 +106,13 @@ export function tradeCalculator(ctx) {
       return found.update;
     });
 
-  // Kamera wie beim Scannen in die Sammlung, nur landet die Karte auf dieser Seite („Nächste Karte scannen“ geht weiter)
+  // Kamera wie beim Scannen in die Sammlung (Einzeln, Serie, Seite), nur landen die Karten auf dieser Seite
   const scan = (side, label) =>
     startScan(ctx, {
       pick: {
         label,
-        add: (card) => {
-          tradeDraft.add(side, card);
+        add: (card, qty) => {
+          tradeDraft.add(side, card, qty);
           draw();
         },
       },
@@ -133,7 +133,7 @@ export function tradeCalculator(ctx) {
         ...tradeDraft.draft[side].map((it) => row(side, it)),
         h("div", { class: "buttons" }, [
           h("button", { type: "button", class: "btn btn-ghost", onclick: () => pick(side, title) }, "+ Karte"),
-          h("button", { type: "button", class: "btn btn-ghost", onclick: () => scan(side, label) }, "📷 Scannen"),
+          h("button", { type: "button", class: "btn btn-ghost", onclick: () => scan(side, label), html: `${ICONS.camera}Scannen` }),
         ]),
       ]),
       ...(empty

@@ -1,35 +1,40 @@
-/* ===== Farben (wie die Checkliste) ===== */
+/* ===== Farben: Pokéball-Rot, Pokédex-Schwarz ===== */
 :root {
   --red: #e8443a;
   --red-dark: #b8302a;
+  --red-strong: #d0362c; /* Rot hinter weißer Schrift (Kontrast ≥ 4.5:1) */
   --ink: #1f2128;
-  --bg: #f6f2ea;
-  --bg-dot: rgba(31, 33, 40, 0.06);
+  --bg: #f6f3ed;
+  --bg-dot: rgba(31, 33, 40, 0.055);
   --surface: #ffffff;
-  --surface-2: #f1ede4;
+  --surface-2: #f0ece4;
   --text: #1f2128;
-  --muted: #646872;
-  --line: rgba(31, 33, 40, 0.12);
-  --accent: #3a9a48;
-  --focus: #3b7fd6;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 6px 18px rgba(0, 0, 0, 0.08);
+  --muted: #61656f;
+  --line: rgba(31, 33, 40, 0.1);
+  --accent: #2f9142;
+  --focus: #2a75bb;
+  /* 1px-Kante + weicher Schatten: Flächen heben sich klar ab, ohne Rahmen im Layout */
+  --shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(31, 33, 40, 0.05), 0 6px 16px -4px rgba(31, 33, 40, 0.08);
   --radius: 18px;
-  --tabs-h: 62px;
+  --tabs-h: 64px;
   --font-head: "Fredoka", "Trebuchet MS", system-ui, sans-serif;
   --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Pokéball als Umriss (Leerzustand) */
+  --ball: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.6'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M2 12h6.6M15.4 12H22'/%3E%3Ccircle cx='12' cy='12' r='3.2'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14151a;
-    --bg-dot: rgba(255, 255, 255, 0.04);
-    --surface: #1e2028;
-    --surface-2: #272a34;
-    --text: #eceef3;
-    --muted: #a0a5b2;
-    --line: rgba(255, 255, 255, 0.1);
+    --bg: #111318;
+    --bg-dot: rgba(255, 255, 255, 0.035);
+    --surface: #1b1e26;
+    --surface-2: #252933;
+    --text: #eef0f5;
+    --muted: #a2a7b4;
+    --line: rgba(255, 255, 255, 0.08);
     --accent: #4cb85b;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+    --focus: #5a9ee0;
+    --shadow: 0 0 0 1px var(--line), 0 8px 24px -6px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -40,7 +45,7 @@ html:has(dialog[open]) { overflow: hidden; }
 
 body {
   margin: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
   font-family: var(--font-body);
   font-size: 16px;
   line-height: 1.45;
@@ -61,7 +66,7 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
 .small { font-size: 12px; }
 .pad { margin: 4px 2px 10px; font-weight: 700; font-size: 14px; }
 
-/* ===== Kopf (rot, unter der iPhone-Statusleiste) ===== */
+/* ===== Kopf: obere Hälfte eines Pokéballs – rot, schwarzes Band, Knopf in der Mitte ===== */
 .top {
   position: sticky;
   top: 0;
@@ -70,10 +75,27 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 12px;
   color: #fff;
-  background: linear-gradient(160deg, #f0574b 0%, var(--red) 50%, var(--red-dark) 100%);
-  border-bottom: 4px solid var(--ink);
+  /* großer Pokéball als Wasserzeichen rechts, angeschnitten */
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23fff' stroke-opacity='.13' stroke-width='7'%3E%3Ccircle cx='50' cy='50' r='44'/%3E%3Cpath d='M6 50h30M64 50h30'/%3E%3Ccircle cx='50' cy='50' r='13'/%3E%3C/svg%3E") right -34px center / 132px no-repeat,
+    linear-gradient(160deg, #f0574b 0%, var(--red) 50%, var(--red-dark) 100%);
+  border-bottom: 5px solid var(--ink);
+}
+.top::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -14.5px; /* Mitte auf dem Band */
+  width: 24px;
+  height: 24px;
+  margin-left: -12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid var(--ink);
+  box-shadow: inset 0 0 0 2px #d9dce2;
+  pointer-events: none;
 }
 [data-stage="dev"] .top { background: repeating-linear-gradient(135deg, #4a4f5c 0 14px, #3b3f4a 14px 28px); }
 [data-stage="dev"] .top h1::after { content: " · DEV"; }
@@ -99,6 +121,9 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
   text-decoration: none;
   background: rgba(0, 0, 0, 0.18);
 }
+/* Kopf-Knöpfe sind 36px hoch – Tippfläche unsichtbar auf 44px vergrößern */
+.sync-dot, .who { position: relative; }
+.sync-dot::before, .who::before { content: ""; position: absolute; inset: -4px; }
 .sync-dot i { width: 9px; height: 9px; border-radius: 50%; background: #c9ccd3; }
 .sync-dot[data-state="ok"] i { background: #6ee07c; }
 .sync-dot[data-state="pending"] i, .sync-dot[data-state="busy"] i { background: #ffd23f; }
@@ -108,38 +133,64 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
 main {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 14px 16px calc(var(--tabs-h) + 24px + env(safe-area-inset-bottom, 0px));
+  padding: 22px 16px calc(var(--tabs-top) + 24px); /* oben Platz für den Pokéball-Knopf */
 }
 
-/* ===== Leiste unten ===== */
+/* ===== Leiste unten: schwebende Glas-Kapsel (wie iOS 26), die Markierung gleitet mit Feder zum Reiter ===== */
+:root {
+  /* Abstand der Leiste zum unteren Rand: über dem Home-Balken, ohne Home-Balken 10px */
+  --tabs-bottom: max(10px, calc(env(safe-area-inset-bottom, 0px) - 8px));
+  --tabs-top: calc(var(--tabs-bottom) + var(--tabs-h)); /* Oberkante der Leiste, von unten gemessen */
+  --spring: linear(0, 0.14, 0.421, 0.699, 0.905, 1.026, 1.077, 1.082, 1.063, 1.039, 1.018, 1.003, 0.996, 0.993, 0.994, 0.995, 0.997, 0.999, 1, 1, 1);
+}
 .tabs {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: var(--tabs-bottom);
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  padding: 4px 8px env(safe-area-inset-bottom, 0px);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line);
+  width: min(100% - 24px, 520px);
+  height: var(--tabs-h);
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 12px 32px -12px rgba(31, 33, 40, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
+@media (prefers-color-scheme: dark) {
+  .tabs { border-color: rgba(255, 255, 255, 0.09); box-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.07); }
+}
+.tab-pill {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc((100% - 12px) / 5);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--red) 13%, transparent);
+  transform: translateX(calc(var(--tab, 0) * 100%));
+  transition: transform 0.55s var(--spring);
+}
+@media (prefers-color-scheme: dark) { .tab-pill { background: color-mix(in srgb, var(--red) 26%, transparent); } }
 .tabs a {
+  position: relative; /* über der Kapsel */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  min-height: var(--tabs-h);
-  font-size: 12px;
+  gap: 1px;
+  font-size: 11.5px;
   font-weight: 800;
   text-decoration: none;
   color: var(--muted);
 }
-.tabs a[aria-current="page"] { color: var(--red); }
-@media (prefers-color-scheme: dark) { .tabs a[aria-current="page"] { color: #ff7a70; } }
+.tabs a[aria-current="page"] { color: var(--red-strong); }
+@media (prefers-color-scheme: dark) { .tabs a[aria-current="page"] { color: #ff8a80; } }
 
 /* ===== Bedienelemente ===== */
 .btn {
@@ -159,10 +210,14 @@ main {
   color: #fff;
   background: var(--ink);
   cursor: pointer;
-  transition: transform 0.12s ease;
+  transition: transform 0.12s ease, filter 0.15s ease;
 }
 @media (prefers-color-scheme: dark) { .btn { background: #eceef3; color: var(--ink); } }
 .btn:active { transform: scale(0.97); }
+@media (hover: hover) { .btn:hover { filter: brightness(1.08); } }
+.btn svg { flex: none; width: 20px; height: 20px; }
+/* Hauptaktion einer Ansicht: Pokéball-Rot */
+.btn.btn-primary { color: #fff; background: var(--red-strong); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 6px 16px -6px color-mix(in srgb, var(--red) 80%, transparent); }
 .btn-ghost { background: transparent; color: var(--text); box-shadow: inset 0 0 0 2px var(--line); }
 @media (prefers-color-scheme: dark) { .btn-ghost { background: transparent; color: var(--text); } }
 .btn.danger { color: #d6336c; }
@@ -196,7 +251,7 @@ select.field { padding-right: 8px; }
 .toolbar .btn { flex: none; }
 .toolbar.tight { margin: 0; }
 .buttons { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 4px; }
-.buttons .btn { flex: 1 1 160px; }
+.buttons .btn { flex: 1 1 140px; } /* zwei Knöpfe passen am Handy nebeneinander */
 
 .segmented {
   flex: 1;
@@ -237,8 +292,8 @@ select.field { padding-right: 8px; }
   background: var(--surface);
   box-shadow: var(--shadow);
 }
-.stat span { font-size: 12px; font-weight: 800; color: var(--muted); }
-.stat b { font-family: var(--font-head); font-size: 24px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12.5px; font-weight: 800; color: var(--muted); }
+.stat b { margin: 2px 0 1px; font-family: var(--font-head); font-size: 27px; font-weight: 600; line-height: 1.05; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
 .stat small { font-size: 11.5px; color: var(--muted); line-height: 1.25; }
 .stat-button { border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform 0.12s ease; }
 .stat-button:active { transform: scale(0.98); }
@@ -250,6 +305,8 @@ select.field { padding-right: 8px; }
 
 .tile { position: relative; display: flex; flex-direction: column; min-width: 0; }
 
+/* Kartenbild wie eine echte Karte: Ecken ~4.5 % der Breite, liegt leicht auf.
+   --ring = Rahmen für „habe ich“ / „ausgewählt“, --lift = Schatten (beim Überfahren höher) */
 .tile-art {
   position: relative;
   display: block;
@@ -257,13 +314,33 @@ select.field { padding-right: 8px; }
   aspect-ratio: 63 / 88;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--surface-2);
   cursor: pointer;
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.25s ease;
+  box-shadow: var(--ring, 0 0 0 0 transparent), var(--lift, 0 1px 2px rgba(0, 0, 0, 0.14), 0 4px 10px -4px rgba(0, 0, 0, 0.22));
+  transition: transform 0.2s var(--ease-out), box-shadow 0.25s ease;
 }
 .tile-art:active { transform: scale(0.97); }
+/* Lade-Schimmer, bis das Kartenbild da ist */
+@keyframes shimmer { to { background-position: -200% 0; } }
+.tile-art:not(.no-img) { background: linear-gradient(100deg, var(--surface-2) 40%, color-mix(in srgb, var(--surface-2), var(--text) 7%) 50%, var(--surface-2) 60%) 0 0 / 200% 100%; animation: shimmer 1.3s linear infinite; }
+.tile-art:has(img.loaded) { animation: none; }
+/* Holo-Glanz: Regenbogenstreifen, der beim Überfahren über die Karte gleitet (nur mit Maus) */
+.tile-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 236, 140, 0.3) 42%, rgba(255, 130, 220, 0.24) 50%, rgba(110, 220, 255, 0.3) 58%, transparent 70%) 100% 0 / 300% 100% no-repeat;
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, background-position 0.7s var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .tile-art:hover { transform: translateY(-4px); --lift: 0 14px 26px -10px rgba(0, 0, 0, 0.45); }
+  .tile-art:hover::after { opacity: 1; background-position: 0 0; }
+}
 .tile-art img {
   display: block;
   width: 100%;
@@ -273,7 +350,7 @@ select.field { padding-right: 8px; }
 }
 /* Nur in Listen (Checklisten) sind fehlende Karten grau */
 .grid.checklist .tile:not(.is-owned) .tile-art img { filter: grayscale(0.75) brightness(0.98); opacity: 0.62; }
-.tile.is-owned .tile-art { box-shadow: 0 0 0 3px var(--accent), 0 0 18px 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+.tile.is-owned .tile-art { --ring: 0 0 0 3px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 40%, transparent); }
 
 .tile-ph {
   position: absolute;
@@ -305,17 +382,19 @@ select.field { padding-right: 8px; }
   background: transparent;
   cursor: pointer;
 }
+/* Pokéball statt Haken: leer = durchsichtiger Umriss, gefangen = rot-weiß (ICONS.ball) */
 .tile-check svg {
-  width: 34px;
-  height: 34px;
-  padding: 6px;
-  border-radius: 50%;
-  color: transparent;
-  background: rgba(0, 0, 0, 0.35);
-  border: 2.5px solid rgba(255, 255, 255, 0.85);
-  transition: background 0.2s ease, color 0.2s ease;
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
+  transform-origin: 50% 85%;
 }
-.tile.is-owned .tile-check svg { color: #fff; background: var(--accent); border-color: #fff; }
+.tile-check svg * { stroke: rgba(255, 255, 255, 0.92); stroke-width: 2; transition: fill 0.2s ease, stroke 0.2s ease; }
+.tile-check .ball-top, .tile-check .ball-bottom { fill: rgba(0, 0, 0, 0.32); stroke: none; }
+.tile-check .ball-btn { fill: rgba(0, 0, 0, 0.32); }
+.tile.is-owned .tile-check svg * { stroke: var(--ink); }
+.tile.is-owned .tile-check .ball-top { fill: #ee1515; }
+.tile.is-owned .tile-check .ball-bottom, .tile.is-owned .tile-check .ball-btn { fill: #fff; }
 
 .tile-info { display: flex; flex-direction: column; gap: 1px; padding-top: 8px; font-size: 12.5px; color: var(--muted); }
 .tile-info b { font-family: var(--font-head); font-size: 16px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; line-height: 1.2; }
@@ -341,9 +420,10 @@ select.field { padding-right: 8px; }
 .row small { color: var(--muted); font-weight: 700; }
 .count { flex: none; padding: 2px 10px; border-radius: 99px; font-size: 13px; font-weight: 800; background: var(--surface-2); font-variant-numeric: tabular-nums; }
 .progress { height: 8px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
-.progress i { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.4s ease; }
+.progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 75%, #fff), var(--accent)); transition: width 0.4s ease; }
 
 .section-title { font-size: 20px; font-weight: 600; margin: 4px 2px 10px; }
+* + .section-title { margin-top: 24px; }
 /* Ordner in der Sammlung: eine Zeile zum Wischen, bis an den Bildschirmrand */
 .folder-strip { display: flex; gap: 8px; margin: 0 -16px 16px; padding: 2px 16px 6px; overflow-x: auto; scroll-snap-type: x proximity; scroll-padding-inline: 16px; scrollbar-width: none; }
 .folder-strip::-webkit-scrollbar { display: none; }
@@ -366,6 +446,18 @@ select.field { padding-right: 8px; }
   padding: 28px 16px;
   text-align: center;
   color: var(--muted);
+}
+/* leerer Pokéball über dem Text */
+.empty::before {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  background: currentColor;
+  opacity: 0.4;
+  -webkit-mask: var(--ball) center / contain no-repeat;
+  mask: var(--ball) center / contain no-repeat;
 }
 .empty b { display: block; font-size: 16px; color: var(--text); }
 .empty p { margin: 6px auto 0; max-width: 420px; font-size: 14px; }
@@ -406,16 +498,20 @@ select.field { padding-right: 8px; }
   color: var(--text);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
 }
-.sheet::backdrop { background: rgba(10, 10, 14, 0.7); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
-@media (max-width: 559px) {
-  .sheet { max-width: none; max-height: none; height: 100%; border-radius: 0; }
-}
+.sheet::backdrop { background: rgba(10, 10, 14, 0.7); } /* ohne Unschärfe: die kostet am iPhone bei jeder Animation */
 .sheet-inner {
   position: relative;
   max-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: calc(14px + env(safe-area-inset-top, 0px)) 16px calc(24px + env(safe-area-inset-bottom, 0px));
+}
+/* Handy: Bottom Sheet – unten angedockt, oben rund mit Griff, die Ansicht dahinter bleibt oben sichtbar.
+   Ganz oben nach unten ziehen schließt (app.js). */
+@media (max-width: 559px) {
+  .sheet { max-width: none; max-height: none; height: calc(100% - env(safe-area-inset-top, 0px) - 12px); margin: auto 0 0; border-radius: 26px 26px 0 0; overflow: hidden; }
+  .sheet::before { content: ""; position: absolute; top: 8px; left: 50%; z-index: 3; width: 38px; height: 5px; margin-left: -19px; border-radius: 99px; background: color-mix(in srgb, var(--text) 25%, transparent); }
+  .sheet-inner { height: 100%; max-height: none; padding-top: 22px; }
 }
 .sheet-close {
   position: sticky;
@@ -442,9 +538,39 @@ select.field { padding-right: 8px; }
   margin: 0 auto 14px;
   border-radius: 16px;
   overflow: hidden;
-  background: var(--surface-2);
+  background: var(--surface-2) center / cover no-repeat; /* Bild: kleines Kachelbild als Platzhalter (cardSheet.js) */
+  box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.5);
+  transition: transform 0.6s var(--spring);
 }
 .sheet-art img { display: block; width: 100%; height: 100%; object-fit: contain; }
+/* Holo: Neigung und Lichtreflex folgen Maus bzw. Handy-Lage (components/holo.js setzt --tx/--ty von −1 bis 1) */
+.sheet-art.tilt { transform: perspective(900px) rotateY(calc(var(--tx) * 9deg)) rotateX(calc(var(--ty) * -9deg)); transition: transform 0.12s linear; }
+.sheet-art::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    radial-gradient(farthest-corner circle at calc(50% + var(--tx, 0) * 45%) calc(50% + var(--ty, 0) * 45%), rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.15) 25%, transparent 50%),
+    linear-gradient(115deg, transparent 15%, hsl(50 100% 60% / 0.35) 30%, hsl(330 100% 65% / 0.3) 42%, hsl(200 100% 60% / 0.35) 54%, hsl(140 90% 55% / 0.3) 66%, transparent 80%) calc(50% + var(--tx, 0) * 40%) calc(50% + var(--ty, 0) * 40%) / 220% 220%;
+  mix-blend-mode: hard-light; /* Regenbogenfolie + Lichtfleck, auf hellen wie dunklen Karten sichtbar */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+.sheet-art.tilt::before { opacity: 0.85; }
+/* Holo-Glanz: einmal quer über die Karte, sobald sie aufgeht (und bei jedem Blättern) */
+.sheet-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 36%, rgba(255, 255, 255, 0.28) 45%, rgba(255, 225, 120, 0.3) 50%, rgba(120, 205, 255, 0.28) 55%, transparent 64%);
+  mix-blend-mode: screen;
+  transform: translateX(-100%);
+  pointer-events: none;
+  animation: holo-sweep 1.1s 0.3s var(--ease-out) both;
+}
+@keyframes holo-sweep { to { transform: translateX(100%); } }
 /* ‹ › zum Blättern: am Handy auf dem Bildrand, im breiten Fenster daneben */
 .sheet-stage { position: relative; }
 .sheet-nav {
@@ -524,7 +650,7 @@ select.field { padding-right: 8px; }
 .mover-diff.up { color: var(--accent); }
 .mover-diff.down { color: #d6336c; }
 
-.btn.cm { width: 100%; margin-top: 8px; font-size: 14px; background: var(--red); color: #fff; }
+.btn.cm { width: 100%; margin-top: 8px; font-size: 14px; background: var(--red-strong); color: #fff; }
 
 .sheet-part { margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .stepper { display: flex; align-items: center; gap: 14px; margin: 6px 0 4px; }
@@ -609,7 +735,7 @@ h3.group-title { font-size: 17px; }
 .tile-pick::before { content: "+"; }
 .tile.is-picked .tile-pick { background: var(--focus); transform: scale(1.06); }
 .tile.is-picked .tile-pick::before { content: "✓"; font-size: 18px; }
-.tile.is-picked .tile-art { box-shadow: 0 0 0 3px var(--focus), 0 0 16px 1px color-mix(in srgb, var(--focus) 45%, transparent); }
+.tile.is-picked .tile-art { --ring: 0 0 0 3px var(--focus), 0 0 16px 1px color-mix(in srgb, var(--focus) 45%, transparent); }
 .grid.checklist .tile.is-picked .tile-art img { filter: none; opacity: 1; }
 
 /* Leiste mit Aktionen über der Navigation */
@@ -617,7 +743,7 @@ h3.group-title { font-size: 17px; }
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--tabs-h) + 14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabs-top) + 10px);
   z-index: 25;
   display: flex;
   flex-wrap: wrap;
@@ -638,7 +764,7 @@ h3.group-title { font-size: 17px; }
 /* „Hinzufügen …“ ist ein eingebautes Auswahlmenü, sieht aber aus wie die Knöpfe daneben */
 .action-bar select.btn { -webkit-appearance: none; appearance: none; flex: 1 1 120px; width: 120px; min-width: 0; text-align: center; text-align-last: center; }
 .action-bar .btn-ghost { color: #fff; background: transparent; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35); }
-main.has-action-bar { padding-bottom: calc(var(--tabs-h) + 200px + env(safe-area-inset-bottom, 0px)); } /* Leiste im Ordner: bis zu 3 Zeilen */
+main.has-action-bar { padding-bottom: calc(var(--tabs-top) + 200px); } /* Leiste im Ordner: bis zu 3 Zeilen */
 
 /* ===== Umsortieren (gedrückt halten und ziehen) ===== */
 /* iPhone: kein Kontextmenü, keine Textauswahl, kein Bild-Ziehen beim langen Drücken */
@@ -841,7 +967,7 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--tabs-h) + 14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabs-top) + 10px);
   z-index: 70;
   display: flex;
   align-items: center;
@@ -868,7 +994,7 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
 .toast-close { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%; color: #fff; background: transparent; cursor: pointer; }
 .toast-close svg { width: 18px; height: 18px; }
 /* über der Aktionsleiste, wenn eine da ist */
-body:has(main.has-action-bar) .toast { bottom: calc(var(--tabs-h) + 96px + env(safe-area-inset-bottom, 0px)); }
+body:has(main.has-action-bar) .toast { bottom: calc(var(--tabs-top) + 92px); }
 .buttons.center { justify-content: center; }
 .buttons.center .btn { flex: 0 1 auto; }
 .link-button { padding: 0; border: 0; background: none; font: inherit; font-weight: 800; color: var(--focus); text-decoration: underline; cursor: pointer; }
@@ -889,8 +1015,10 @@ body:has(main.has-action-bar) .toast { bottom: calc(var(--tabs-h) + 96px + env(s
 main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out); }
 /* Kartenbilder blenden ein, sobald sie geladen sind */
 .tile-art img.loaded, .sheet-art img.loaded { animation: img-in 0.3s ease; }
-/* Haken / Auswahl springen kurz */
+/* Auswahl springt kurz; gefangen = der Pokéball wackelt wie im Spiel */
+@keyframes catch { 0% { transform: scale(0.6); } 30% { transform: scale(1.15); } 50% { transform: rotate(-16deg); } 70% { transform: rotate(12deg); } 88% { transform: rotate(-5deg); } 100% { transform: none; } }
 .tile.just-changed .tile-check svg, .tile.just-changed .tile-pick { animation: pop 0.35s var(--ease-out); }
+.tile.is-owned.just-changed .tile-check svg { animation: catch 0.55s ease-out; }
 /* Kartenansicht fährt von unten herein und wieder hinaus */
 .sheet[open] { animation: sheet-in 0.28s var(--ease-out); }
 .sheet[open]::backdrop { animation: fade-in 0.25s ease; }
@@ -901,7 +1029,27 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 @keyframes turn-prev { from { opacity: 0; transform: translateX(-28px); } }
 .sheet-inner.turn-next { animation: turn-next 0.2s var(--ease-out); }
 .sheet-inner.turn-prev { animation: turn-prev 0.2s var(--ease-out); }
-.sheet.closing::backdrop { animation: fade-out 0.18s ease-in forwards; }
+.sheet.closing::backdrop, .sheet.dropping::backdrop { animation: fade-out 0.2s ease-in forwards; }
+/* Handy: Bottom Sheet fährt von ganz unten herein und hinaus */
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes sheet-down { to { transform: translateY(100%); } }
+@media (max-width: 559px) {
+  .sheet[open] { animation: sheet-up 0.4s cubic-bezier(0.2, 0.9, 0.25, 1); }
+  .sheet.closing { animation: sheet-down 0.18s ease-in forwards; }
+}
+/* Kachel ↔ Kartenansicht (app.js #fly): ein Abbild der Karte fliegt (nur transform), das Sheet steht still und
+   blendet nur Hintergrund und Inhalt ein bzw. aus – so hat der Flug ein festes Ziel und läuft flüssig */
+.flyer { position: fixed; z-index: 10; border-radius: 16px; background: center / cover no-repeat; box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.5); transform-origin: 0 0; pointer-events: none; will-change: transform; }
+@keyframes sheet-bg-in { from { background-color: transparent; box-shadow: none; } }
+@keyframes sheet-bg-out { to { background-color: transparent; box-shadow: none; } }
+@keyframes rise-in { from { opacity: 0; transform: translateY(16px); } }
+.sheet.hero[open] { animation: sheet-bg-in 0.3s ease both; }
+.sheet.hero::before, .sheet.hero .sheet-nav, .sheet.hero .sheet-inner > :not(.sheet-stage, .sheet-art) { animation: rise-in 0.4s 0.1s var(--ease-out) both; }
+.sheet.hero .sheet-art::after { animation-delay: 0.5s; } /* Glanz erst, wenn die Karte gelandet ist */
+.sheet.landed[open]:not(.closing, .hero-out) { animation: none; } /* nach dem Flug: Sheet-Animation nicht neu starten */
+.sheet.hero-out[open] { animation: sheet-bg-out 0.3s ease forwards; }
+.sheet.hero-out::before, .sheet.hero-out .sheet-nav, .sheet.hero-out .sheet-inner > :not(.sheet-stage, .sheet-art) { animation: fade-out 0.15s ease-in forwards; }
+.sheet.hero-out::backdrop { animation: fade-out 0.3s ease-in forwards; }
 /* Aktionsleiste unten, Platzhalter beim Ziehen, Sync läuft */
 .action-bar { animation: rise 0.25s var(--ease-out); }
 .reorder-placeholder { animation: fade-in 0.15s ease; }
@@ -911,9 +1059,8 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
 .row:active { transform: scale(0.985); }
 .tabs a { transition: color 0.2s ease, transform 0.12s ease; }
 .tabs a:active { transform: scale(0.92); }
-.tabs a svg { transition: transform 0.2s var(--ease-out); }
-.tabs a[aria-current="page"] svg { transform: translateY(-1px) scale(1.08); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+  .sheet-art.tilt { transform: none; }
 }

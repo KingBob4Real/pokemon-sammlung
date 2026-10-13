@@ -16,9 +16,9 @@ const FILTERS = [
 ];
 
 /**
- * Ansicht einer Liste: Fortschritt, filtern, sortieren, Karten abhaken (= in die Sammlung).
+ * Ansicht einer Liste: Fortschritt, filtern, sortieren, Karten auswählen (Pokéball oder „Auswählen“) und z. B. in die Sammlung.
  * „Karten hinzufügen“ öffnet Suche/Sets zum Antippen, „Auswählen“ markiert mehrere Karten
- * für „Hinzufügen …“ (Sammlung, andere Liste) oder „Entfernen“ (aus dieser Liste).
+ * für „Aktion …“ (Sammlung, andere Liste, aus der Sammlung nehmen) oder „Entfernen“ (aus dieser Liste).
  */
 export function render(main, ctx, listId) {
   const { lists, collection, prices, sorters, prefs } = ctx;
@@ -106,7 +106,7 @@ export function render(main, ctx, listId) {
   if (!items.length) main.append(emptyState("Noch keine Karten in dieser Liste.", "Tippe auf „+ Hinzufügen“ und dann einfach auf die Karten, die rein sollen."));
   else if (!shown.length) main.append(emptyState(filter === "missing" ? "Alles gesammelt! 🎉" : "Noch keine Karte aus dieser Liste in der Sammlung."));
 
-  // Auswahl: „Hinzufügen …“ (Sammlung, andere Liste) und „Entfernen“ aus dieser Liste
+  // Auswahl: „Aktion …“ (Sammlung, andere Liste) und „Entfernen“ aus dieser Liste
   const onPick = selecting
     ? selection.bar(main, {
         except: listId,
@@ -125,5 +125,5 @@ export function render(main, ctx, listId) {
       })
     : null;
   prices.request(items.map((i) => i.card.id));
-  return { refresh, onPick, dispose };
+  return { refresh, onPick, dispose, select: selection.start };
 }

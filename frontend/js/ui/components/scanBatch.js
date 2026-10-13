@@ -8,8 +8,8 @@ import { imageFor } from "./cardTile.js";
 
 /**
  * Serien- und Seiten-Scan: viele Karten sammeln, ohne jedes Mal ein neues Foto zu machen, am Ende alle auf einmal
- * in die Sammlung. Jede Karte (jedes Fach) ist ein Scan. Die Liste liegt in ctx.session, bis sie gespeichert ist –
- * Dialog zu oder „Weiter scannen“ verliert nichts. Die Fotos liegen nur im Speicher (Vorschau), nie auf dem Gerät.
+ * in die Sammlung – oder mit ctx.pick in den Tauschrechner (eigene Liste je Seite). Jede Karte (jedes Fach) ist ein Scan.
+ * Die Liste liegt in ctx.session, bis sie gespeichert ist – Dialog zu oder „Weiter scannen“ verliert nichts. Die Fotos liegen nur im Speicher (Vorschau), nie auf dem Gerät.
  * Eintrag: { status: wait | read | find | ok | pick | none | error | limit, preview, rec, cards, card, qty }
  */
 
@@ -30,7 +30,7 @@ let uid = 0;
 export const MAX_EMPTY_AUTO = 3; // so oft hintereinander automatisch nichts erkannt → Automatik pausiert
 
 export function batchOf(ctx) {
-  return (ctx.session.scanBatch ??= { items: [], queue: [], running: 0, note: "", emptyAutos: 0, changed: () => {} });
+  return (ctx.session[ctx.pick ? `scanBatch ${ctx.pick.label}` : "scanBatch"] ??= { items: [], queue: [], running: 0, note: "", emptyAutos: 0, changed: () => {} });
 }
 
 // Fotos dazu (Serie: eins, Seite: eins pro Fach) und lesen lassen
@@ -183,12 +183,13 @@ export function batchTray(ctx, { onDone }) {
 }
 
 /**
- * Prüfen und speichern: unsichere Karten klären, Zustand/Sprache/Ordner/Liste für alle, „12 Karten in die Sammlung“.
+ * Prüfen und speichern: unsichere Karten klären, Zustand/Sprache/Ordner/Liste für alle, „12 Karten in die Sammlung“
+ * (Tauschrechner: nur klären, „12 Karten zu „Ich bekomme““).
  * Gibt die Funktion zum Neuzeichnen zurück (Preise, Fortschritt).
  */
 export function batchReview(body, ctx, { listId, onScanMore }) {
   const b = batchOf(ctx);
-  const { collection, lists } = ctx;
+  const { collection, lists, pick } = ctx;
   const closeButton = h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: ctx.close, html: ICONS.close });
   const live = () => closeButton.isConnected && body.closest("dialog").open;
   const option = (value, label, selected = false) => h("option", { value, selected }, label);
@@ -213,7 +214,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
     rows.replaceChildren(...b.items.map((it) => itemRow(ctx, it, resolve)));
     const n = cardsIn(b);
     save.disabled = !n;
-    save.textContent = n ? `${plural(n, "Karte", "Karten")} in die Sammlung` : "In die Sammlung";
+    save.textContent = `${plural(n, "Karte", "Karten")} ${pick ? `zu „${pick.label}“` : "in die Sammlung"}`;
   };
 
   function showList() {
@@ -222,15 +223,17 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
       title,
       note,
       rows,
-      h("section", { class: "sheet-part" }, [
-        h("h3", {}, "Für alle Karten"),
-        h("label", { class: "label" }, ["Zustand", cond]),
-        h("label", { class: "label" }, ["Sprache", lang]),
-        h("label", { class: "label" }, ["Ordner", section]),
-        h("label", { class: "label" }, ["Liste", list]),
-        h("p", { class: "muted batch-hint" }, "Zustand und Sprache gelten für Karten, die neu in die Sammlung kommen – bei vorhandenen erhöht sich nur die Anzahl."),
-      ]),
-      h("div", { class: "scan-bar" }, [save, h("button", { type: "button", class: "btn btn-ghost", onclick: onScanMore }, "📷 Weiter scannen")])
+      pick
+        ? null
+        : h("section", { class: "sheet-part" }, [
+            h("h3", {}, "Für alle Karten"),
+            h("label", { class: "label" }, ["Zustand", cond]),
+            h("label", { class: "label" }, ["Sprache", lang]),
+            h("label", { class: "label" }, ["Ordner", section]),
+            h("label", { class: "label" }, ["Liste", list]),
+            h("p", { class: "muted batch-hint" }, "Zustand und Sprache gelten für Karten, die neu in die Sammlung kommen – bei vorhandenen erhöht sich nur die Anzahl."),
+          ]),
+      h("div", { class: "scan-bar" }, [save, h("button", { type: "button", class: "btn btn-ghost", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` })])
     );
     redraw = draw;
     draw();
@@ -239,14 +242,14 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
   // Unsichere/fehlende Karte klären: Foto-Ausschnitt, Treffer, Suche
   function resolve(item) {
     if (item.status === "error") return retry(ctx, item);
-    const pick = (card) => {
+    const choose = (card) => {
       item.card = card;
       item.status = "ok";
       ctx.prices.request([card.id]);
       showList();
     };
-    const choices = item.cards.length ? choiceGrid(ctx, item.cards, pick) : null;
-    const search = cardSearch(ctx, { query: item.rec?.name || item.rec?.number || "", onPick: pick, live });
+    const choices = item.cards.length ? choiceGrid(ctx, item.cards, choose) : null;
+    const search = cardSearch(ctx, { query: item.rec?.name || item.rec?.number || "", onPick: choose, live });
     show(
       closeButton,
       h("button", { type: "button", class: "back", onclick: showList }, "‹ Zurück zur Liste"),
@@ -266,16 +269,19 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
     if (!ready.length) return;
     const cards = ready.map((it) => it.card);
     const count = cardsIn(b);
-    ctx.store.batch(() => {
-      for (const it of ready) {
-        const owned = collection.quantity(it.card.id);
-        collection.setQuantity(it.card, owned + it.qty);
-        if (!owned) collection.update(it.card.id, { cond: cond.value, lang: lang.value || LANGUAGE_NAMES[it.rec?.language] || "Deutsch" });
-      }
-      if (section.value) collection.setSection(cards, section.value);
-      if (list.value) lists.addCards(list.value, cards);
-    });
-    ctx.afterChange(Boolean(list.value));
+    if (pick) for (const it of ready) pick.add(it.card, it.qty);
+    else {
+      ctx.store.batch(() => {
+        for (const it of ready) {
+          const owned = collection.quantity(it.card.id);
+          collection.setQuantity(it.card, owned + it.qty);
+          if (!owned) collection.update(it.card.id, { cond: cond.value, lang: lang.value || LANGUAGE_NAMES[it.rec?.language] || "Deutsch" });
+        }
+        if (section.value) collection.setSection(cards, section.value);
+        if (list.value) lists.addCards(list.value, cards);
+      });
+      ctx.afterChange(Boolean(list.value));
+    }
     for (const it of ready) drop(b, it); // Ungeklärte bleiben für später in der Liste
     b.note = "";
     navigator.vibrate?.(15);
@@ -284,10 +290,10 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
       closeButton,
       h("div", { class: "scan-done" }, [
         h("span", { class: "scan-done-icon", html: ICONS.check }),
-        h("h2", {}, `${plural(count, "Karte", "Karten")} in der Sammlung`),
+        h("h2", {}, `${plural(count, "Karte", "Karten")} ${pick ? `bei „${pick.label}“` : "in der Sammlung"}`),
         b.items.length ? h("p", { class: "muted" }, `${plural(b.items.length, "ungeklärte Karte bleibt", "ungeklärte Karten bleiben")} in der Scan-Liste.`) : null,
       ]),
-      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: onScanMore }, "📷 Weiter scannen"), h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig")])
+      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` }), h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig")])
     );
   }
 
