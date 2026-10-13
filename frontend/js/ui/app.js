@@ -349,8 +349,7 @@ export class App {
     if (button.hasAttribute("data-open")) return this.openCard(card, tile);
     // Pokéball: nicht gleich in die Sammlung – die Karte wird ausgewählt, unten entscheidet man, was damit passiert
     haptic();
-    if (this.#viewSelect) this.#viewSelect(card);
-    else this.openCard(card, tile);
+    this.#viewSelect?.(card);
   }
 
   // Bild fehlt → nächste Quelle (TCGdex deutsch → englisch → Limitless → pokemontcg.io, domain/card.js), sonst Platzhalter.
