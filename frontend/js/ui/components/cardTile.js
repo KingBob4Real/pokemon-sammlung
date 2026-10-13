@@ -48,7 +48,7 @@ export function cardImg(card, size, src, attrs) {
 
 /**
  * Kartenkachel in drei Arten:
- *   "default" – Bild antippen = Kartenansicht, Haken = in Sammlung ja/nein
+ *   "default" – Bild antippen = Kartenansicht, Pokéball (rot = in der Sammlung) antippen = Auswahl starten
  *   "view"    – nur Kartenansicht (z. B. in der Sammlung)
  *   "pick"    – ganze Kachel antippen = auswählen (Listen bearbeiten); Zustand über setPicked()
  */
@@ -91,8 +91,7 @@ export function updateTile(el, { qty, value }) {
   el.classList.toggle("is-owned", qty > 0);
   const check = el.querySelector(".tile-check");
   if (check) {
-    check.setAttribute("aria-pressed", String(qty > 0));
-    check.setAttribute("aria-label", `${card.name}: ${qty > 0 ? "in der Sammlung, antippen zum Entfernen" : "fehlt, antippen zum Hinzufügen"}`);
+    check.setAttribute("aria-label", `${card.name}: ${qty > 0 ? "in der Sammlung" : "fehlt"} – antippen zum Auswählen`);
   }
   el.querySelector(".tile-value").textContent = (qty > 1 ? `${qty}× ` : "") + (value != null ? fmtEur(value) : "");
 }

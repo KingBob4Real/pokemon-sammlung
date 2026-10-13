@@ -5,8 +5,8 @@ import { ask } from "./ask.js";
 import { setPicked, tileCard } from "./cardTile.js";
 
 /**
- * Mehrfach-Auswahl in Sammlung, Liste und Suche: „Auswählen“ → Karten antippen → Leiste unten mit
- * Anzahl, „Alle“, einem Menü „Hinzufügen …“ (Sammlung, jede Liste, neue Liste – plus eigene Gruppen der Ansicht,
+ * Mehrfach-Auswahl in Sammlung, Liste, Suche und Set: „Auswählen“ (oder Pokéball einer Kachel) → Karten antippen → Leiste unten mit
+ * Anzahl, „Alle“, einem Menü „Aktion …“ (Sammlung, jede Liste, neue Liste, aus der Sammlung nehmen – plus eigene Gruppen der Ansicht,
  * z. B. Ordner) und eigenen Knöpfen (z. B. „Entfernen“).
  * Gemerkt in ctx.session.selection = { where, cards: Map(id → Karte) } – in der Suche auch über neue Suchen hinweg.
  *   where – welche Ansicht gerade auswählt („sammlung“, „suche“, „liste:<id>“); woanders hin = Auswahl vorbei
@@ -26,6 +26,13 @@ export function useSelection(ctx, where) {
   return {
     active,
     toggle: () => h("button", { type: "button", class: "btn btn-ghost", onclick: () => set(!active) }, active ? "Auswahl beenden" : "Auswählen"),
+    // Pokéball auf einer Kachel: Auswahl hier starten, diese Karte ist schon markiert
+    start(card) {
+      sel.where = where;
+      sel.cards.clear();
+      sel.cards.set(card.id, card);
+      ctx.render();
+    },
     // Kachel passend zur Auswahl markieren
     mark(el, card) {
       if (active) setPicked(el, sel.cards.has(card.id));
@@ -35,7 +42,7 @@ export function useSelection(ctx, where) {
     //   except  – Ziel, das das Menü nicht anbietet (hier ist man ja)
     //   menu    – Beschriftung des Menüs; groups: weitere Gruppen [{ label, items: [[Text, (Karten) → Meldung | null]] }]
     //   buttons – (chosen, stop) → weitere Knöpfe
-    bar: (main, { except = null, menu = "Hinzufügen …", groups = [], buttons = () => [] } = {}) =>
+    bar: (main, { except = null, menu = "Aktion …", groups = [], buttons = () => [] } = {}) =>
       actionBar(ctx, main, sel, { except, menu, groups, buttons, stop: () => set(false) }),
   };
 }
@@ -85,10 +92,17 @@ function actionMenu(ctx, chosen, { except, menu, groups }, stop) {
     lists.addCards(listId, cards);
     return { message: `in „${lists.get(listId).name}“`, href: links.list(listId) };
   };
+  // nur die vorhandenen Karten raus; „Rückgängig“ holt Anzahl, Zustand, Kaufpreis und Ordner zurück
+  const takeOut = (cards) => {
+    const owned = cards.filter((c) => collection.has(c.id));
+    return { count: owned.length, message: "aus der Sammlung genommen", undo: owned.length ? collection.removeAll(owned) : null };
+  };
+  const outside = except !== COLLECTION_TARGET; // in der Sammlung selbst gibt es „Entfernen“ als eigenen Knopf
   const targets = [
-    except === COLLECTION_TARGET ? null : ["Zur Sammlung", (cards) => (collection.markOwned(cards), { message: "in der Sammlung", href: "#sammlung" })],
+    outside ? ["Zur Sammlung", (cards) => (collection.markOwned(cards), { message: "in der Sammlung", href: "#sammlung" })] : null,
     ...lists.all().filter((l) => l.id !== except).map((l) => [`Zu „${l.name}“`, (cards) => toList(l.id, cards)]),
     ["Neue Liste …", async (cards) => toList(lists.create((await ask("Name der neuen Liste", { placeholder: "z. B. Wunschliste", ok: "Anlegen" })) || ""), cards)],
+    outside ? ["Aus der Sammlung nehmen", takeOut] : null,
   ].filter(Boolean);
 
   const runs = new Map();
@@ -108,9 +122,18 @@ function actionMenu(ctx, chosen, { except, menu, groups }, stop) {
     const result = await run(cards); // „Neue Liste …“/„+ Neuer Ordner …“ fragen erst nach dem Namen
     if (!result) return;
     stop();
-    ctx.notify(`${plural(cards.length, "Karte", "Karten")} ${result.message}.`, {
+    ctx.notify(`${plural(result.count ?? cards.length, "Karte", "Karten")} ${result.message}.`, {
       type: "success",
-      action: result.href ? { label: "Ansehen", run: () => (location.hash = result.href) } : null,
+      action: result.undo
+        ? { label: "Rückgängig", run: () => (result.undo(), ctx.afterChange(false)) }
+        : result.href
+          ? { label: "Ansehen", run: () => (location.hash = result.href) }
+          : null,
+    });
+    // betroffene Kacheln kurz antippen lassen – frisch gefangene Pokébälle wackeln (nach dem Neuaufbau der Ansicht)
+    const ids = new Set(cards.map((c) => c.id));
+    requestAnimationFrame(() => {
+      for (const el of document.querySelectorAll("#view .tile")) if (ids.has(tileCard(el)?.id)) ctx.bounce(el);
     });
   });
   return select;

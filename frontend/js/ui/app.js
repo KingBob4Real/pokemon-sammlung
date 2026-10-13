@@ -2,7 +2,7 @@ import { IMAGE_PROXY } from "../config.js";
 import { $, h, haptic } from "../core/dom.js";
 import { describeError } from "../core/errors.js";
 import { deliverFile } from "../core/files.js";
-import { cardNumber, nextImage } from "../domain/card.js";
+import { nextImage } from "../domain/card.js";
 import { renderCardSheet } from "./components/cardSheet.js";
 import { avatarColor, chosenThisSession, initial, showProfiles } from "./components/profilePicker.js";
 import { rememberImage, tileCard, updateTile } from "./components/cardTile.js";
@@ -22,7 +22,7 @@ import * as tradeView from "./views/tradeView.js";
 // Jede Ansicht: render(main, ctx, arg) → { refresh?, onPick?, dispose? }. Neue Ansicht = hier eintragen.
 const VIEWS = { sammlung: collectionView, ordner: collectionView, tauschen: tradeView, listen: listsView, liste: listView, hinzufuegen: addView, suche: searchView, set: setView, mehr: moreView };
 const SYNC_LABELS = { off: "Sync aus", offline: "Offline", busy: "Sync …", error: "Sync-Problem", pending: "Nicht synchron", ok: "Synchron" };
-const RERENDER_DELAY_MS = 700; // kurz warten, damit man den Haken noch sieht
+const RERENDER_DELAY_MS = 700; // kurz warten, damit man die Änderung noch sieht
 const SHEET_CLOSE_MS = 180; // so lange fährt die Kartenansicht hinaus
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -40,6 +40,7 @@ function replay(el, className) {
 export class App {
   #viewRefresh = null;
   #viewPick = null; // Ansichten mit Auswahl-Kacheln bekommen das Antippen hierüber
+  #viewSelect = null; // Pokéball auf einer Kachel → Auswahl in der Ansicht starten (Suche, Set, Liste)
   #viewDispose = null; // räumt beim Ansichtswechsel auf (z. B. Drag & Drop)
   #sheetRefresh = null;
   #sheetNav = null; // { prev, next } der offenen Kartenansicht
@@ -197,6 +198,7 @@ export class App {
     }
     this.#viewRefresh = view.refresh || null;
     this.#viewPick = view.onPick || null;
+    this.#viewSelect = view.select || null;
     this.#viewDispose = view.dispose || null;
     const tabs = [...document.querySelectorAll(".tabs a")];
     for (const a of tabs) {
@@ -345,20 +347,10 @@ export class App {
     const button = e.target.closest("[data-open], [data-toggle]");
     if (!button) return;
     if (button.hasAttribute("data-open")) return this.openCard(card, tile);
-    // Mehrere Exemplare? Dann nicht per Haken auf 0 setzen, sondern die Anzahl in der Kartenansicht ändern
-    if (this.services.collection.quantity(card.id) > 1) return this.openCard(card, tile);
-    const undo = this.services.collection.toggle(card);
+    // Pokéball: nicht gleich in die Sammlung – die Karte wird ausgewählt, unten entscheidet man, was damit passiert
     haptic();
-    replay(tile, "just-changed");
-    this.afterChange(false);
-    // Abhaken wie überall mit „Rückgängig“ (holt Zustand, Kaufpreis und Ordner zurück); Hinzufügen bleibt still
-    if (undo) {
-      this.toast.show(`${card.name} ${cardNumber(card)} aus der Sammlung entfernt.`, {
-        type: "success",
-        force: true,
-        action: { label: "Rückgängig", run: () => (undo(), this.afterChange(false)) },
-      });
-    }
+    if (this.#viewSelect) this.#viewSelect(card);
+    else this.openCard(card, tile);
   }
 
   // Bild fehlt → nächste Quelle (TCGdex deutsch → englisch → Limitless → pokemontcg.io, domain/card.js), sonst Platzhalter.

@@ -16,7 +16,7 @@ export function h(tag, attrs = {}, children = []) {
   return el;
 }
 
-// Kurzes Ticken beim Abhaken. iPhone kennt navigator.vibrate nicht – dort tickt ein angetippter Schalter (iOS 18+).
+// Kurzes Ticken beim Antippen des Pokéballs. iPhone kennt navigator.vibrate nicht – dort tickt ein angetippter Schalter (iOS 18+).
 // ponytail: Trick über <input switch>, ersetzen, sobald Safari eine Vibrations-Schnittstelle hat
 export function haptic() {
   if (navigator.vibrate) return navigator.vibrate(12);
