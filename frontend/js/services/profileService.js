@@ -3,9 +3,9 @@ import { isObj } from "../core/format.js";
 
 /**
  * „Wer sammelt?“ – wie die Profilauswahl bei Netflix. Die Personen kommen vom Backend, sind also auf jedem
- * Gerät da. Antippen meldet dieses Gerät an (eigene Sitzung, kein Sync-Schlüssel nötig). Hat eine Person ein
- * Passwort, wird es bei jedem Wechsel zu ihr abgefragt (wie die PIN bei Netflix).
- * ponytail: ohne Passwort kann jeder mit der App-Adresse eine Person antippen – gewollt, „nur für uns 3“.
+ * Gerät da. Antippen + Passwort meldet dieses Gerät an (eigene Sitzung, kein Sync-Schlüssel nötig); das Passwort
+ * wird bei jedem Wechsel zu der Person abgefragt (wie die PIN bei Netflix). Ohne Passwort lehnt das Backend ab – die App
+ * ist öffentlich. Wer schon angemeldet ist, wechselt ohne Passwort weiter (bis er eins festlegt).
  * Jede Person hat auf dem Gerät eigene Daten (eigener Speicher-Platz); wer zuerst da war, behält die bisherigen ("").
  * Gespeichert: { active: Person-ID, slots: { Person-ID: Speicher-Platz }, people: [{ id, name, locked }] }
  * Wechseln = Person merken und die App neu laden, damit alles mit deren Daten startet.
@@ -67,30 +67,29 @@ export class ProfileService {
     if (changed) this.#save();
   }
 
-  // Zu einer Person wechseln → { firstLogin } (geklappt, App neu laden) | { needPassword } | { error }
+  // Zu einer Person wechseln → {} (geklappt, App neu laden) | { needPassword } | { error }
   async choose(id, password = "") {
     const person = this.people.find((p) => p.id === id);
     if (!person) return { error: "Diese Person gibt es nicht mehr." };
     const slot = this.#slotFor(id);
     const saved = this.storage.get(this.keysOf(slot).sync, null);
     // Schon angemeldet und ohne Passwort → einfach wechseln (geht auch offline)
-    let firstLogin = false;
     if (person.locked || !saved?.key) {
       if (person.locked && !password) return { needPassword: true };
       try {
-        const { token, user, firstLogin: first } = await this.api.login(this.url, id, password);
-        firstLogin = Boolean(first);
+        const { token, user } = await this.api.login(this.url, id, password);
         this.storage.set(this.keysOf(slot).sync, { at: 0, ...saved, url: this.url, key: token, user: user.name, userId: user.id, error: "" });
       } catch (e) {
         const { kind, message } = describeError(e);
         if (kind === "offline") return { error: "Zum Anmelden braucht es Internet." };
-        return { error: e.status === 401 || e.status === 429 ? e.body?.error || "Falsches Passwort." : message };
+        // 401/403/429 bringen eine verständliche Meldung vom Backend mit („Falsches Passwort.“, „… hat noch kein Passwort …“)
+        return { error: (e.status >= 400 && e.status < 500 && e.body?.error) || message };
       }
     }
     this.data.slots[id] = slot;
     this.data.active = id;
     this.#save();
-    return { firstLogin };
+    return {};
   }
 
   // Anmeldung der aktiven Person auf diesem Gerät: { url, key }

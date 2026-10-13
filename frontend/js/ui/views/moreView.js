@@ -156,8 +156,6 @@ function accountPanel(ctx, status) {
   const fresh = h("input", { type: "password", class: "field", placeholder: "Neues Passwort (mind. 4 Zeichen)", "aria-label": "Neues Passwort", autocomplete: "new-password" });
   const setButton = h("button", { type: "button", class: "btn" }, me.locked ? "Passwort ändern" : "Passwort festlegen");
   setButton.addEventListener("click", () => run(setButton, () => profiles.setPassword(fresh.value, old.value), "Passwort gespeichert. Andere Geräte von dir sind jetzt abgemeldet."));
-  const removeButton = h("button", { type: "button", class: "btn btn-ghost danger" }, "Passwort entfernen");
-  removeButton.addEventListener("click", () => run(removeButton, () => profiles.setPassword("", old.value), "Passwort entfernt."));
 
   return panel("Wer sammelt?", [
     h("p", {}, `Angemeldet als ${me.name}.`),
@@ -165,10 +163,10 @@ function accountPanel(ctx, status) {
     h("div", { class: "buttons" }, [switchButton]),
     h("label", { class: "label" }, ["Dein Name", h("div", { class: "toolbar tight" }, [name, renameButton])]),
     h("h3", { class: "label" }, "Passwort"),
-    h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Ändern oder entfernen geht nur mit dem bisherigen." : "Ohne Passwort kann jeder mit der App dein Profil öffnen. Mit Passwort wird es bei jedem Wechsel zu dir abgefragt."),
+    h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Ändern geht nur mit dem bisherigen." : "Du hast noch kein Passwort – auf einem neuen Gerät kommst du so nur mit dem Sync-Schlüssel rein. Leg eins fest, es wird bei jedem Wechsel zu dir abgefragt."),
     me.locked ? h("label", { class: "label" }, ["Bisheriges Passwort", old]) : null,
     h("label", { class: "label" }, ["Neues Passwort", fresh]),
     note,
-    h("div", { class: "buttons" }, [setButton, me.locked ? removeButton : null]),
+    h("div", { class: "buttons" }, [setButton]),
   ]);
 }

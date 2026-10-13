@@ -31,12 +31,9 @@ export class UserRepository {
     return results.map((r) => ({ id: r.id, name: r.name, locked: Boolean(r.locked) }));
   }
 
-  // → { id, name, password_hash, failed_logins, failed_at, sessions } (sessions = Anzahl angemeldeter Geräte)
+  // → { id, name, password_hash }
   find(id) {
-    return this.db
-      .prepare("SELECT id, name, password_hash, failed_logins, failed_at, (SELECT COUNT(*) FROM sessions WHERE user_id = ?1) AS sessions FROM users WHERE id = ?1")
-      .bind(id)
-      .first();
+    return this.db.prepare("SELECT id, name, password_hash FROM users WHERE id = ?1").bind(id).first();
   }
 
   rename(id, name) {
@@ -51,8 +48,14 @@ export class UserRepository {
     ]);
   }
 
-  loginFailed(id, now) {
-    return this.db.prepare("UPDATE users SET failed_logins = failed_logins + 1, failed_at = ?2 WHERE id = ?1").bind(id, now).run();
+  // Anmeldeversuch zählen, bevor das Passwort geprüft wird → false = gesperrt (maxFails Versuche, letzter vor < lockMs).
+  // Prüfen und Hochzählen in einer Anweisung: gleichzeitige Versuche sehen so immer den neuesten Zähler.
+  async loginAttempt(id, now, maxFails, lockMs) {
+    const row = await this.db
+      .prepare("UPDATE users SET failed_logins = failed_logins + 1, failed_at = ?2 WHERE id = ?1 AND (failed_logins < ?3 OR ?2 - failed_at >= ?4) RETURNING id")
+      .bind(id, now, maxFails, lockMs)
+      .first();
+    return row != null;
   }
 
   // Anmeldung geklappt: Fehlversuche vergessen, Sitzung für dieses Gerät anlegen

@@ -27,8 +27,8 @@ export async function verifyPassword(password, stored) {
 }
 
 /**
- * „Wer sammelt?“: Personen auflisten, per Antippen anmelden (mit Passwort, falls gesetzt),
- * Passwort und Namen ändern. Eine Anmeldung = eine Sitzung für ein Gerät; sie gilt wie der Sync-Schlüssel.
+ * „Wer sammelt?“: Personen auflisten, mit Passwort anmelden, Passwort und Namen ändern.
+ * Eine Anmeldung = eine Sitzung für ein Gerät; sie gilt wie der Sync-Schlüssel.
  */
 export class AuthService {
   constructor(users) {
@@ -39,29 +39,34 @@ export class AuthService {
     return this.users.all();
   }
 
-  // Passwort der Person prüfen (mit Sperre nach zu vielen Fehlversuchen) → null wenn ok, sonst { status, error }
+  // Passwort der Person prüfen (mit Sperre nach zu vielen Fehlversuchen) → null wenn ok, sonst { status, error }.
+  // Jeder Versuch zählt schon vor dem Prüfen, und zwar atomar in der Datenbank – sonst kämen viele gleichzeitige
+  // Versuche alle an der Sperre vorbei. Ein richtiges Passwort setzt den Zähler wieder auf 0 (startSession, setPassword).
   async #check(user, password, now) {
     if (!user.password_hash) return null;
-    if (user.failed_logins >= MAX_FAILS && now - user.failed_at < LOCK_MS) return { status: 429, error: "Zu viele falsche Versuche – in 15 Minuten nochmal." };
     if (!password) return { status: 401, error: "Passwort fehlt." };
-    if (await verifyPassword(password, user.password_hash)) return null;
-    await this.users.loginFailed(user.id, now);
-    return { status: 401, error: "Falsches Passwort." };
+    if (!(await this.users.loginAttempt(user.id, now, MAX_FAILS, LOCK_MS))) return { status: 429, error: "Zu viele falsche Versuche – in 15 Minuten nochmal." };
+    return (await verifyPassword(password, user.password_hash)) ? null : { status: 401, error: "Falsches Passwort." };
   }
 
-  // → { token, user: { id, name }, firstLogin } | { status, error }
-  // firstLogin: noch nie per Antippen angemeldet und ohne Passwort → die App bietet an, eins festzulegen
+  // → { token, user: { id, name } } | { status, error }
+  // Ohne Passwort kein Anmelden: die App ist öffentlich, sonst könnte jeder die Person antippen und übernehmen.
+  // Dann bleibt der Sync-Schlüssel (Notfall-Zugang) – damit angemeldet, legt man ein Passwort fest.
   async login(id, password, now = Date.now()) {
     const user = await this.users.find(id);
     if (!user) return { status: 404, error: "Diese Person gibt es nicht." };
+    if (!user.password_hash) {
+      return { status: 403, error: `${user.name} hat noch kein Passwort. Auf einem Gerät, auf dem ${user.name} angemeldet ist, unter „Mehr“ eins festlegen – oder hier unter „Mehr“ → „Erweitert“ mit dem Sync-Schlüssel anmelden.` };
+    }
     const denied = await this.#check(user, password, now);
     if (denied) return denied;
     const token = newSession();
     await this.users.startSession(id, await hashKey(token), now);
-    return { token, user: { id: user.id, name: user.name }, firstLogin: !user.password_hash && !user.sessions };
+    return { token, user: { id: user.id, name: user.name } };
   }
 
   // Passwort festlegen, ändern oder entfernen (leer). Gibt es schon eins, nur mit dem alten.
+  // Entfernen bietet die App nicht mehr an (danach ginge es auf neuen Geräten nur mit dem Schlüssel); der Smoke-Test räumt so auf.
   // Andere Geräte dieser Person werden abgemeldet, dieses bleibt angemeldet. → null | { status, error }
   async setPassword(user, password, oldPassword, now = Date.now()) {
     const denied = await this.#check(await this.users.find(user.id), oldPassword, now);

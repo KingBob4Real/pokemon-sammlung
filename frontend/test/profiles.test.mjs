@@ -8,15 +8,16 @@ const storage = { get: (k, f) => (mem.has(k) ? structuredClone(mem.get(k)) : f),
 const keysOf = (slot) => ({ sync: `ps.${slot ? `${slot}.` : ""}sync` });
 const fail = (status, error) => Promise.reject(Object.assign(new Error(error), { status, body: { error } }));
 
-// Kleines Backend: Lukas ohne Passwort, Lucas mit Passwort „geheim“
+// Kleines Backend: Lukas ohne Passwort (Anmelden geht dann nicht), Lucas mit Passwort „geheim“
 const people = [{ id: "owner", name: "Lukas", locked: false }, { id: "lucas", name: "Lucas", locked: true }];
 let logins = 0;
 const api = {
   people: async () => ({ people: structuredClone(people) }),
   login: async (url, id, password) => {
     const p = people.find((x) => x.id === id);
-    if (p.locked && password !== "geheim") return fail(401, "Falsches Passwort.");
-    return { token: `token-${id}-${++logins}`, user: { id, name: p.name }, firstLogin: !p.locked && logins === 1 };
+    if (!p.locked) return fail(403, `${p.name} hat noch kein Passwort.`);
+    if (password !== "geheim") return fail(401, "Falsches Passwort.");
+    return { token: `token-${id}-${++logins}`, user: { id, name: p.name } };
   },
   setPassword: async ({ key }, password, oldPassword) => (people[0].locked && oldPassword !== "alt1" ? fail(401, "Bitte das bisherige Passwort angeben.") : ((people[0].locked = Boolean(password)), { ok: true })),
   rename: async (_, name) => ((people[0].name = name), { ok: true, name }),
@@ -36,21 +37,24 @@ await fresh().refreshIfOlder(24 * 3600e3, Date.now() + 25 * 3600e3);
 await Promise.all([profiles.refresh(), profiles.refresh()]);
 assert.equal(peopleCalls, 2, "frisch: keine Anfrage; nach 25 h: eine; gleichzeitig: eine");
 api.people = askPeople;
-assert.deepEqual(await profiles.choose("owner"), { firstLogin: true }, "Antippen genügt, erster Login");
-assert.equal(profiles.slot, "", "erste Person nutzt die bisherigen Speicher-Namen");
-assert.equal(storage.get("ps.sync").key, "token-owner-1", "Sitzung statt Sync-Schlüssel gespeichert");
+// Ohne Passwort kein Anmelden per Antippen (die App ist öffentlich) – die Meldung des Backends kommt an
+assert.deepEqual(await profiles.choose("owner"), { error: "Lukas hat noch kein Passwort." }, "ohne Passwort kein Antippen");
+assert.equal(storage.get("ps.sync", null), null, "nichts gespeichert");
 
-// Mit Passwort: ohne → nachfragen, falsch → Meldung, richtig → eigener Platz
+// Mit Passwort: ohne → nachfragen, falsch → Meldung, richtig → angemeldet; die erste Person bekommt den bisherigen Platz
 assert.deepEqual(await profiles.choose("lucas"), { needPassword: true });
 assert.deepEqual(await profiles.choose("lucas", "falsch"), { error: "Falsches Passwort." });
-assert.deepEqual(await profiles.choose("lucas", "geheim"), { firstLogin: false });
-assert.equal(fresh().slot, "lucas", "eigener Platz, nach Neustart noch aktiv");
+assert.deepEqual(await profiles.choose("lucas", "geheim"), {});
+assert.equal(fresh().slot, "", "erste Person nutzt die bisherigen Speicher-Namen, nach Neustart noch aktiv");
+assert.equal(storage.get("ps.sync").key, "token-lucas-1", "Sitzung statt Sync-Schlüssel gespeichert");
 
-// Zurück zu Lukas: schon angemeldet → ohne neuen Login; zu Lucas immer mit Passwort (wie die PIN bei Netflix)
+// Lukas ist auf dem Gerät schon angemeldet (z. B. von früher) → Wechsel ohne neuen Login; zu Lucas immer mit Passwort
+storage.set("ps.owner.sync", { key: "token-owner-alt" });
 profiles = fresh();
 const before = logins;
-assert.deepEqual(await profiles.choose("owner"), { firstLogin: false });
+assert.deepEqual(await profiles.choose("owner"), {});
 assert.equal(logins, before, "kein neuer Login nötig");
+assert.equal(profiles.slot, "owner", "eigener Platz");
 assert.deepEqual(await profiles.choose("lucas"), { needPassword: true }, "geschützt: bei jedem Wechsel fragen");
 
 // Gerät mit altem Sync-Schlüssel: Sync nennt die Person → sie übernimmt den bisherigen Platz

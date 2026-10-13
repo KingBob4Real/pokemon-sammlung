@@ -33,11 +33,9 @@ export function showProfiles(ctx, { start = false } = {}) {
   const grid = h("div", { class: "profiles-grid" });
   const info = h("p", { class: "muted" });
   let asking = null; // Person, deren Passwort gerade gefragt ist
-  let switched = false; // schon gewechselt (nur noch Passwort-Angebot offen) → beim Schließen neu laden
 
   const done = () => {
     markChosen();
-    if (switched) return location.reload();
     dialog.close();
   };
 
@@ -64,36 +62,7 @@ export function showProfiles(ctx, { start = false } = {}) {
       return asking && password.select();
     }
     markChosen();
-    switched = true;
-    if (result.firstLogin) return offerPassword(person);
     location.reload(); // neu starten, damit alles mit den Daten dieser Person läuft
-  }
-
-  // Zum ersten Mal da und ohne Passwort: eins anbieten (freiwillig). Ändern geht später nur mit diesem.
-  function offerPassword(person) {
-    const fresh = h("input", { type: "password", class: "field", placeholder: "Neues Passwort (mind. 4 Zeichen)", "aria-label": "Neues Passwort", autocomplete: "new-password", enterkeyhint: "done" });
-    const hint = h("p", { class: "field-note", role: "alert" });
-    const save = h("button", { type: "submit", class: "btn" }, "Festlegen");
-    const setForm = h("form", { class: "toolbar tight profiles-add" }, [fresh, save]);
-    setForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      save.disabled = true;
-      const result = await profiles.setPassword(fresh.value);
-      save.disabled = false;
-      if (result.error) {
-        hint.textContent = result.error;
-        return fresh.select();
-      }
-      location.reload();
-    });
-    inner.replaceChildren(
-      h("h1", {}, `Hallo, ${person.name}!`),
-      h("p", { class: "profiles-text" }, "Möchtest du ein Passwort festlegen? Dann kann nur, wer es kennt, dein Profil öffnen. Ändern oder entfernen geht später nur mit diesem Passwort."),
-      setForm,
-      hint,
-      h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn btn-ghost", onclick: () => location.reload() }, "Ohne Passwort weiter")])
-    );
-    fresh.focus();
   }
   form.addEventListener("submit", (e) => {
     e.preventDefault();

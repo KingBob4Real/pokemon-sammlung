@@ -11,7 +11,7 @@ export class AccountApi {
     return this.fetchJson(`${base(url)}/people`);
   }
 
-  // → { token, user: { id, name }, firstLogin }; Fehler 401 (Passwort falsch/fehlt), 429 (zu viele Versuche)
+  // → { token, user: { id, name } }; Fehler 401 (Passwort falsch/fehlt), 403 (noch kein Passwort), 429 (zu viele Versuche)
   login(url, id, password) {
     return this.#post(url, "/login", { id, password });
   }

@@ -55,7 +55,7 @@ export function createApp(env) {
     .get("/trade", requireUser(users, async (request, user) => json(await tradeService.forUser(user))))
     // Kartenbilder, die es nur bei Limitless oder TCGplayer gibt (ohne Schlüssel – <img> schickt keinen mit)
     .get("/img", (request) => imageController.image(request))
-    // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden per Antippen oder mit Passwort
+    // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden nur mit Passwort (ohne: Sync-Schlüssel)
     .get("/people", () => authController.people())
     .post("/login", (request) => authController.login(request))
     .post("/me/password", requireUser(users, (request, user) => authController.password(request, user)))
