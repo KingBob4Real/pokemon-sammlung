@@ -160,6 +160,13 @@ node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Lis
 
 Bei **jeder** Änderung an CSS oder JS in `frontend/` die Versionsnummer `?v=` in `index.html` hochzählen (beide Stellen) – sonst behalten Geräte die gespeicherten App-Dateien (siehe „App & offline“).
 
+**Sicherheit:**
+- **Ohne Passwort ist eine Person offen:** Die App liegt öffentlich im Netz, „Wer sammelt?“ zeigt alle Namen. Wer auf eine Person ohne Passwort tippt, ist als sie angemeldet – und könnte sogar selbst ein Passwort setzen und sie damit aussperren (dann hilft nur der Befehl oben). Darum für jede Person ein Passwort festlegen („Mehr“ → Passwort).
+- **Fehlversuche:** Nach 5 falschen Passwörtern ist die Person 15 Minuten gesperrt, danach geht ein Versuch pro 15 Minuten. Gezählt wird vor dem Prüfen und atomar in der Datenbank, damit viele gleichzeitige Versuche die Sperre nicht umgehen (`UserRepository.loginAttempt`, Test: `node backend/test/security.test.mjs`).
+- **Sitzungen** laufen nicht ab. Ein verlorenes Gerät meldet man ab, indem man das Passwort ändert (beendet alle anderen Sitzungen dieser Person).
+- **Kartendaten** (Tabelle `cards`) teilen sich alle Personen; Bilder nimmt das Backend darum nur von `https://assets.tcgdex.net/` an (`changeValidator.js`). Der Bild-Durchreicher `GET /img` baut die Adresse selbst aus geprüften Teilen und reicht nur PNG/JPEG/WebP durch.
+- **Frontend:** Content-Security-Policy in `index.html` – nur eigene Skripte, Verbindungen nur zu TCGdex, dem Backend (Live, Dev, lokal) und der alten Checkliste. Neue Datenquelle → dort unter `connect-src` eintragen, sonst blockiert der Browser sie.
+
 ## Backend automatisch veröffentlichen (GitHub Action)
 
 Jeder Push mit Änderungen in `backend/` spielt neue Datenbank-Migrationen ein und veröffentlicht den Worker (`main` → live, `develop` → Dev). Dafür braucht GitHub einmalig einen Cloudflare-API-Token:

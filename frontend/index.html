@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Pokémon-Sammlung</title>
   <meta name="description" content="Meine Pokémon-Kartensammlung: deutsche und englische Karten suchen und scannen, Sammlung und Listen pflegen, Marktwerte sehen.">
+  <!-- Nur eigene Skripte; Daten nur von TCGdex, dem eigenen Backend (Live/Dev, lokal) und der alten Checkliste (Import).
+       Inline-Styles erlaubt: die App setzt Breiten/Farben per style-Attribut. Bilder von überall per https (Kartenquellen). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data: blob: http://127.0.0.1:8787; connect-src 'self' https://api.tcgdex.net https://*.pokemon-sammlung-backend.workers.dev https://kingbob4real.github.io http://127.0.0.1:8787; object-src 'none'; base-uri 'self'; form-action 'self'">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#e8443a">
   <link rel="manifest" href="manifest.webmanifest">

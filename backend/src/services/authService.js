@@ -39,14 +39,14 @@ export class AuthService {
     return this.users.all();
   }
 
-  // Passwort der Person prüfen (mit Sperre nach zu vielen Fehlversuchen) → null wenn ok, sonst { status, error }
+  // Passwort der Person prüfen (mit Sperre nach zu vielen Fehlversuchen) → null wenn ok, sonst { status, error }.
+  // Jeder Versuch zählt schon vor dem Prüfen, und zwar atomar in der Datenbank – sonst kämen viele gleichzeitige
+  // Versuche alle an der Sperre vorbei. Ein richtiges Passwort setzt den Zähler wieder auf 0 (startSession, setPassword).
   async #check(user, password, now) {
     if (!user.password_hash) return null;
-    if (user.failed_logins >= MAX_FAILS && now - user.failed_at < LOCK_MS) return { status: 429, error: "Zu viele falsche Versuche – in 15 Minuten nochmal." };
     if (!password) return { status: 401, error: "Passwort fehlt." };
-    if (await verifyPassword(password, user.password_hash)) return null;
-    await this.users.loginFailed(user.id, now);
-    return { status: 401, error: "Falsches Passwort." };
+    if (!(await this.users.loginAttempt(user.id, now, MAX_FAILS, LOCK_MS))) return { status: 429, error: "Zu viele falsche Versuche – in 15 Minuten nochmal." };
+    return (await verifyPassword(password, user.password_hash)) ? null : { status: 401, error: "Falsches Passwort." };
   }
 
   // → { token, user: { id, name }, firstLogin } | { status, error }

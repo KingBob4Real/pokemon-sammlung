@@ -9,6 +9,9 @@ const int = (v) => Number.isSafeInteger(v);
 const optAmount = (v) => v == null || (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 1e7);
 const optPosition = (v) => v == null || (typeof v === "number" && Number.isFinite(v));
 const optBool = (v) => v == null || typeof v === "boolean";
+// Bilder nur von TCGdex: die Tabelle cards teilen sich alle Personen – eine fremde Adresse (z. B. ein Zählpixel)
+// bekämen sonst auch die anderen in ihre App geschickt. Die App setzt nie etwas anderes (domain/card.js, toCard).
+const TCGDEX_IMAGES = "https://assets.tcgdex.net/";
 
 const isCard = (c) =>
   c != null &&
@@ -18,7 +21,7 @@ const isCard = (c) =>
   str(c.set, 60) &&
   str(c.setName, 200) &&
   (c.total == null || int(c.total)) &&
-  (c.img == null || (str(c.img, 300) && c.img.startsWith("https://")));
+  (c.img == null || (str(c.img, 300) && c.img.startsWith(TCGDEX_IMAGES)));
 
 const DATA_RULES = {
   collection: (d, id) =>
@@ -27,8 +30,6 @@ const DATA_RULES = {
   section: (d) => str(d.name, 80) && d.name.trim() !== "" && int(d.created) && optPosition(d.position),
   listItem: (d, id) => str(d.list, 100) && isCard(d.card) && int(d.added) && optPosition(d.position) && id === `${d.list}:${d.card.id}`,
 };
-
-export const CHANGE_TYPES = Object.keys(DATA_RULES);
 
 function isValidChange(c) {
   if (c == null || typeof c !== "object" || !DATA_RULES[c.type]) return false;
