@@ -18,7 +18,7 @@ let picker = null; // unsichtbares Datei-Feld: Foto-App oder Mediathek, falls di
  * ganze Ordnerseite (Liste in scanBatch.js). Läuft im Dialog, Meldungen stehen deshalb dort statt unten als Hinweis.
  * Jeder Fehler hat einen Ausweg: Nochmal, manuell suchen, schließen.
  *   listId – beim Scannen aus einer Liste ist diese Liste schon angehakt
- *   pick   – { label, add(card) }: Karte nicht in die Sammlung, sondern z. B. in den Tauschrechner (nur Einzeln)
+ *   pick   – { label, add(card, qty) }: Karten nicht in die Sammlung, sondern z. B. in den Tauschrechner
  */
 export function startScan(ctx, { listId = null, pick = null } = {}) {
   if (!navigator.onLine) return ctx.notify("Zum Scannen braucht es Internet.", { type: "info" });
@@ -58,21 +58,21 @@ async function pageFromFile(ctx, file, layout) {
 
 // Live-Kamera im Dialog. Einzeln: nach dem Foto geht es mit dem Erkennen weiter. Serie/Seite: Kamera bleibt an,
 // die Karten sammeln sich in der Liste darüber; „Fertig“ → prüfen und alle in die Sammlung.
-// pick: nur Einzeln (Serie und Seite speichern über die Prüfliste in die Sammlung)
+// pick: Serie und Seite sammeln in einer eigenen Liste (batchOf), „Fertig“ legt die Karten dorthin statt in die Sammlung
 function cameraStep(body, ctx, listId, pick = null) {
+  if (pick) ctx = { ...ctx, pick };
   const batch = batchOf(ctx);
   let redraw = null;
   const tray = batchTray(ctx, { onDone: () => review() });
   const saved = ctx.prefs.get("scanMode");
   const camera = cameraView({
-    mode: pick ? "single" : batch.items.length && saved === "single" ? "series" : saved, // offene Liste → weiter sammeln
-    modes: pick ? ["single"] : undefined,
+    mode: batch.items.length && saved === "single" ? "series" : saved, // offene Liste → weiter sammeln
     layout: ctx.prefs.get("scanLayout"),
-    tray: pick ? null : tray.el,
+    tray: tray.el,
     onPhoto: (file) => (redraw = scanFlow(body, ctx, file, listId, pick)),
     onShot: (blob, { auto }) => addShots(ctx, [blob], { auto }),
     onPage: (blobs) => addShots(ctx, blobs, { page: true }),
-    onMode: (mode, layout) => pick || (ctx.prefs.set("scanMode", mode), ctx.prefs.set("scanLayout", layout)),
+    onMode: (mode, layout) => (ctx.prefs.set("scanMode", mode), ctx.prefs.set("scanLayout", layout)),
     onCancel: ctx.close,
     onPick: (mode, layout) =>
       pickPhoto((file) => {
@@ -110,7 +110,7 @@ function cameraStep(body, ctx, listId, pick = null) {
   };
   function review() {
     camera.stop();
-    redraw = batchReview(body, ctx, { listId, onScanMore: () => ctx.openSheet((b, sheet) => cameraStep(b, sheet, listId)) });
+    redraw = batchReview(body, ctx, { listId, onScanMore: () => ctx.openSheet((b, sheet) => cameraStep(b, sheet, listId, pick)) });
   }
   batch.changed = draw;
   body.replaceChildren(camera.el);

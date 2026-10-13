@@ -17,13 +17,13 @@ export class TradeDraftService {
     this.draft = Object.fromEntries(SIDES.map((s) => [s, (Array.isArray(saved[s]) ? saved[s] : []).filter((i) => isObj(i?.card) && i.qty > 0)]));
   }
 
-  // Karte auf eine Seite legen; liegt sie schon da, eine mehr. Was ich gebe, startet mit Sprache und Zustand aus meiner Sammlung.
-  add(side, card) {
+  // Karte qty-mal auf eine Seite legen; liegt sie schon da, entsprechend mehr. Was ich gebe, startet mit Sprache und Zustand aus meiner Sammlung.
+  add(side, card, qty = 1) {
     const found = this.draft[side].find((i) => i.card.id === card.id);
-    if (found) found.qty++;
+    if (found) found.qty += qty;
     else {
       const mine = side === "give" ? this.collection.entry(card.id) : null;
-      this.draft[side].push(item(card, mine ? { lang: mine.lang, cond: mine.cond } : {}));
+      this.draft[side].push(item(card, { qty, ...(mine && { lang: mine.lang, cond: mine.cond }) }));
     }
     this.#save();
   }
