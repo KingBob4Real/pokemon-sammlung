@@ -71,7 +71,7 @@ export function cardTile(card, { mode = "default" } = {}) {
         h("span", { class: "tile-ph", "aria-hidden": "true" }, [card.name, h("br"), cardNumber(card)]),
       ]
     ),
-    mode === "default" ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.check }) : null,
+    mode === "default" ? h("button", { type: "button", class: "tile-check", "data-toggle": "", html: ICONS.ball }) : null,
     pick ? h("span", { class: "tile-pick", "aria-hidden": "true" }) : null,
     h("div", { class: "tile-info" }, [h("b", {}, card.name), h("span", {}, `${cardNumber(card)} · ${card.setName}`), h("span", { class: "tile-value" })]),
   ]);

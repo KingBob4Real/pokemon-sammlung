@@ -61,7 +61,7 @@ export function render(main, ctx, folderId = "") {
   if (entries.length) main.append(h("div", { class: "toolbar tight-row" }, [filter, selection.toggle()]), h("div", { class: "toolbar" }, [quickRow]));
   const trends = inFolder ? null : h("div"); // Gestiegen & Gefallen – nur für die ganze Sammlung
   main.append(stats, ...(trends ? [trends] : []));
-  if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
+  if (scan) main.append(h("div", { class: "buttons" }, [h("a", { class: "btn btn-primary", href: links.addTo(COLLECTION_TARGET) }, "+ Karten hinzufügen"), scan.button]), scan.note);
   const overview = inFolder || !all.length ? null : folderOverview(ctx, folders, all, valueOf);
   if (overview) main.append(...overview.elements);
 

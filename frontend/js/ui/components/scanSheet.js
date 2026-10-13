@@ -121,9 +121,9 @@ function cameraStep(body, ctx, listId, pick = null) {
   return () => (redraw ? redraw() : draw());
 }
 
-// Knopf „📷 Scannen“ für Ansichten; offline ausgegraut mit Hinweis. refresh() bei online/offline aufrufen.
+// Knopf „Scannen“ (mit Kamera-Symbol) für Ansichten; offline ausgegraut mit Hinweis. refresh() bei online/offline aufrufen.
 export function scanButton(ctx, options) {
-  const button = h("button", { type: "button", class: "btn", onclick: () => startScan(ctx, options) }, "📷 Scannen");
+  const button = h("button", { type: "button", class: "btn", onclick: () => startScan(ctx, options), html: `${ICONS.camera}Scannen` });
   const note = h("p", { class: "muted pad" }, "Zum Scannen braucht es Internet.");
   const refresh = () => {
     button.disabled = !navigator.onLine;
