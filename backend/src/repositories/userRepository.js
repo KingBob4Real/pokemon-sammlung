@@ -31,12 +31,9 @@ export class UserRepository {
     return results.map((r) => ({ id: r.id, name: r.name, locked: Boolean(r.locked) }));
   }
 
-  // → { id, name, password_hash, sessions } (sessions = Anzahl angemeldeter Geräte)
+  // → { id, name, password_hash }
   find(id) {
-    return this.db
-      .prepare("SELECT id, name, password_hash, (SELECT COUNT(*) FROM sessions WHERE user_id = ?1) AS sessions FROM users WHERE id = ?1")
-      .bind(id)
-      .first();
+    return this.db.prepare("SELECT id, name, password_hash FROM users WHERE id = ?1").bind(id).first();
   }
 
   rename(id, name) {

@@ -1,5 +1,5 @@
 // Sicherheit ohne Netz: node backend/test/security.test.mjs
-// Sperre nach Fehlversuchen hält auch bei gleichzeitigen Versuchen; Kartenbilder nur von TCGdex.
+// Kein Anmelden ohne Passwort; Sperre nach Fehlversuchen hält auch bei gleichzeitigen Versuchen; Kartenbilder nur von TCGdex.
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { UserRepository } from "../src/repositories/userRepository.js";
@@ -21,8 +21,13 @@ const stmt = (sql, args = []) => ({
 const db = { prepare: (sql) => stmt(sql), batch: async (list) => Promise.all(list.map((s) => s.run())) };
 
 sqlite.prepare("INSERT INTO users (id, name, key_hash, created, password_hash) VALUES ('tim', 'Tim', 'x', 0, ?)").run(await hashPassword("geheim"));
+sqlite.prepare("INSERT INTO users (id, name, key_hash, created) VALUES ('max', 'Max', 'y', 0)").run();
 const auth = new AuthService(new UserRepository(db));
 const now = 1_000_000;
+
+// Ohne Passwort kein Anmelden – die App ist öffentlich, sonst könnte jeder die Person antippen
+assert.equal((await auth.login("max", "", now)).status, 403, "ohne Passwort kein Antippen");
+assert.equal(sqlite.prepare("SELECT COUNT(*) AS n FROM sessions").get().n, 0, "keine Sitzung entstanden");
 
 // 20 falsche Passwörter gleichzeitig: nur 5 werden geprüft, der Rest ist gesperrt
 const results = await Promise.all(Array.from({ length: 20 }, (_, i) => auth.login("tim", `falsch${i}`, now)));

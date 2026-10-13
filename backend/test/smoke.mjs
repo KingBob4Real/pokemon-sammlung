@@ -162,27 +162,24 @@ assert.ok(me && me.name === start.body.user, "Person steht in der Liste, Sync ne
 // Darum nur auf Wunsch und am besten mit einer Test-Person: SMOKE_ACCOUNTS=1 node test/smoke.mjs <Dev-URL> <Test-Schlüssel>
 if (process.env.SMOKE_ACCOUNTS === "1" && !me.locked) {
   const id = me.id;
-  const a = await post("/login", { id });
-  assert.equal(a.status, 200, "ohne Passwort: Antippen genügt");
-  assert.equal(typeof a.body.firstLogin, "boolean", "App erfährt, ob die Person zum ersten Mal da ist");
-  const other = (await post("/login", { id })).body.token; // zweites Gerät
-  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "Sitzung gilt wie der Schlüssel");
-  assert.equal((await post("/me/password", { password: "abc" }, a.body.token)).status, 400, "zu kurzes Passwort abgelehnt");
-  assert.equal((await post("/me/password", { password: "test-1234" }, a.body.token)).status, 200);
+  assert.equal((await post("/login", { id })).status, 403, "ohne Passwort kein Anmelden per Antippen");
+  assert.equal((await post("/me/password", { password: "abc" }, key)).status, 400, "zu kurzes Passwort abgelehnt");
+  assert.equal((await post("/me/password", { password: "test-1234" }, key)).status, 200, "Passwort festlegen mit dem Sync-Schlüssel");
   assert.ok((await (await fetch(`${base}/people`)).json()).people.find((p) => p.id === id).locked, "Person ist jetzt gesperrt");
   assert.equal((await post("/login", { id })).status, 401, "ohne Passwort kein Zutritt");
   assert.equal((await post("/login", { id, password: "falsch" })).status, 401, "falsches Passwort");
-  const b = await post("/login", { id, password: "test-1234" });
-  assert.equal(b.status, 200, "richtiges Passwort");
-  assert.equal(b.body.firstLogin, false, "mit Passwort ist es nie der erste Login");
+  const a = await post("/login", { id, password: "test-1234" });
+  assert.equal(a.status, 200, "richtiges Passwort");
+  const other = (await post("/login", { id, password: "test-1234" })).body.token; // zweites Gerät
+  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "Sitzung gilt wie der Schlüssel");
+  assert.equal((await post("/me/password", { password: "neu-12345" }, a.body.token)).status, 401, "ändern ohne altes Passwort geht nicht");
+  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "falsch" }, a.body.token)).status, 401, "ändern mit falschem alten geht nicht");
+  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "test-1234" }, a.body.token)).status, 200, "ändern mit dem alten Passwort");
   assert.equal((await call({ since: 0, changes: [] }, other)).status, 401, "anderes Gerät wurde abgemeldet");
   assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "dieses Gerät bleibt angemeldet");
   assert.equal((await call({ since: 0, changes: [] })).status, 200, "Sync-Schlüssel gilt weiter");
-  assert.equal((await post("/me/password", { password: "neu-12345" }, b.body.token)).status, 401, "ändern ohne altes Passwort geht nicht");
-  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "falsch" }, b.body.token)).status, 401, "ändern mit falschem alten geht nicht");
-  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "test-1234" }, b.body.token)).status, 200, "ändern mit dem alten Passwort");
-  assert.equal((await post("/me/password", { password: "" }, b.body.token)).status, 401, "entfernen nur mit altem Passwort");
-  assert.equal((await post("/me/password", { password: "", oldPassword: "neu-12345" }, b.body.token)).status, 200, "Passwort wieder weg");
+  assert.equal((await post("/me/password", { password: "" }, a.body.token)).status, 401, "entfernen nur mit altem Passwort");
+  assert.equal((await post("/me/password", { password: "", oldPassword: "neu-12345" }, a.body.token)).status, 200, "Passwort wieder weg (nur der Test, die App bietet das nicht an)");
   assert.equal((await post("/me/name", { name: "Smoke-Name" }, key)).body.name, "Smoke-Name", "Name ändern");
   await post("/me/name", { name: me.name }, key);
   console.log("Anmelden & Passwort ok");
