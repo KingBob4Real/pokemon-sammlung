@@ -214,8 +214,7 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
     rows.replaceChildren(...b.items.map((it) => itemRow(ctx, it, resolve)));
     const n = cardsIn(b);
     save.disabled = !n;
-    const to = pick ? `zu „${pick.label}“` : "in die Sammlung";
-    save.textContent = n ? `${plural(n, "Karte", "Karten")} ${to}` : to[0].toUpperCase() + to.slice(1);
+    save.textContent = `${plural(n, "Karte", "Karten")} ${pick ? `zu „${pick.label}“` : "in die Sammlung"}`;
   };
 
   function showList() {

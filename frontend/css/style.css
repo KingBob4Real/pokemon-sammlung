@@ -1,9 +1,8 @@
-/* ===== Farben: Pokéball-Rot, Pokédex-Schwarz, Pikachu-Gelb ===== */
+/* ===== Farben: Pokéball-Rot, Pokédex-Schwarz ===== */
 :root {
   --red: #e8443a;
   --red-dark: #b8302a;
   --red-strong: #d0362c; /* Rot hinter weißer Schrift (Kontrast ≥ 4.5:1) */
-  --yellow: #ffcb05;
   --ink: #1f2128;
   --bg: #f6f3ed;
   --bg-dot: rgba(31, 33, 40, 0.055);
@@ -98,7 +97,6 @@ button, select, label { touch-action: manipulation; } /* schnelles Tippen (+ + +
   box-shadow: inset 0 0 0 2px #d9dce2;
   pointer-events: none;
 }
-@media (prefers-color-scheme: dark) { .top::after { background: #e4e7ec; } }
 [data-stage="dev"] .top { background: repeating-linear-gradient(135deg, #4a4f5c 0 14px, #3b3f4a 14px 28px); }
 [data-stage="dev"] .top h1::after { content: " · DEV"; }
 .top h1 {
@@ -163,7 +161,7 @@ main {
   color: var(--muted);
 }
 /* aktiver Bereich: Symbol in einer roten Pille */
-.tabs a svg { box-sizing: content-box; padding: 4px 18px; border-radius: 99px; transition: background-color 0.2s ease, transform 0.2s var(--ease-out); }
+.tabs a svg { box-sizing: content-box; padding: 4px 18px; border-radius: 99px; transition: background-color 0.2s ease; }
 .tabs a[aria-current="page"] { color: var(--red-strong); }
 .tabs a[aria-current="page"] svg { background: color-mix(in srgb, var(--red) 14%, transparent); }
 @media (prefers-color-scheme: dark) {
@@ -361,7 +359,6 @@ select.field { padding-right: 8px; }
 .tile-check svg {
   width: 32px;
   height: 32px;
-  overflow: visible;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
   transform-origin: 50% 85%;
 }
