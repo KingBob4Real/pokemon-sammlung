@@ -1,3 +1,4 @@
+import { PERSONAL_KEYS } from "../config.js";
 import { describeError } from "../core/errors.js";
 import { isObj } from "../core/format.js";
 
@@ -79,9 +80,17 @@ export class ProfileService {
       try {
         const { token, user } = await this.api.login(this.url, id, password);
         this.storage.set(this.keysOf(slot).sync, { at: 0, ...saved, url: this.url, key: token, user: user.name, userId: user.id, error: "" });
+        // die alte Sitzung dieses Geräts beenden – sonst sammelt jeder Wechsel zu einer Person mit Passwort eine an
+        if (saved?.key) this.api.logout({ url: this.url, key: saved.key }).catch(() => {});
       } catch (e) {
         const { kind, message } = describeError(e);
         if (kind === "offline") return { error: "Zum Anmelden braucht es Internet." };
+        // gespeicherte Liste veraltet: die Person hat inzwischen ein Passwort → danach fragen statt Sackgasse
+        if (e.status === 401 && !password) {
+          person.locked = true;
+          this.#save();
+          return { needPassword: true };
+        }
         // 401/403/429 bringen eine verständliche Meldung vom Backend mit („Falsches Passwort.“, „… hat noch kein Passwort …“)
         return { error: (e.status >= 400 && e.status < 500 && e.body?.error) || message };
       }
@@ -96,6 +105,17 @@ export class ProfileService {
   credentials() {
     const saved = this.storage.get(this.keysOf(this.slot).sync, null);
     return { url: this.url, key: saved?.key || "" };
+  }
+
+  // Auf diesem Gerät abmelden: Sitzung im Backend beenden und die eigenen Daten der Person vom Gerät löschen
+  // (im Backend bleibt alles). ponytail: offline bleibt die Sitzung im Backend gültig, das Gerät kennt sie aber nicht mehr.
+  async logout() {
+    const keys = this.keysOf(this.slot);
+    await this.api.logout(this.credentials()).catch(() => {});
+    for (const k of PERSONAL_KEYS) this.storage.remove(keys[k]);
+    delete this.data.slots[this.active];
+    this.data.active = "";
+    this.#save();
   }
 
   // Passwort festlegen, ändern oder entfernen (leer) – ändern und entfernen nur mit dem alten.

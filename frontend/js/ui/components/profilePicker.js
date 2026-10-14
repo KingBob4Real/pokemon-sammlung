@@ -14,6 +14,15 @@ export function chosenThisSession() {
   }
 }
 
+// Nach dem Abmelden: beim nächsten Start wieder fragen, wer sammelt
+export function forgetChoice() {
+  try {
+    sessionStorage.removeItem(CHOSEN);
+  } catch {
+    /* privater Modus: dann fragt die App ohnehin */
+  }
+}
+
 function markChosen() {
   try {
     sessionStorage.setItem(CHOSEN, "1");

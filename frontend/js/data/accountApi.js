@@ -21,6 +21,11 @@ export class AccountApi {
     return this.#post(url, "/me/password", { password, oldPassword }, key);
   }
 
+  // beendet die Sitzung dieses Geräts (mit dem Sync-Schlüssel: nichts zu beenden)
+  logout({ url, key }) {
+    return this.#post(url, "/logout", {}, key);
+  }
+
   rename({ url, key }, name) {
     return this.#post(url, "/me/name", { name }, key);
   }
