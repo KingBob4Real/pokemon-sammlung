@@ -40,6 +40,15 @@ assert.ok(ok.token, "nach Ablauf der Sperre klappt das richtige Passwort");
 assert.equal(sqlite.prepare("SELECT failed_logins FROM users WHERE id = 'tim'").get().failed_logins, 0);
 assert.equal((await auth.login("tim", "falsch", now + 17 * 60 * 1000)).status, 401, "danach zählt es neu");
 
+// Abmelden beendet genau die eigene Sitzung; mit dem Sync-Schlüssel angemeldet (session = null) passiert nichts
+const users = new UserRepository(db);
+const second = await auth.login("tim", "geheim", now + 33 * 60 * 1000);
+await auth.logout(await users.findByKey(ok.token));
+assert.equal(await users.findByKey(ok.token), null, "abgemeldete Sitzung gilt nicht mehr");
+assert.ok(await users.findByKey(second.token), "andere Sitzung bleibt");
+await auth.logout({ id: "tim", session: null });
+assert.ok(await users.findByKey(second.token), "Abmelden mit dem Schlüssel beendet keine Sitzung");
+
 // Kartenbilder: nur TCGdex – die Tabelle cards gilt für alle Personen
 const change = (img) => ({ since: 0, changes: [{ type: "collection", id: "base1-4", updated: 1, deleted: 0, data: { qty: 1, added: 1, card: { id: "base1-4", name: "Glurak", num: "4", set: "base1", setName: "Grundset", img } } }] });
 assert.ok(parseSyncRequest(change("https://assets.tcgdex.net/de/base/base1/4")).ok, "TCGdex-Bild geht durch");

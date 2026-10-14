@@ -180,6 +180,8 @@ if (process.env.SMOKE_ACCOUNTS === "1" && !me.locked) {
   assert.equal((await call({ since: 0, changes: [] })).status, 200, "Sync-Schlüssel gilt weiter");
   assert.equal((await post("/me/password", { password: "" }, a.body.token)).status, 401, "entfernen nur mit altem Passwort");
   assert.equal((await post("/me/password", { password: "", oldPassword: "neu-12345" }, a.body.token)).status, 200, "Passwort wieder weg (nur der Test, die App bietet das nicht an)");
+  assert.equal((await post("/logout", {}, a.body.token)).status, 200, "abmelden");
+  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 401, "abgemeldetes Gerät kommt nicht mehr rein");
   assert.equal((await post("/me/name", { name: "Smoke-Name" }, key)).body.name, "Smoke-Name", "Name ändern");
   await post("/me/name", { name: me.name }, key);
   console.log("Anmelden & Passwort ok");

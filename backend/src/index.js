@@ -58,6 +58,7 @@ export function createApp(env) {
     // „Wer sammelt?“: Personen sind öffentlich sichtbar (nur Namen), Anmelden nur mit Passwort (ohne: Sync-Schlüssel)
     .get("/people", () => authController.people())
     .post("/login", (request) => authController.login(request))
+    .post("/logout", requireUser(users, (request, user) => authController.logout(user)))
     .post("/me/password", requireUser(users, (request, user) => authController.password(request, user)))
     .post("/me/name", requireUser(users, (request, user) => authController.rename(request, user)));
 }

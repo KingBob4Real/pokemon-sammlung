@@ -58,6 +58,11 @@ export class UserRepository {
     return row != null;
   }
 
+  // Abmelden: genau diese Sitzung beenden
+  endSession(tokenHash) {
+    return this.db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
+  }
+
   // Anmeldung geklappt: Fehlversuche vergessen, Sitzung für dieses Gerät anlegen
   startSession(id, tokenHash, now) {
     return this.db.batch([

@@ -3,9 +3,10 @@ import { deliverFile } from "../../core/files.js";
 import { describeError } from "../../core/errors.js";
 import { fmtDateTime, plural } from "../../core/format.js";
 import { confirmDialog } from "../components/ask.js";
+import { forgetChoice } from "../components/profilePicker.js";
 import { panel } from "../components/widgets.js";
 
-// Ansicht „Mehr“: Konto & Sync-Stand, Sicherung, unter „Erweitert“ Sync-Schlüssel und alte Checkliste, Hinweise zu Preisen
+// Ansicht „Mehr“: Konto & Sync-Stand (Person wechseln, abmelden), Sicherung, unter „Erweitert“ Sync-Schlüssel und alte Checkliste, Hinweise zu Preisen
 export function render(main, ctx) {
   const { sync, backup, legacyImport, updates } = ctx;
   ctx.setTitle("Mehr");
@@ -148,6 +149,16 @@ function accountPanel(ctx, status) {
     ctx.render();
   };
 
+  // Abmelden, z. B. auf einem geliehenen Handy: Sitzung beenden, Daten der Person vom Gerät, danach „Wer sammelt?“
+  const logout = async () => {
+    const noPassword = me.locked ? "" : " Du hast noch kein Passwort – danach kommst du nur mit dem Sync-Schlüssel wieder rein.";
+    const unsaved = sync.pendingCount ? ` Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen und gehen dabei verloren.` : "";
+    if (!(await confirmDialog(`Auf diesem Gerät abmelden? Deine Sammlung und Listen verschwinden von diesem Gerät, im Backend bleibt alles.${noPassword}${unsaved}`, { ok: "Abmelden", danger: true }))) return;
+    await profiles.logout();
+    forgetChoice();
+    location.reload();
+  };
+
   const name = h("input", { type: "text", class: "field", value: me.name, maxlength: 40, "aria-label": "Name", autocomplete: "off", enterkeyhint: "done" });
   const renameButton = h("button", { type: "button", class: "btn btn-ghost" }, "Speichern");
   renameButton.addEventListener("click", () => run(renameButton, () => profiles.rename(name.value), "Name gespeichert."));
@@ -160,7 +171,7 @@ function accountPanel(ctx, status) {
   return panel("Wer sammelt?", [
     h("p", {}, `Angemeldet als ${me.name}.`),
     status,
-    h("div", { class: "buttons" }, [switchButton]),
+    h("div", { class: "buttons" }, [switchButton, h("button", { type: "button", class: "btn btn-ghost danger", onclick: logout }, "Abmelden")]),
     h("label", { class: "label" }, ["Dein Name", h("div", { class: "toolbar tight" }, [name, renameButton])]),
     h("h3", { class: "label" }, "Passwort"),
     h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Ändern geht nur mit dem bisherigen." : "Du hast noch kein Passwort – auf einem neuen Gerät kommst du so nur mit dem Sync-Schlüssel rein. Leg eins fest, es wird bei jedem Wechsel zu dir abgefragt."),
