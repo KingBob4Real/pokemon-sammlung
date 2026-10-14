@@ -65,6 +65,7 @@ const first = await sync("tim", 0, [entry(100, { qty: 2, card: card("Glurak") })
 assert.equal(first.status, 200);
 assert.equal(first.changes.length, 1);
 assert.equal(first.changes[0].data.qty, 2, "eigene Änderung kommt zurück");
+assert.ok(Math.abs(first.now - Date.now()) < 5000, "Server schickt seine Uhrzeit mit");
 
 // Ein älterer Stand (z. B. von einem zweiten Gerät, das offline war) überschreibt nichts Neueres
 const stale = await sync("tim", first.rev, [entry(50, { qty: 7, card: card("Glurak") })]);

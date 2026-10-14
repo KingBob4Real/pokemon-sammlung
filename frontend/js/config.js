@@ -31,7 +31,7 @@ const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen
 export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
 
 // Speicher-Namen, die einer Person allein gehören – beim Abmelden fliegen genau diese vom Gerät (services/profileService.js)
-export const PERSONAL_KEYS = ["entities", "dirty", "rev", "sync", "prefs", "history", "trade"];
+export const PERSONAL_KEYS = ["entities", "dirty", "base", "rev", "sync", "prefs", "history", "trade"];
 
 // Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel, Einstellungen und Wertverlauf gehören ihr allein,
 // Preise, Sets und Bild-Ersatz teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
@@ -40,6 +40,7 @@ export function storageKeys(profile = "") {
   return {
     entities: `${own}entities.v1`,
     dirty: `${own}dirty.v1`,
+    base: `${own}base.v1`, // Stand vor eigenen, noch nicht hochgeladenen Änderungen (services/entityStore.js, Zusammenführen)
     rev: `${own}rev.v1`,
     sync: `${own}sync.v1`,
     prefs: `${own}prefs.v1`,

@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: "Test: Frontend (Katalog, Sammlung, Speicher, Personen, Scanner)"
+      - name: "Test: Frontend (Katalog, Sammlung, Speicher, Personen, Scanner, Abgleich)"
         run: for t in frontend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
       - name: "Test: Backend (Sicherheit, Exemplare, Abgleich)"
         run: for t in backend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done

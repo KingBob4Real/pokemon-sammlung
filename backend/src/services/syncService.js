@@ -26,6 +26,7 @@ export class SyncService {
     return {
       user: user.name,
       userId: user.id,
+      now: Date.now(), // Uhrzeit des Servers: Geräte mit falsch gehender Uhr gleichen ihre Zeitstempel daran an
       rev: results[results.length - 1].results[0].rev,
       changes: readResults.flatMap((r, i) => r.results.map((row) => this.tables[i].toEntity(row))),
     };

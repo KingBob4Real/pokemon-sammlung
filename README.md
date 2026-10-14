@@ -222,7 +222,7 @@ Nach Änderungen an JS/CSS hält der Service Worker lokal die alten Dateien (die
 
 | Was | Befehl | Wann automatisch |
 | --- | --- | --- |
-| Frontend: Katalog, Sammlung (inkl. Exemplare), Speicher & Preise, Personen, Scanner | `node frontend/test/<catalog\|collection\|memory\|profiles\|scan>.test.mjs` | jeder Push (`test.yml`), vor jedem Pages-Deploy |
+| Frontend: Katalog, Sammlung (inkl. Exemplare), Speicher & Preise, Personen, Scanner, Abgleich zwischen Geräten | `node frontend/test/<catalog\|collection\|memory\|profiles\|scan\|sync>.test.mjs` | jeder Push (`test.yml`), vor jedem Pages-Deploy |
 | Backend: Sicherheit, Exemplare, Abgleich (echte SQL auf SQLite) | `node backend/test/<security\|copies\|sync>.test.mjs` | jeder Push, vor jedem Backend-Deploy |
 | Smoke gegen ein laufendes Backend | `node backend/test/smoke.mjs <URL> <Schlüssel> [Schlüssel B]` | von Hand nach einem Deploy |
 
@@ -313,6 +313,9 @@ Cloudflare D1 (SQLite). Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstel
 
 Sammlung, Listen, Einträge und Ordner gehören je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen und seinem letzten Stand und bekommt alles Neue dieser Person zurück – gelesen werden nur geänderte Zeilen (Index auf Person + Stand), denn D1 zählt gelesene Zeilen.
 
+- **Uhr:** `updated` setzt das Gerät, aber nach der Uhr des Servers (jede Antwort hat `now`, das Gerät merkt sich die Abweichung) – eine falsch gehende Handy-Uhr verliert so keine Änderungen.
+- **Zusammenführen:** Wartet etwas auf dem Gerät, holt der Sync erst ab. Hat ein anderes Gerät denselben Eintrag inzwischen geändert, wird Feld für Feld zusammengeführt (nur hier geändert → von hier, nur dort → von dort, beides → die neuere Änderung; Anzahl, Exemplare, Zustand, Sprache und Kaufpreis nur gemeinsam). Dafür merkt sich das Gerät den Stand vor der eigenen Änderung (`base`).
+
 ### Personen & Schlüssel
 
 Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. Der Schlüssel ist der Notfall-Zugang („Mehr“ → „Erweitert“), angemeldet wird per Antippen und Passwort. Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/` (für Dev jeweils `--env dev`):
@@ -343,7 +346,7 @@ Safari gibt der Domain etwa 5 MB `localStorage` für alle Personen zusammen. Gem
 
 | Schlüssel | Inhalt | Größe | Aufräumen |
 | --- | --- | --- | --- |
-| `ps.[<person>.]entities.v1` (+ `dirty`, `rev`) | Sammlung, Listen, Ordner einer Person | ~330 B je Sammlungs-Eintrag, ~300 B je Listen-Eintrag, ~110 B je gelöschtem | gelöschte bleiben (siehe unten); „Abmelden“ löscht alles der Person |
+| `ps.[<person>.]entities.v1` (+ `dirty`, `base`, `rev`) | Sammlung, Listen, Ordner einer Person | ~330 B je Sammlungs-Eintrag, ~300 B je Listen-Eintrag, ~110 B je gelöschtem | gelöschte bleiben (siehe unten); „Abmelden“ löscht alles der Person |
 | `ps.prices.v4` | Preise, alle Personen | ~150 B je Karte (456 Karten: 69 KB) | beim Speichern alles älter als 30 Tage raus |
 | `ps.sets.v4` | Set-Liste | ~23 KB | wird wöchentlich ersetzt |
 | `ps.images.v1` | Bild-Ersatz: Karte + Größe → Adresse oder „keine“ | ~100 B je Karte, die Ersatz brauchte | nach 30 Tagen wird neu probiert |
@@ -357,7 +360,7 @@ Live und Dev liegen auf derselben Domain und trennen sich über den Namen (`ps.`
 <summary>Messwerte und Entscheidungen</summary>
 
 - **Speichern pro Änderung** (`#persist` in `services/entityStore.js`, alles neu als JSON): 0,2 ms bei 115 Einträgen, 0,7 ms bei 456, 2,6 ms bei 1.000, 14 ms bei 2.000 (Median, Desktop-Chrome; iPhone geschätzt doppelt so lang). Unter ~16 ms bleibt es bis grob 1.500 Einträge pro Person – gebündeltes Speichern lohnt erst darüber.
-- **Gelöschte Einträge** bleiben auch nach dem Sync liegen: Ohne sie holt eine ältere Sicherung Gelöschtes zurück aufs Gerät und lädt es hoch, bis der nächste Sync es wieder löscht. Bei schiefer Uhr zwischen zwei Geräten könnte ein neu angelegter Eintrag sogar gegen die alte Löschung verlieren. Der Platzgewinn wäre klein.
+- **Gelöschte Einträge** bleiben auch nach dem Sync liegen: Ohne sie holt eine ältere Sicherung Gelöschtes zurück aufs Gerät und lädt es hoch, bis der nächste Sync es wieder löscht. Der Platzgewinn wäre klein.
 - Eng wird es erst bei mehreren tausend Karten pro Person; dann wäre IndexedDB der nächste Schritt.
 - **App-Dateien „Speicher zuerst“:** Ein normaler Start fragt nur `index.html` übers Netz (gemessen: 2 statt 63 Anfragen an die eigene Seite) und startet bei schlechtem Empfang nach 3 s aus dem Speicher.
 

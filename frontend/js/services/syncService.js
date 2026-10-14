@@ -27,8 +27,9 @@ export class SyncService extends EventTarget {
     this.storage = storage;
     this.storageKey = storageKey;
     this.batchSize = batchSize;
-    this.config = { url: "", key: "", user: "", at: 0, error: "", ...objOr(storage.get(storageKey, {})) };
+    this.config = { url: "", key: "", user: "", at: 0, error: "", offset: 0, ...objOr(storage.get(storageKey, {})) };
     this.config.url = defaultUrl; // fest – die Adresse ist in der App nicht mehr einstellbar
+    store.clockOffset = Number.isSafeInteger(this.config.offset) ? this.config.offset : 0;
   }
 
   get enabled() {
@@ -88,12 +89,16 @@ export class SyncService extends EventTarget {
     this.#notify();
     let rejected = 0;
     try {
+      // Wartet etwas? Dann erst abholen: Was andere Geräte an denselben Einträgen geändert haben, führt der Speicher
+      // Feld für Feld mit den eigenen Änderungen zusammen – sonst überschriebe der ganze Eintrag von hier deren Felder.
+      // ponytail: ändert ein anderes Gerät genau zwischen Abholen und Hochladen, gewinnt wieder der ganze Eintrag
+      if (this.store.pendingCount) this.store.applySyncResult([], await this.#request([]));
       // in Päckchen hochladen, bis nichts mehr wartet
       for (let round = 0; round < 50; round++) {
         const sent = this.store.pendingChanges(this.batchSize);
         let result;
         try {
-          result = await this.api.sync(this.config, this.store.rev, sent);
+          result = await this.#request(sent);
         } catch (e) {
           // Einzelner Eintrag abgelehnt? Diesen zurückhalten und weitermachen, statt alles zu blockieren
           const bad = e.status === 400 && Number.isInteger(e.body?.index) ? sent[e.body.index] : null;
@@ -127,6 +132,14 @@ export class SyncService extends EventTarget {
       this.#report({ kind: "rejected", message: `${plural(rejected, "Eintrag konnte", "Einträge konnten")} nicht synchronisiert werden und ${rejected === 1 ? "bleibt" : "bleiben"} nur auf diesem Gerät.` });
     }
     if (this.store.pendingCount && !this.config.error) this.schedule(); // unterwegs Geändertes nachschieben
+  }
+
+  // Ein Abgleich; nebenbei die Uhr des Geräts an der des Servers messen (Mitte zwischen Senden und Antwort)
+  async #request(changes) {
+    const sentAt = Date.now();
+    const result = await this.api.sync(this.config, this.store.rev, changes);
+    if (Number.isSafeInteger(result?.now)) this.store.clockOffset = this.config.offset = Math.round(result.now - (sentAt + Date.now()) / 2);
+    return result;
   }
 
   #report(problem) {
