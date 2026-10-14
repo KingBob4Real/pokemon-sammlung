@@ -1,12 +1,11 @@
 # Deploy: einen beliebigen Branch auf Dev oder Prod bringen – Test, Build, Backend und Frontend in einem Lauf.
-# Starten: Actions → „Deploy“ → Run workflow → bei „Use workflow from“ den Branch wählen, darunter die Stage.
+# Starten: Actions → „Deploy“ → Run workflow → bei „Use workflow from“ den Branch wählen (z. B. feature/xyz), darunter die Stage.
 #   dev  → develop wird auf den Branch gesetzt → Dev-Backend + pokekiste.app/dev/
 #   prod → der Branch wird in main gemergt     → Live-Backend + pokekiste.app
-# Warum develop/main mitwandern: Die Seite wird jeden Tag neu aus main (/) und develop (/dev/) gebaut – ohne das wäre der
-# Deploy beim nächsten Neubau wieder weg. Pushes dieses Laufs (GitHub-Token) starten keine weiteren Läufe.
+# Warum develop/main mitwandern: Die Seite wird immer aus main (/) und develop (/dev/) gebaut – auch jeden Tag neu. Ohne
+# das wäre der Deploy beim nächsten Neubau wieder weg. Pushes dieses Laufs (GitHub-Token) starten keine weiteren Läufe.
+# Frontend: GitHub Pages veröffentlicht nur Läufe von main – darum startet Deploy pages.yml auf main und wartet ihn ab.
 # Die Schritte stehen in test.yml, backend.yml und pages.yml; die laufen weiter auch einzeln bei jedem Push.
-# Einmalig nötig: Settings → Environments → github-pages → Deployment branches → „No restriction“, sonst darf nur main
-# die Seite veröffentlichen.
 name: Deploy
 
 run-name: "Deploy ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'Prod' || 'Dev' }}"
@@ -20,25 +19,21 @@ on:
         options: [dev, prod]
         default: dev
 
-# was die aufgerufenen Abläufe brauchen (Pages veröffentlichen); push auf develop/main nur im Job „stage“
 permissions:
   contents: read
-  pages: write
-  id-token: write
-  actions: write
 
-# pro Stage immer nur ein Deploy auf einmal
+# immer nur ein Deploy auf einmal – beide Stages landen in derselben Seite
 concurrency:
-  group: deploy-${{ inputs.stage }}
+  group: deploy
   cancel-in-progress: false
 
 jobs:
   test:
-    name: "🧪 Test"
+    name: "Test"
     uses: ./.github/workflows/test.yml
 
   stage:
-    name: "🔀 Stage: ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'main' || 'develop' }}"
+    name: "Stage: ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'main' || 'develop' }}"
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -47,11 +42,11 @@ jobs:
       STAGE: ${{ inputs.stage }}
       BRANCH: ${{ github.ref_name }}
     steps:
-      - name: "📥 Checkout: ${{ github.ref_name }} mit allen Branches"
+      - name: "Checkout: ${{ github.ref_name }} mit allen Branches"
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: "🔀 ${{ inputs.stage == 'prod' && 'main: Branch hineinmergen' || 'develop: auf den Branch setzen' }}"
+      - name: "${{ inputs.stage == 'prod' && 'Merge: Branch in main' || 'Push: develop auf den Branch setzen' }}"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -78,11 +73,11 @@ jobs:
             git push origin HEAD:main
             echo "main → $(git rev-parse --short HEAD) (Release: $BRANCH)"
           fi
-          echo "## 🚀 Deploy \`$BRANCH\` → $STAGE" >> "$GITHUB_STEP_SUMMARY"
-          echo "Stage-Branch: \`$([ "$STAGE" = dev ] && echo develop || echo main)\` → \`$(git rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Deploy \`$BRANCH\` → $STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Stage-Branch \`$([ "$STAGE" = dev ] && echo develop || echo main)\` → \`$(git rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
 
   backend:
-    name: "⚙️ Backend"
+    name: "Backend"
     needs: stage
     uses: ./.github/workflows/backend.yml
     with:
@@ -90,9 +85,31 @@ jobs:
     secrets: inherit
 
   frontend:
-    name: "🌐 Frontend"
+    name: "Frontend: Pages-Lauf auf main"
     needs: backend
-    uses: ./.github/workflows/pages.yml
-    with:
-      direkt: true
-    secrets: inherit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: "Deployment: Pages-Lauf auf main starten (main → /, develop → /dev/)"
+        run: |
+          since=$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run pages.yml --ref main
+          for i in $(seq 1 24); do
+            sleep 5
+            id=$(gh run list --workflow pages.yml --branch main --event workflow_dispatch --limit 10 --json databaseId,createdAt \
+              --jq "[.[] | select(.createdAt >= \"$since\")] | sort_by(.createdAt) | .[0].databaseId // empty")
+            [ -n "$id" ] && break
+          done
+          [ -n "$id" ] || { echo "::error::Den gestarteten Pages-Lauf nicht gefunden."; exit 1; }
+          echo "RUN_ID=$id" >> "$GITHUB_ENV"
+          echo "Pages-Lauf: https://github.com/$GH_REPO/actions/runs/$id"
+      - name: "Kontrolle: Pages-Lauf abwarten (Build, Deployment, Kontrolle der Version)"
+        run: |
+          gh run watch "$RUN_ID" --exit-status --interval 15 > /dev/null || { gh run view "$RUN_ID"; exit 1; }
+          echo "### Frontend" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pages-Lauf: https://github.com/$GH_REPO/actions/runs/$RUN_ID" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pages-Lauf fertig: https://github.com/$GH_REPO/actions/runs/$RUN_ID"

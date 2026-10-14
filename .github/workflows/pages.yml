@@ -1,7 +1,7 @@
 # Veröffentlicht frontend/ auf GitHub Pages: main unter /, develop unter /dev/ – ein Pages-Auftritt für beide.
 # Pages nimmt nur Läufe von main an (Umgebungsschutz) → ein Push auf develop stößt einen Lauf auf main an.
 # Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Cardmarkets Preisliste von heute).
-# Auch Teil von deploy.yml (Frontend nach dem Backend).
+# deploy.yml startet nach dem Backend einen Lauf hiervon auf main und wartet ihn ab.
 # Achtung: Zeitplan und Ablauf kommen immer aus der Datei auf main – Änderungen hier wirken erst nach dem Merge.
 name: Frontend auf GitHub Pages
 
@@ -12,67 +12,59 @@ on:
   schedule:
     - cron: "30 4 * * *" # Cardmarket erneuert seine Preisliste nachts
   workflow_dispatch:
-  workflow_call:
-    inputs:
-      direkt:
-        description: "Direkt bauen und veröffentlichen, egal von welchem Branch gestartet (deploy.yml)"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Alle Läufe, die veröffentlichen, teilen sich eine Gruppe (es gibt nur eine Seite); der neueste gewinnt – er baut
-# ohnehin den aktuellen Stand von main und develop.
 concurrency:
-  group: pages-${{ (github.ref_name == 'main' || inputs.direkt) && 'deploy' || github.ref_name }}
+  group: pages-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   trigger:
-    name: "↪️ Weiterleiten: Lauf auf main starten"
-    if: github.ref_name != 'main' && !inputs.direkt
+    name: "Weiterleiten: Lauf auf main starten"
+    if: github.ref_name != 'main'
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - name: "↪️ pages.yml auf main starten (nur main darf veröffentlichen)"
+      - name: "pages.yml auf main starten (nur main darf veröffentlichen)"
         run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
         env:
           GH_TOKEN: ${{ github.token }}
 
   build:
-    name: "🏗️ Build: Seite für Live (/) und Dev (/dev/)"
-    if: github.ref_name == 'main' || inputs.direkt
+    name: "Build: Seite für Live (/) und Dev (/dev/)"
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     outputs:
       live: ${{ steps.version.outputs.main }}
       dev: ${{ steps.version.outputs.develop }}
     steps:
       # ganze Geschichte: die Version braucht den letzten Commit, der frontend/ geändert hat
-      - name: "📥 Checkout: main (Live)"
+      - name: "Checkout: main (Live)"
         uses: actions/checkout@v7
         with: { ref: main, path: main, fetch-depth: 0 }
-      - name: "📥 Checkout: develop (Dev)"
+      - name: "Checkout: develop (Dev)"
         uses: actions/checkout@v7
         with: { ref: develop, path: develop, fetch-depth: 0 }
-      - name: "🧰 Setup: Node 24"
+      - name: "Setup: Node 24"
         uses: actions/setup-node@v7
         with:
           node-version: 24
       # Live nur mit grünen Tests (Dev wird in test.yml bei jedem Push getestet)
-      - name: "🧪 Test: Live-Frontend (main)"
+      - name: "Test: Live-Frontend (main)"
         run: cd main && for t in frontend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
-      - name: "🏗️ Build: Dateien zusammenstellen (main → /, develop → /dev/)"
+      - name: "Build: Dateien zusammenstellen (main → /, develop → /dev/)"
         run: cp -r main/frontend site && cp -r develop/frontend site/dev
       # Version (?v= in index.html) = Zeitpunkt der letzten Änderung an frontend/ – ändert sich nur mit dem Code, nicht beim
       # täglichen Neubau. Neue Version → der Service Worker wirft die gespeicherten App-Dateien weg (sw.js), Geräte laden neu.
-      - name: "🏷️ Build: Version setzen (?v=)"
+      - name: "Build: Version setzen (?v=)"
         id: version
         run: |
-          echo "### 🌐 Frontend" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Frontend" >> "$GITHUB_STEP_SUMMARY"
           for branch in main develop; do
             out=site; [ "$branch" = develop ] && out=site/dev
             v=$(git -C "$branch" log -1 --format=%ct -- frontend)
@@ -82,7 +74,7 @@ jobs:
             echo "- \`$branch\` → \`${out#site}/\` · Version $v · Commit \`$(git -C "$branch" rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
           done
       # Fehlt die Preisliste mal, wird trotzdem veröffentlicht – die App fragt dann wie früher TCGdex
-      - name: "💶 Build: Cardmarket-Preisliste von heute"
+      - name: "Build: Cardmarket-Preisliste von heute"
         continue-on-error: true
         run: |
           for branch in main develop; do
@@ -91,13 +83,13 @@ jobs:
               node "$branch/scripts/cardmarket.mjs" prices "$branch/scripts/cardmarket-map.json" "$out/data/cardmarket-prices.json"
             fi
           done
-      - name: "📦 Build: Seite hochladen"
+      - name: "Build: Seite hochladen"
         uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
   deploy:
-    name: "🚀 Deployment: GitHub Pages"
+    name: "Deployment: GitHub Pages"
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -106,16 +98,16 @@ jobs:
     outputs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: "🚀 Deployment: Seite veröffentlichen"
+      - name: "Deployment: Seite veröffentlichen"
         id: deployment
         uses: actions/deploy-pages@v5
 
   verify:
-    name: "🔎 Kontrolle: Seite liefert die neue Version"
+    name: "Kontrolle: Seite liefert die neue Version"
     needs: [build, deploy]
     runs-on: ubuntu-latest
     steps:
-      - name: "🔎 Live und Dev liefern die neue Version (bis zu 5 Minuten, der Zwischenspeicher braucht etwas)"
+      - name: "Live und Dev liefern die neue Version (bis zu 5 Minuten, der Zwischenspeicher braucht etwas)"
         env:
           URL: ${{ needs.deploy.outputs.url }}
           LIVE: ${{ needs.build.outputs.live }}
