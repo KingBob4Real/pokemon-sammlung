@@ -58,7 +58,7 @@ const call = async (body, k = key) => {
 
 const t = Date.now();
 const card = { id: "smoke-test-1", name: "Smoke-Test", num: "1", set: "smoke", setName: "Test", total: null, img: null };
-const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, section: null, position: null, trade: null, card } });
+const entry = (updated, qty) => ({ type: "collection", id: card.id, updated, deleted: 0, data: { qty, cond: "Near Mint", lang: "Deutsch", paid: 1.5, added: t, section: null, position: null, trade: null, copies: null, card } });
 const find = (res, type, id) => res.body.changes.find((c) => c.type === type && c.id === id);
 
 assert.equal((await fetch(base)).status, 200, "Backend antwortet");
@@ -140,6 +140,11 @@ const s1 = await call({ since: b.body.rev, changes: [section, placed] });
 assert.equal(find(s1, "section", "smoke-section").data.name, "Smoke-Abteilung", "Abteilung kommt an");
 assert.deepEqual([find(s1, "collection", card.id).data.section, find(s1, "collection", card.id).data.position], ["smoke-section", 1.5], "Karte kennt Abteilung und Position");
 await call({ since: s1.body.rev, changes: [{ ...section, updated: t + 2, deleted: 1, data: null }] });
+
+// Exemplare einzeln (Migration 0008_copies.sql): kommen genau so zurück
+const copies = [{ cond: "Near Mint", lang: "Deutsch", paid: 1.5 }, { cond: "Played", lang: "Englisch", paid: null }];
+const split = await call({ since: s1.body.rev, changes: [{ ...entry(t + 2, 2), data: { ...entry(t + 2, 2).data, copies } }] });
+assert.deepEqual(find(split, "collection", card.id).data.copies, copies, "Exemplare kommen zurück");
 
 const gone = { type: "listItem", id: item.id, updated: t + 1, deleted: 1, data: null };
 const c = await call({ since: b.body.rev, changes: [gone, { ...list, updated: t + 1, deleted: 1, data: null }, entry(t + 3, 0)] });
