@@ -20,10 +20,14 @@ export const SETS_TTL_MS = 7 * DAY_MS;
 export const IMAGE_MEMORY_MS = 30 * DAY_MS; // Bild-Ersatz merken, danach neu probieren (TCGdex reicht selten Bilder nach)
 export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
+export const MAX_COPIES = 100; // einzeln erfasste Exemplare einer Karte – wie MAX_COPIES im Backend
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
 export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
+
+// Speicher-Namen, die einer Person allein gehören – beim Abmelden fliegen genau diese vom Gerät (services/profileService.js)
+export const PERSONAL_KEYS = ["entities", "dirty", "rev", "sync", "prefs", "history", "trade"];
 
 // Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel, Einstellungen und Wertverlauf gehören ihr allein,
 // Preise, Sets und Bild-Ersatz teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.

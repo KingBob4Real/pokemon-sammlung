@@ -97,6 +97,28 @@ await done;
 assert.deepEqual([extra.value("bw9-40"), extra.get("bw9-40").cardmarketId, extra.get("bw9-40").extra, extra.get("bw9-40").rarity], [0.18, 280918, true, "Häufig"], "Preis aus der Liste, Details von TCGdex");
 assert.deepEqual([extra.value("bw9-41"), extra.get("bw9-41").extra, loads], [null, undefined, 1], "nicht in der Liste: ohne Preis; Liste nur einmal geladen");
 
+// Bekannte Karten (Cardmarket-Produkt gemerkt): Preis aus der Preisliste von heute statt TCGdex; neue Karten und eine
+// veraltete Liste (Pages-Lauf ausgefallen) fragen weiter TCGdex
+const tcgCalls = [];
+const tcgdexCount = { card: async (id, lang) => (tcgCalls.push(`${lang}:${id}`), { rarity: "Selten", dexId: [6], pricing: { cardmarket: { idProduct: 777, avg7: 9, avg30: 8, low: 5, avg1: 10 } } }) };
+let listAge = 3600e3;
+const cmList = async () => ({ updated: new Date(Date.now() - listAge).toISOString(), prices: {}, products: { 777: [12, 11, 10, 7] } });
+mem.set("p4", { "base1-4": { at: Date.now() - 2 * DAY, avg7: 1, avg30: 1, low: 1, avg1: 1, cardmarketId: 777, rarity: "Holo-Selten", dexId: 6 } });
+const listed = new PriceService(tcgdexCount, storage, "p4", DAY, 30 * DAY, cmList);
+done = loaded(listed);
+listed.request(["base1-4", "neu-9"]);
+await done;
+assert.deepEqual(tcgCalls, ["de:neu-9"], "nur die neue Karte fragt TCGdex");
+assert.deepEqual([listed.get("base1-4").avg7, listed.get("base1-4").low, listed.get("base1-4").rarity, listed.isFresh("base1-4")], [11, 7, "Holo-Selten", true], "Preis aus der Liste, Details bleiben");
+assert.equal(listed.get("neu-9").cardmarketId, 777, "neue Karte merkt sich ihr Produkt");
+listAge = 3 * DAY;
+mem.set("p5", { "base1-4": { at: Date.now() - 2 * DAY, avg7: 1, low: 1, cardmarketId: 777 } });
+const stale = new PriceService(tcgdexCount, storage, "p5", DAY, 30 * DAY, cmList);
+done = loaded(stale);
+stale.request(["base1-4"]);
+await done;
+assert.deepEqual([tcgCalls.at(-1), stale.value("base1-4")], ["de:base1-4", 9], "Liste älter als 2 Tage → TCGdex");
+
 // Zuordnung im Skript: Name + Attacken im selben Set, ♀ und ’ wie bei Cardmarket; Doppeldrucke nur in Sets mit
 // fortlaufenden Produkt-IDs (ID = Startwert + Nummer), dann genau dieses Produkt
 const { matchSet } = await import("../../scripts/cardmarket.mjs");

@@ -75,6 +75,11 @@ export class AuthService {
     return null;
   }
 
+  // Dieses Gerät abmelden. Mit dem Sync-Schlüssel angemeldet (session = null): nichts zu beenden, der Schlüssel gilt immer.
+  async logout(user) {
+    if (user.session) await this.users.endSession(user.session);
+  }
+
   rename(user, name) {
     return this.users.rename(user.id, name);
   }

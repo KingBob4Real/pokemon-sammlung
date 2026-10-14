@@ -27,6 +27,11 @@ export class AuthController {
     return denied ? error(denied.status, denied.error) : json({ ok: true, locked: Boolean(parsed.password) });
   }
 
+  async logout(user) {
+    await this.auth.logout(user);
+    return json({ ok: true });
+  }
+
   async rename(request, user) {
     const parsed = parseName(await body(request));
     if (!parsed.ok) return error(parsed.status, parsed.error);
