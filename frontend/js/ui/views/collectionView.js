@@ -46,7 +46,15 @@ export function render(main, ctx, folderId = "") {
   const entries = all.filter(inThis).sort(sorters[sortKey].compare);
   const stats = h("div", { class: "stats" });
   const scan = inFolder ? null : scanButton(ctx);
-  const filter = h("input", { type: "search", class: "field", placeholder: inFolder ? "Im Ordner suchen …" : "In der Sammlung suchen …", "aria-label": "Karten filtern", autocomplete: "off", enterkeyhint: "search", value: session.collectionFilter });
+  const filter = h("input", {
+    type: "search",
+    class: "field",
+    placeholder: inFolder ? "Im Ordner suchen …" : "In der Sammlung suchen …",
+    "aria-label": "Karten filtern",
+    autocomplete: "off",
+    enterkeyhint: "search",
+    value: session.collectionFilter,
+  });
   // Schnellfilter (Doppelte, ohne Kaufpreis, ohne Preis) – wirkt mit dem Textfilter zusammen, bleibt wie dieser erhalten
   const quick = QUICK_FILTERS[session.collectionQuick] ? session.collectionQuick : "all";
   const quickRow = segmented(

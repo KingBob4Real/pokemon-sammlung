@@ -145,7 +145,15 @@ function itemRow(ctx, item, onResolve = null) {
   };
   const action = onResolve && ACTIONS[item.status];
   return h("li", { class: `batch-row is-${item.status}` }, [
-    h("span", { class: "batch-art" }, [h("img", { src, alt: "", decoding: "async", onload: (e) => card && Object.assign(item, { src: e.target.src, srcOf: card.id }), ...(src === item.preview ? {} : { crossorigin: "anonymous" }) })]),
+    h("span", { class: "batch-art" }, [
+      h("img", {
+        src,
+        alt: "",
+        decoding: "async",
+        onload: (e) => card && Object.assign(item, { src: e.target.src, srcOf: card.id }),
+        ...(src === item.preview ? {} : { crossorigin: "anonymous" }),
+      }),
+    ]),
     h("div", { class: "batch-info" }, [
       h("b", {}, title),
       h("span", {}, card ? `${cardNumber(card)} · ${card.setName}` : STATUS[item.status]),
@@ -210,7 +218,13 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
     const open = b.items.filter((it) => !it.card).length;
     const busy = b.items.filter((it) => ["wait", "read", "find"].includes(it.status)).length;
     title.textContent = b.items.length ? `${plural(b.items.length, "Karte", "Karten")} gescannt` : "Liste ist leer";
-    note.textContent = [b.note, busy ? `${busy} ${busy === 1 ? "wird" : "werden"} noch gelesen …` : "", open - busy > 0 ? `${open - busy} ungeklärt – antippen zum Wählen, sonst bleiben sie draußen.` : ""].filter(Boolean).join(" ");
+    note.textContent = [
+      b.note,
+      busy ? `${busy} ${busy === 1 ? "wird" : "werden"} noch gelesen …` : "",
+      open - busy > 0 ? `${open - busy} ungeklärt – antippen zum Wählen, sonst bleiben sie draußen.` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     rows.replaceChildren(...b.items.map((it) => itemRow(ctx, it, resolve)));
     const n = cardsIn(b);
     save.disabled = !n;
@@ -292,7 +306,10 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
         h("h2", {}, `${plural(count, "Karte", "Karten")} ${pick ? `bei „${pick.label}“` : "in der Sammlung"}`),
         b.items.length ? h("p", { class: "muted" }, `${plural(b.items.length, "ungeklärte Karte bleibt", "ungeklärte Karten bleiben")} in der Scan-Liste.`) : null,
       ]),
-      h("div", { class: "scan-bar" }, [h("button", { type: "button", class: "btn btn-big", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` }), h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig")])
+      h("div", { class: "scan-bar" }, [
+        h("button", { type: "button", class: "btn btn-big", onclick: onScanMore, html: `${ICONS.camera}Weiter scannen` }),
+        h("button", { type: "button", class: "btn btn-ghost", onclick: ctx.close }, "Fertig"),
+      ])
     );
   }
 

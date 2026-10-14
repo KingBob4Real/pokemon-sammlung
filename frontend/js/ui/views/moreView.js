@@ -7,9 +7,9 @@ import { confirmDialog } from "../components/ask.js";
 import { forgetChoice } from "../components/profilePicker.js";
 import { panel } from "../components/widgets.js";
 
-// Ansicht „Mehr“: Konto & Sync-Stand (Person wechseln, abmelden), Sicherung, unter „Erweitert“ Sync-Schlüssel und alte Checkliste, Hinweise zu Preisen
+// Ansicht „Mehr“: Konto & Sync-Stand (Person wechseln, abmelden), Sicherung, unter „Erweitert“ der Sync-Schlüssel, Hinweise zu Preisen
 export function render(main, ctx) {
-  const { sync, backup, legacyImport, updates } = ctx;
+  const { sync, backup, updates } = ctx;
   ctx.setTitle("Mehr");
 
   // --- Sync ---
@@ -49,25 +49,16 @@ Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch 
     ctx.render();
   });
 
-  // --- Alte Checkliste ---
-  const legacy = legacyImport.readLocal();
-  const importLegacy = async () => {
-    try {
-      const r = await legacyImport.import(legacy);
-      ctx.notify(`Übernommen: ${plural(r.cards, "Karte", "Karten")} in die Sammlung, ${plural(r.lists, "neue Liste", "neue Listen")}.`, { type: "success" });
-    } catch (e) {
-      ctx.notifyError(e, { prefix: "Die alte Checkliste ist gerade nicht erreichbar. ", retry: importLegacy });
-    }
-    ctx.render();
-  };
-
   main.append(
     accountPanel(ctx, status),
     panel("Sicherung", [
       h("p", {}, "Alle Daten als Datei sichern oder eine Sicherung zurückholen. Import nimmt auch die Export-Datei der alten Checkliste."),
-      h("div", { class: "buttons" }, [h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"), h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file])]),
+      h("div", { class: "buttons" }, [
+        h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"),
+        h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file]),
+      ]),
     ]),
-    // Selten gebraucht: Notfall-Zugang per Schlüssel und die einmalige Übernahme – zugeklappt
+    // Selten gebraucht: Notfall-Zugang per Schlüssel – zugeklappt
     h("details", { class: "panel advanced" }, [
       h("summary", {}, h("h2", {}, "Erweitert")),
       h("h3", {}, "Sync-Schlüssel"),
@@ -78,11 +69,6 @@ Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch 
         h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
         h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
       ]),
-      h("h3", {}, "Alte Checkliste übernehmen"),
-      h("p", {}, "Legt für jede Gruppe der alten Checkliste eine Liste an und übernimmt abgehakte Karten samt „Mein Preis“ als Kaufpreis in die Sammlung. Mehrfach ausführen ist ok, es entsteht nichts doppelt."),
-      legacy
-        ? h("button", { type: "button", class: "btn", onclick: importLegacy }, `Aus diesem Browser übernehmen (${legacy.owned.length} abgehakt)`)
-        : h("p", { class: "muted" }, "In diesem Browser ist keine alte Checkliste gespeichert. Exportiere sie dort und wähle die Datei oben bei „Import“."),
     ]),
     panel("App", [
       h("p", {}, "Neue Versionen lädt die App automatisch, sobald du sie öffnest oder zu ihr zurückkehrst."),
@@ -101,8 +87,12 @@ Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch 
       h("p", { class: "muted small" }, `Version ${APP_VERSION}${IS_DEV ? " · Dev" : ""}`),
     ]),
     panel("Zu den Preisen", [
-      h("p", {}, "Der Marktwert ist der Cardmarket-Durchschnitt der letzten 7 Tage aus der TCGdex-API (fehlt er: 30 Tage; Trend und „ab“ zählen nicht). Er mischt alle Sprachen und Zustände. Echte Preise für Karten in deiner Sprache ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),
-      h("p", { class: "muted small" }, ["Kartenbilder & Daten: ", h("a", { href: "https://tcgdex.dev", target: "_blank", rel: "noopener" }, "TCGdex"), ". Fan-Projekt ohne Verbindung zu Nintendo, Creatures, GAME FREAK, The Pokémon Company oder Cardmarket."]),
+      h("p", {}, "Der Marktwert ist der Cardmarket-Durchschnitt der letzten 7 Tage aus Cardmarkets täglicher Preisliste (fehlt er: 30 Tage; Trend und „ab“ zählen nicht). Er mischt alle Sprachen und Zustände. Echte Preise für Karten in deiner Sprache ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),
+      h("p", { class: "muted small" }, [
+        "Kartenbilder & Daten: ",
+        h("a", { href: "https://tcgdex.dev", target: "_blank", rel: "noopener" }, "TCGdex"),
+        ". Fan-Projekt ohne Verbindung zu Nintendo, Creatures, GAME FREAK, The Pokémon Company oder Cardmarket.",
+      ]),
     ])
   );
 

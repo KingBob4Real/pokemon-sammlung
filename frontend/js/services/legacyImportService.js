@@ -6,14 +6,8 @@ import { objOr, positive } from "../core/format.js";
  * Mehrfach ausführen ist ok – vorhandene Listen und Einträge werden nicht doppelt angelegt.
  */
 export class LegacyImportService {
-  constructor({ store, collection, lists, fetchJson, storage, oldAppUrl, keys }) {
-    Object.assign(this, { store, collection, lists, fetchJson, storage, oldAppUrl, keys });
-  }
-
-  // Gleiche Domain wie die alte Checkliste → im selben Browser direkt lesbar
-  readLocal() {
-    const owned = this.storage.get(this.keys.legacyOwned, null);
-    return Array.isArray(owned) ? { owned, ownPrices: objOr(this.storage.get(this.keys.legacyPrices, {})) } : null;
+  constructor({ store, collection, lists, fetchJson, oldAppUrl }) {
+    Object.assign(this, { store, collection, lists, fetchJson, oldAppUrl });
   }
 
   async import({ owned, ownPrices }) {

@@ -49,9 +49,6 @@ export function storageKeys(profile = "") {
     prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
     sets: `${P}sets.v4`, // v4: Kartenzahl = Deutsch oder Englisch, was mehr hat (v3: deutsche + englische Sets, Serie je Set)
     images: `${P}images.v1`, // Karten-ID + Größe → Bild-Adresse, die geklappt hat, oder "" (ui/components/cardTile.js)
-    // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
-    legacyOwned: "pkc.owned.v1",
-    legacyPrices: "pkc.ownPrices.v1",
   };
 }
 

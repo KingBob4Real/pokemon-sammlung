@@ -67,7 +67,18 @@ export class CollectionRepository {
       deleted: row.deleted,
       data: row.deleted
         ? null
-        : { qty: row.qty, cond: row.condition, lang: row.language, paid: row.paid, added: row.added, section: row.section, position: row.position, trade: row.trade == null ? null : Boolean(row.trade), copies: row.copies ? JSON.parse(row.copies) : null, card: cardFromRow(row) },
+        : {
+            qty: row.qty,
+            cond: row.condition,
+            lang: row.language,
+            paid: row.paid,
+            added: row.added,
+            section: row.section,
+            position: row.position,
+            trade: row.trade == null ? null : Boolean(row.trade),
+            copies: row.copies ? JSON.parse(row.copies) : null,
+            card: cardFromRow(row),
+          },
     };
   }
 }

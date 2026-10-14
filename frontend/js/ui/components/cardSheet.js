@@ -35,10 +35,22 @@ export function cardHead(card, prices, language = () => "Deutsch") {
             : !navigator.onLine
               ? h("p", { class: "muted" }, "Du bist offline – für diese Karte ist noch kein Preis gespeichert.")
               : prices.hasFailed(card.id)
-                ? h("p", { class: "muted" }, ["Der Preis konnte gerade nicht geladen werden. ", h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden")])
+                ? h("p", { class: "muted" }, [
+                    "Der Preis konnte gerade nicht geladen werden. ",
+                    h("button", { type: "button", class: "link-button", onclick: () => (prices.request([card.id]), drawPrices()) }, "Erneut laden"),
+                  ])
                 : h("p", { class: "muted" }, "Preis wird geladen …"),
-      h("p", { class: "muted small" }, `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}${p?.extra ? " · aus Cardmarkets Preisliste (TCGdex ordnet diese Karte nicht zu)" : ""}`),
-      h("a", { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" }, `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`)
+      h(
+        "p",
+        { class: "muted small" },
+        `Richtwert über alle Sprachen & Zustände${p?.updated ? ` · Stand ${fmtDate(p.updated)}` : ""}` +
+          (p?.extra ? " · aus Cardmarkets Preisliste (TCGdex ordnet diese Karte nicht zu)" : "")
+      ),
+      h(
+        "a",
+        { class: "btn cm", href: cardmarketUrl(card, p, language()), target: "_blank", rel: "noopener" },
+        `Auf Cardmarket ansehen (${CARDMARKET_LANGUAGES[language()] ? language() : "alle Sprachen"}, ab Excellent)`
+      )
     );
   };
   const image = imageFor(card, "high");
@@ -64,7 +76,17 @@ export function cardHead(card, prices, language = () => "Deutsch") {
 }
 
 const choice = (options, value) => h("select", { class: "field" }, options.map((o) => h("option", { selected: value === o }, o)));
-const priceInput = (value, label) => h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", "aria-label": label, value: fmtPriceInput(value) });
+const priceInput = (value, label) =>
+  h("input", {
+    type: "text",
+    class: "field",
+    inputmode: "decimal",
+    autocomplete: "off",
+    enterkeyhint: "done",
+    placeholder: "z. B. 12,50 €",
+    "aria-label": label,
+    value: fmtPriceInput(value),
+  });
 
 /**
  * Kartenansicht: Kopf (Bild, Preise), Sammlung (Anzahl, Zustand, Sprache, Kaufpreis – ab 2 Stück auch je Exemplar) und Listen.
@@ -152,7 +174,8 @@ export function renderCardSheet(body, card, ctx) {
       syncFields();
       ctx.afterChange(false);
     };
-    return h("div", { class: "copy-row" }, [h("span", { class: "copy-n" }, `${i + 1}.`), l, k, p, h("button", { type: "button", class: "btn btn-ghost copy-del", "aria-label": `Exemplar ${i + 1} herausnehmen`, onclick: drop, html: ICONS.close })]);
+    const del = h("button", { type: "button", class: "btn btn-ghost copy-del", "aria-label": `Exemplar ${i + 1} herausnehmen`, onclick: drop, html: ICONS.close });
+    return h("div", { class: "copy-row" }, [h("span", { class: "copy-n" }, `${i + 1}.`), l, k, p, del]);
   };
   const drawCopies = () => {
     const e = collection.entry(card.id);

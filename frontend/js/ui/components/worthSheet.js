@@ -70,7 +70,11 @@ export function openWorthSheet(ctx, { trends = false } = {}) {
       const img = imageFor(card, "low");
       return h("button", { type: "button", class: "mover", onclick: () => sheet.openCard(card) }, [
         h("span", { class: img ? "mover-art" : "mover-art no-img" }, img ? [cardImg(card, "low", img, { alt: "", loading: "lazy" })] : []),
-        h("span", { class: "mover-info" }, [h("b", {}, card.name), h("small", {}, `${cardNumber(card)} · ${card.setName}`), h("small", {}, `Ø 7 T ${fmtEur(price.avg7)} · Ø 30 T ${fmtEur(price.avg30)}`)]),
+        h("span", { class: "mover-info" }, [
+          h("b", {}, card.name),
+          h("small", {}, `${cardNumber(card)} · ${card.setName}`),
+          h("small", {}, `Ø 7 T ${fmtEur(price.avg7)} · Ø 30 T ${fmtEur(price.avg30)}`),
+        ]),
         h("span", { class: `mover-diff ${diff > 0 ? "up" : "down"}` }, [fmtSigned(diff), h("small", {}, `${diff > 0 ? "+" : "−"}${Math.round(Math.abs(diff / price.avg30) * 100)} %`)]),
       ]);
     };

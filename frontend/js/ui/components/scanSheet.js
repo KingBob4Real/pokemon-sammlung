@@ -304,7 +304,12 @@ function scanFlow(body, ctx, file, listId, pick = null) {
         h("label", { class: "label" }, ["Kaufpreis pro Stück", h("div", { class: "toolbar tight" }, [paid, takePrice])]),
         paidNote,
       ]),
-      checks.length ? h("section", { class: "sheet-part" }, [h("h3", {}, "Listen"), h("div", { class: "checks" }, checks.map(([list, box]) => h("label", { class: "check-row" }, [box, h("span", {}, list.name)])))]) : null,
+      checks.length
+        ? h("section", { class: "sheet-part" }, [
+            h("h3", {}, "Listen"),
+            h("div", { class: "checks" }, checks.map(([list, box]) => h("label", { class: "check-row" }, [box, h("span", {}, list.name)]))),
+          ])
+        : null,
       h("div", { class: "buttons" }, [ghost("Falsche Karte? Manuell suchen", manualSearch(rec))]),
       h("div", { class: "scan-bar" }, [add])
     );

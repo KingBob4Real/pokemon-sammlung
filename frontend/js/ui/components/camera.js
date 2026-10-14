@@ -46,7 +46,11 @@ export function cameraView({ mode = "single", layout = "3x3", tray = null, onPho
   const shutter = h("button", { type: "button", class: "camera-shutter", "aria-label": "Foto aufnehmen", disabled: true });
   const auto = h("input", { type: "checkbox", checked: true });
   const autoLabel = h("label", { class: "camera-chip" }, [auto, "Auto"]);
-  const grid = h("select", { class: "camera-chip", "aria-label": "Fächer pro Seite (Spalten × Zeilen)" }, LAYOUTS.map((l) => h("option", { value: l, selected: l === layout }, l.replace("x", " × "))));
+  const grid = h(
+    "select",
+    { class: "camera-chip", "aria-label": "Fächer pro Seite (Spalten × Zeilen)" },
+    LAYOUTS.map((l) => h("option", { value: l, selected: l === layout }, l.replace("x", " × ")))
+  );
   const modeButtons = Object.entries(MODES).map(([m, label]) => h("button", { type: "button", class: "camera-mode", "data-mode": m, onclick: () => setMode(m) }, label));
   const el = h("div", { class: "camera" }, [
     video,
