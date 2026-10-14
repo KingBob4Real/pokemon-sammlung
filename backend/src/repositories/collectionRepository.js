@@ -25,7 +25,7 @@ const UPSERT = `
 // gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
 const ROWS = `
   SELECT c.card_id AS id, c.qty, c.condition, c.language, c.paid, c.added, c.section, c.position, c.trade, c.copies, c.updated, c.deleted, ${CARD_COLUMNS}
-  FROM collection c LEFT JOIN cards k ON k.id = c.card_id`;
+  FROM collection c LEFT JOIN cards k ON k.user_id = c.user_id AND k.id = c.card_id`;
 const CHANGED = `
   ${ROWS} WHERE c.user_id = ?3 AND c.rev > ?1
   UNION
@@ -35,7 +35,7 @@ const CHANGED = `
 // trade = 0 heißt behalten, auch wenn doppelt. Gelöschte und Anzahl 0 zählen nicht.
 const OFFERS = `
   SELECT c.user_id, c.qty, c.condition, c.language, ${CARD_COLUMNS}
-  FROM collection c JOIN cards k ON k.id = c.card_id
+  FROM collection c JOIN cards k ON k.user_id = c.user_id AND k.id = c.card_id
   WHERE c.user_id != ?1 AND c.deleted = 0 AND c.qty > 0 AND (c.trade = 1 OR (c.trade IS NULL AND c.qty > 1))`;
 
 export class CollectionRepository {

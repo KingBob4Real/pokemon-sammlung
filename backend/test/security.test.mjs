@@ -49,7 +49,7 @@ assert.ok(await users.findByKey(second.token), "andere Sitzung bleibt");
 await auth.logout({ id: "tim", session: null });
 assert.ok(await users.findByKey(second.token), "Abmelden mit dem Schlüssel beendet keine Sitzung");
 
-// Kartenbilder: nur TCGdex – die Tabelle cards gilt für alle Personen
+// Kartenbilder: nur TCGdex – die anderen sehen deine Karten beim Tauschen
 const change = (img) => ({ since: 0, changes: [{ type: "collection", id: "base1-4", updated: 1, deleted: 0, data: { qty: 1, added: 1, card: { id: "base1-4", name: "Glurak", num: "4", set: "base1", setName: "Grundset", img } } }] });
 assert.ok(parseSyncRequest(change("https://assets.tcgdex.net/de/base/base1/4")).ok, "TCGdex-Bild geht durch");
 assert.ok(parseSyncRequest(change(null)).ok, "ohne Bild geht durch");

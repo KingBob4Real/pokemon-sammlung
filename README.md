@@ -223,7 +223,7 @@ Nach Änderungen an JS/CSS hält der Service Worker lokal die alten Dateien (die
 | Was | Befehl | Wann automatisch |
 | --- | --- | --- |
 | Frontend: Katalog, Sammlung (inkl. Exemplare), Speicher & Preise, Personen, Scanner | `node frontend/test/<catalog\|collection\|memory\|profiles\|scan>.test.mjs` | jeder Push (`test.yml`), vor jedem Pages-Deploy |
-| Backend: Sicherheit, Exemplare (echte SQL auf SQLite) | `node backend/test/<security\|copies>.test.mjs` | jeder Push, vor jedem Backend-Deploy |
+| Backend: Sicherheit, Exemplare, Abgleich (echte SQL auf SQLite) | `node backend/test/<security\|copies\|sync>.test.mjs` | jeder Push, vor jedem Backend-Deploy |
 | Smoke gegen ein laufendes Backend | `node backend/test/smoke.mjs <URL> <Schlüssel> [Schlüssel B]` | von Hand nach einem Deploy |
 
 Der Smoke-Test prüft Sync, Trennung zwischen Personen, Tauschen, Exemplare, Scan und Bilder. Mit `SMOKE_ACCOUNTS=1` auch Anmelden, Passwort und Abmelden – setzt kurz ein Passwort und meldet andere Geräte ab, darum nur mit einer Test-Person. Gegen Live nur mit dem eigenen Schlüssel.
@@ -303,7 +303,7 @@ Cloudflare D1 (SQLite). Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstel
 
 | Tabelle | Inhalt |
 | --- | --- |
-| `cards` | Kartendaten: Name, Nummer, Set, Bild (für alle Personen gemeinsam) |
+| `cards` | Kartendaten: Name, Nummer, Set, Bild (pro Person – was ein Gerät schickt, gilt nur für die eigene Sammlung) |
 | `collection` | Sammlung: Anzahl, Zustand, Sprache, Kaufpreis, `section` (Ordner), `position` (eigene Reihenfolge), `trade` (leer = wenn doppelt), `copies` (JSON je Exemplar, leer = alle gleich) |
 | `lists` · `list_items` | eigene Listen und welche Karte in welcher Liste |
 | `sections` | Ordner der Sammlung (Name, Position) |
@@ -334,7 +334,7 @@ node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Lis
 - **Anmelden nur mit Passwort:** Die App liegt öffentlich im Netz, „Wer sammelt?“ zeigt alle Namen. Ohne Passwort lehnt `POST /login` ab (403 mit Erklärung) – sonst könnte jeder eine Person antippen, übernehmen und mit einem eigenen Passwort aussperren.
 - **Fehlversuche:** Nach 5 falschen Passwörtern ist die Person 15 Minuten gesperrt, danach geht ein Versuch pro 15 Minuten. Gezählt wird vor dem Prüfen und atomar in der Datenbank, damit viele gleichzeitige Versuche die Sperre nicht umgehen (`UserRepository.loginAttempt`).
 - **Sitzungen** laufen nicht ab. „Abmelden“ beendet die Sitzung dieses Geräts (`POST /logout`) und löscht die eigenen Daten der Person vom Gerät (`PERSONAL_KEYS` in `config.js`). Ein verlorenes Gerät meldet man ab, indem man das Passwort ändert (beendet alle anderen Sitzungen). Jede neue Anmeldung auf einem Gerät beendet dessen vorige Sitzung.
-- **Kartendaten** (`cards`) teilen sich alle Personen; Bilder nimmt das Backend darum nur von `https://assets.tcgdex.net/` an. Der Bild-Durchreicher `GET /img` baut die Adresse selbst aus geprüften Teilen und reicht nur PNG/JPEG/WebP durch.
+- **Kartendaten** (`cards`) gehören jeder Person selbst – keine (veraltete) App überschreibt fremde. Die anderen sehen sie beim Tauschen; Bilder nimmt das Backend darum nur von `https://assets.tcgdex.net/` an. Der Bild-Durchreicher `GET /img` baut die Adresse selbst aus geprüften Teilen und reicht nur PNG/JPEG/WebP durch.
 - **Frontend:** Content-Security-Policy in `index.html` – nur eigene Skripte, Verbindungen nur zu TCGdex, dem Backend (Live, Dev, lokal) und der alten Checkliste.
 
 ### Speicher auf dem Gerät

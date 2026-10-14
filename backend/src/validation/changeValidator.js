@@ -15,8 +15,8 @@ const optCopies = (v, qty) =>
   v == null ||
   (Array.isArray(v) && v.length >= 2 && v.length <= MAX_COPIES && v.length === qty &&
     v.every((c) => c != null && typeof c === "object" && Object.keys(c).every((k) => COPY_KEYS.includes(k)) && optStr(c.cond, 40) && optStr(c.lang, 40) && optAmount(c.paid)));
-// Bilder nur von TCGdex: die Tabelle cards teilen sich alle Personen – eine fremde Adresse (z. B. ein Zählpixel)
-// bekämen sonst auch die anderen in ihre App geschickt. Die App setzt nie etwas anderes (domain/card.js, toCard).
+// Bilder nur von TCGdex: die anderen sehen deine Karten beim Tauschen – eine fremde Adresse (z. B. ein Zählpixel)
+// bekämen sonst auch sie in ihre App geschickt. Die App setzt nie etwas anderes (domain/card.js, toCard).
 const TCGDEX_IMAGES = "https://assets.tcgdex.net/";
 
 const isCard = (c) =>

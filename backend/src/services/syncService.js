@@ -18,7 +18,7 @@ export class SyncService {
 
   async sync(user, since, changes) {
     const json = JSON.stringify(changes);
-    const writes = changes.length ? [this.revisions.bump(), this.cards.upsertFrom(json), ...this.tables.map((t) => t.upsert(json, user.id))] : [];
+    const writes = changes.length ? [this.revisions.bump(), this.cards.upsertFrom(json, user.id), ...this.tables.map((t) => t.upsert(json, user.id))] : [];
     const reads = this.tables.map((t) => t.changed(since, json, user.id));
     // Ein Batch ist eine Transaktion – und bleibt weit unter den 50 Abfragen pro Aufruf im Gratis-Tarif
     const results = await this.db.batch([...writes, ...reads, this.revisions.current()]);
