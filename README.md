@@ -171,7 +171,7 @@ Eigener Reiter **„Tauschen“** unten (`#tauschen`).
 
 ```mermaid
 flowchart LR
-  App["📱 App<br/>GitHub Pages"] -- "Sync · Scan · Tauschen · Anmelden" --> Worker["⚙️ Cloudflare Worker"]
+  App["App<br/>GitHub Pages"] -- "Sync · Scan · Tauschen · Anmelden" --> Worker["Cloudflare Worker"]
   Worker --> D1[("D1-Datenbank")]
   Worker --> AI["Workers AI<br/>(Scanner)"]
   App -- "Karten, Bilder, neue Preise" --> TCGdex["TCGdex-API"]
@@ -249,13 +249,13 @@ Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) –
 
 ### Deploy mit einem Klick
 
-**Actions → „Deploy“ → Run workflow:** bei „Use workflow from“ den **Branch** wählen, darunter die **Stage**.
+**Actions → „Deploy“ → Run workflow:** bei „Use workflow from“ den **Branch** wählen – z. B. `feature/xyz`, um ein einzelnes Feature auf Dev zu testen –, darunter die **Stage**.
 
 ```mermaid
 flowchart LR
-  T["🧪 Test<br/>Frontend + Backend"] --> S["🔀 Stage<br/>develop bzw. main setzen"]
-  S --> B["⚙️ Backend<br/>npm ci · Tests · Migrationen · Worker · Kontrolle"]
-  B --> F["🌐 Frontend<br/>Build · Deployment · Kontrolle"]
+  T["Test<br/>Frontend + Backend"] --> S["Stage<br/>develop bzw. main setzen"]
+  S --> B["Backend<br/>npm ci · Tests · Migrationen · Worker · Kontrolle"]
+  B --> F["Frontend<br/>Pages-Lauf auf main: Build · Deployment · Kontrolle"]
 ```
 
 | Stage | Was mit dem Branch passiert | Ziel |
@@ -267,7 +267,8 @@ flowchart LR
 - **Dev** überschreibt `develop`, bricht aber ab, wenn dort Commits liegen, die es in keinem anderen Branch gibt – nichts geht verloren.
 - **Prod** geht nur, wenn der Branch `main` schon enthält (sonst erst `main` in den Branch mergen) – so geht genau das live, was getestet wurde.
 - Deployt wird, was auf GitHub liegt: vorher pushen. Den Workflow hat jeder Branch, der von `main` abzweigt.
-- Am Ende prüft die Kontrolle, dass `/` und `/dev/` wirklich die neue Version ausliefern; jeder Lauf schreibt eine Zusammenfassung (Commit, Version, Ziel).
+- **Frontend:** GitHub Pages veröffentlicht nur Läufe von `main` – darum startet Deploy den Pages-Lauf auf `main` (der baut `main` → `/` und `develop` → `/dev/`) und wartet ihn ab; der Link steht in der Zusammenfassung. Dessen Kontrolle prüft, dass beide wirklich die neue Version ausliefern.
+- Immer nur ein Deploy auf einmal; jeder Lauf schreibt eine Zusammenfassung (Branch, Commit, Ziel).
 
 ### Was bei jedem Push passiert
 
@@ -276,7 +277,7 @@ flowchart LR
 | `test.yml` – **Tests** | jeder Push, jeder Branch | alle Tests ohne Netz |
 | `backend.yml` – **Backend zu Cloudflare** | Push auf `main`/`develop` mit Änderungen in `backend/` | Token prüfen → `npm ci` → Tests → Migrationen → Worker → Kontrolle (`main` → Live, `develop` → Dev) |
 | `pages.yml` – **Frontend auf GitHub Pages** | Push auf `main`/`develop` mit Änderungen in `frontend/` oder `scripts/`, täglich 04:30 UTC | Build (Live-Tests, `main` → `/`, `develop` → `/dev/`, Version, Cardmarket-Preisliste) → Deployment → Kontrolle |
-| `deploy.yml` – **Deploy** | von Hand | siehe oben; ruft die drei anderen auf |
+| `deploy.yml` – **Deploy** | von Hand, beliebiger Branch | siehe oben; ruft `test.yml` und `backend.yml` auf und startet `pages.yml` auf `main` |
 
 - **Pages nur von main:** Zeitplan und Ablauf von `pages.yml` kommen immer aus der Datei auf `main`. Ein Push auf `develop` stößt einen Lauf auf `main` an, der beide Branches baut.
 - **Version:** `?v=` in `index.html` setzt der Pages-Workflow selbst – Zeitpunkt des letzten Commits, der `frontend/` geändert hat (der tägliche Neubau ändert sie also nicht). Neue Version → der Service Worker wirft die gespeicherten App-Dateien weg, alte und neue Module mischen sich nie. **Nicht von Hand hochzählen.**
@@ -379,13 +380,6 @@ node test/smoke.mjs https://<backend-adresse> "$(cat ../.keys/owner.txt)"
 5. Testen: **Actions → „Backend zu Cloudflare“ → Run workflow**.
 
 Ohne Secret läuft `backend.yml` durch, warnt nur und veröffentlicht nichts.
-
-</details>
-
-<details>
-<summary><b>GitHub: Pages für den Deploy-Workflow freigeben</b></summary>
-
-Settings → Environments → **github-pages** → *Deployment branches and tags* → **No restriction**. Sonst darf nur ein Lauf von `main` die Seite veröffentlichen, und „Deploy“ scheitert beim Frontend für andere Branches.
 
 </details>
 
