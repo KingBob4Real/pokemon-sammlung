@@ -162,4 +162,31 @@ assert.equal(draft.draft.give.length, 0, "Anzahl 0 nimmt die Karte raus");
 draft.fill([{ card: card("a"), qty: 2, cond: "Mint", lang: "Deutsch" }], [{ card: card("t1"), qty: 3, cond: "Good", lang: "Englisch" }]);
 assert.deepEqual([draft.draft.give[0].qty, draft.draft.get[0].cond], [1, "Good"], "Vorschlag: je ein Exemplar");
 
+// Exemplare: eins auf Deutsch für 120 €, eins auf Englisch ohne Kaufpreis; alle gleich → wieder nur die Anzahl
+const g = card("g");
+const gl = () => collection.entry("g");
+collection.setQuantity(g, 1);
+collection.update("g", { paid: 120 });
+collection.addCopies(g, 1, { cond: "Played", lang: "Englisch" });
+assert.deepEqual([gl().qty, gl().copies.map((x) => x.lang), gl().lang, gl().paid], [2, ["Deutsch", "Englisch"], "Deutsch", 120], "Scan: neues Exemplar mit eigenen Angaben, das erste bleibt");
+assert.deepEqual(collection.summary(() => 100, [gl()]), { count: 2, distinct: 1, worth: 200, unknown: 0, paid: 120, diff: -20, diffCount: 1 }, "Kaufpreis pro Exemplar");
+assert.ok(QUICK_FILTERS.unpaid.test(gl()), "ein Exemplar ohne Kaufpreis → „Ohne Kaufpreis“");
+collection.setCopy("g", 1, { lang: "Deutsch", cond: "Near Mint", paid: 120 });
+assert.deepEqual([gl().copies, gl().qty, QUICK_FILTERS.unpaid.test(gl())], [null, 2, false], "alle gleich → wieder nur Anzahl");
+collection.setCopy("g", 0, { lang: "Japanisch" });
+assert.equal(gl().lang, "Japanisch", "Felder der Karte = erstes Exemplar (Tauschen, Cardmarket-Link)");
+collection.setQuantity(g, 3);
+assert.deepEqual(gl().copies.map((x) => x.lang), ["Japanisch", "Deutsch", "Deutsch"], "mehr = wie das letzte");
+collection.update("g", { cond: "Mint" });
+assert.deepEqual(gl().copies.map((x) => x.cond), ["Mint", "Mint", "Mint"], "Zustand für alle");
+const undoG = collection.removeAll([g]);
+assert.deepEqual([gl().qty, gl().copies], [0, null], "raus aus der Sammlung");
+undoG();
+assert.equal(gl().copies.length, 3, "Rückgängig holt die Exemplare zurück");
+collection.removeCopy("g", 0);
+assert.deepEqual([gl().copies, gl().lang, gl().qty], [null, "Deutsch", 2], "erstes raus → die übrigen sind gleich");
+collection.setCopy("g", 1, { lang: "Englisch" });
+collection.setQuantity(g, 101);
+assert.deepEqual([gl().qty, gl().copies], [101, null], "über 100 nur noch als Anzahl");
+
 console.log("Sammlung ok");

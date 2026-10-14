@@ -20,6 +20,7 @@ export const SETS_TTL_MS = 7 * DAY_MS;
 export const IMAGE_MEMORY_MS = 30 * DAY_MS; // Bild-Ersatz merken, danach neu probieren (TCGdex reicht selten Bilder nach)
 export const SEARCH_LIMIT = 120;
 export const SYNC_BATCH = 500;
+export const MAX_COPIES = 100; // einzeln erfasste Exemplare einer Karte – wie MAX_COPIES im Backend
 export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen

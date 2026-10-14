@@ -1,5 +1,6 @@
 // Grenzen des Sync-Endpunkts
 export const MAX_CHANGES_PER_REQUEST = 1000;
+export const MAX_COPIES = 100; // einzeln erfasste Exemplare einer Karte (mehr gleiche gehen über die Anzahl)
 
 // Karten-Scanner (Workers AI). Gratis-Tarif: 10.000 Neurons pro Tag für das ganze Cloudflare-Konto,
 // also für Live und Dev zusammen. Gemessen: 6,6–9,3 Neurons pro Scan (825 Tokens rein, ~65 raus), höchstens

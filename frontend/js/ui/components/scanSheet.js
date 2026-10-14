@@ -251,7 +251,7 @@ function scanFlow(body, ctx, file, listId, pick = null) {
     let qty = 1;
     const qtyOut = h("output", { "aria-live": "polite" }, "1");
     const cond = h("select", { class: "field" }, CONDITIONS.map((c) => h("option", { selected: (entry?.cond || "Near Mint") === c }, c)));
-    const language = entry?.lang || LANGUAGE_NAMES[rec?.language] || "Deutsch"; // englische Karte gescannt → „Englisch“
+    const language = LANGUAGE_NAMES[rec?.language] || entry?.lang || "Deutsch"; // englische Karte gescannt → „Englisch“ (neues Exemplar)
     const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: language === l }, l)));
     lang.addEventListener("change", () => head.drawPrices()); // Cardmarket-Link passend zur Sprache
     const head = cardHead(card, prices, () => lang.value);
@@ -277,8 +277,7 @@ function scanFlow(body, ctx, file, listId, pick = null) {
       }
       let structural = false;
       ctx.store.batch(() => {
-        collection.setQuantity(card, owned + qty);
-        collection.update(card.id, { cond: cond.value, lang: lang.value, paid: price });
+        collection.addCopies(card, qty, { cond: cond.value, lang: lang.value, paid: price || null }); // eigene Angaben, die vorhandenen bleiben
         for (const [list, box] of checks) {
           if (box.checked === lists.contains(list.id, card.id)) continue;
           lists.setMembership(list.id, card, box.checked);
