@@ -32,7 +32,7 @@ export function createSorters({ valueOf, setOrder, dexOf }) {
 export const QUICK_FILTERS = {
   all: { label: "Alle", test: () => true },
   dupes: { label: "Doppelte", test: (e) => e.qty > 1 },
-  unpaid: { label: "Ohne Kaufpreis", test: (e) => positive(e.paid) == null },
+  unpaid: { label: "Ohne Kaufpreis", test: (e) => (e.copies ?? [e]).some((c) => positive(c.paid) == null) }, // auch ein Exemplar ohne
   noprice: { label: "Ohne Preis", test: (e, valueOf) => valueOf(e.card.id) == null }, // wie „x ohne Preis“ bei den Kennzahlen
 };
 

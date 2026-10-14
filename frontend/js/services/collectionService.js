@@ -1,10 +1,29 @@
+import { MAX_COPIES } from "../config.js";
 import { isObj, positive } from "../core/format.js";
 import { orderOf } from "../domain/sorting.js";
 
 const cleanName = (name) => String(name ?? "").trim().slice(0, 80);
 
+// --- Exemplare: jedes Stück mit eigenem Zustand, eigener Sprache und eigenem Kaufpreis ---
+// Gespeichert nur, wenn sie sich unterscheiden (copies, genau qty Stück); sonst gelten cond/lang/paid für alle wie bisher.
+// cond/lang/paid sind immer die des ersten Exemplars – für Tauschen, den Cardmarket-Link und ältere App-Fassungen.
+const COPY_FIELDS = ["cond", "lang", "paid"];
+const copyOf = (e) => ({ cond: e.cond, lang: e.lang, paid: e.paid ?? null });
+const same = (x, y) => COPY_FIELDS.every((k) => (x[k] ?? null) === (y[k] ?? null));
+
+// Alle Exemplare einer Karte, auch wenn sie gleich sind und nur als Anzahl gespeichert
+export const copiesOf = (e) => e?.copies ?? Array.from({ length: e?.qty || 0 }, () => copyOf(e));
+
+// Exemplare → Eintrag. ponytail: über MAX_COPIES (Backend: genauso) nur noch als Anzahl mit den Angaben des ersten –
+// so viele verschiedene Stücke einer Karte hat niemand.
+function withCopies(e, copies) {
+  const first = copies[0] ?? copyOf(e);
+  const differ = copies.length > 1 && copies.length <= MAX_COPIES && copies.some((c) => !same(c, first));
+  return { ...e, ...first, qty: copies.length, copies: differ ? copies : null };
+}
+
 /**
- * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis, dazu Ordner und eigene Position.
+ * Meine Sammlung: pro Karte Anzahl, Zustand, Sprache und Kaufpreis (auch je Exemplar, siehe oben), dazu Ordner und eigene Position.
  * Anzahl 0 = nicht vorhanden. Zustand & Kaufpreis bleiben dabei erhalten,
  * versehentlich entfernt ist also nichts verloren.
  * Ordner (Art „section“ – hießen früher Abteilungen, Daten unverändert) sind eigene Fächer der Sammlung, z. B. „Ordner 1“,
@@ -36,15 +55,32 @@ export class CollectionService {
 
   setQuantity(card, qty) {
     const prev = this.entry(card.id);
-    this.store.put("collection", card.id, {
-      cond: "Near Mint",
-      lang: "Deutsch",
-      paid: null,
-      ...prev,
-      card,
-      qty: Math.max(0, Math.min(9999, qty)),
-      added: prev && prev.qty > 0 ? prev.added : Date.now(),
-    });
+    const n = Math.max(0, Math.min(9999, qty));
+    const next = { cond: "Near Mint", lang: "Deutsch", paid: null, ...prev, card, qty: n, added: prev && prev.qty > 0 ? prev.added : Date.now() };
+    // einzeln erfasste Exemplare: weniger = die letzten weg, mehr = wie das letzte
+    const copies = prev?.copies && (n <= prev.copies.length ? prev.copies.slice(0, n) : [...prev.copies, ...Array(n - prev.copies.length).fill(prev.copies.at(-1))]);
+    this.store.put("collection", card.id, copies ? withCopies(next, copies) : next);
+  }
+
+  // Neue Exemplare mit eigenen Angaben (Scannen) – die vorhandenen bleiben, wie sie sind
+  addCopies(card, n, copy) {
+    const prev = this.entry(card.id);
+    const have = prev?.qty || 0;
+    if (have + n > MAX_COPIES) return this.setQuantity(card, have + n);
+    const added = Array.from({ length: n }, () => ({ cond: "Near Mint", lang: "Deutsch", paid: null, ...copy }));
+    const base = { ...prev, card, added: have ? prev.added : Date.now() };
+    this.store.put("collection", card.id, withCopies(base, [...(have ? copiesOf(prev) : []), ...added]));
+  }
+
+  // Ein Exemplar ändern (patch: cond, lang, paid) bzw. herausnehmen
+  setCopy(cardId, index, patch) {
+    const e = this.entry(cardId);
+    if (e) this.store.put("collection", cardId, withCopies(e, copiesOf(e).map((c, i) => (i === index ? { ...c, ...patch } : c))));
+  }
+
+  removeCopy(cardId, index) {
+    const e = this.entry(cardId);
+    if (e) this.store.put("collection", cardId, withCopies(e, copiesOf(e).filter((_, i) => i !== index)));
   }
 
   // Haken: rein (Anzahl 1) oder raus → beim Rausnehmen die Funktion für „Rückgängig“, sonst null
@@ -81,9 +117,12 @@ export class CollectionService {
     return counts;
   }
 
+  // Zustand, Sprache oder Kaufpreis hier gelten für alle Exemplare
   update(cardId, patch) {
     const e = this.entry(cardId);
-    if (e) this.store.put("collection", cardId, { ...e, ...patch });
+    if (!e) return;
+    const forCopies = Object.fromEntries(Object.entries(patch).filter(([k]) => COPY_FIELDS.includes(k)));
+    this.store.put("collection", cardId, e.copies ? withCopies({ ...e, ...patch }, e.copies.map((c) => ({ ...c, ...forCopies }))) : { ...e, ...patch });
   }
 
   // --- Eigene Reihenfolge (Drag & Drop) ---
@@ -152,18 +191,22 @@ export class CollectionService {
     const s = { count: 0, distinct: 0, worth: 0, unknown: 0, paid: 0, diff: 0, diffCount: 0 };
     for (const e of entries) {
       const value = valueOf(e.card.id);
-      const paid = positive(e.paid);
       s.count += e.qty;
       s.distinct++;
       if (value == null) s.unknown++;
       else s.worth += value * e.qty;
-      if (paid != null) {
-        s.paid += paid * e.qty;
+      // Kaufpreis pro Exemplar; gleiche Exemplare als [Preis, Anzahl]
+      let counted = false;
+      for (const [p, n] of e.copies ? e.copies.map((c) => [c.paid, 1]) : [[e.paid, e.qty]]) {
+        const paid = positive(p);
+        if (paid == null) continue;
+        s.paid += paid * n;
         if (value != null) {
-          s.diff += (value - paid) * e.qty;
-          s.diffCount++;
+          s.diff += (value - paid) * n;
+          counted = true;
         }
       }
+      if (counted) s.diffCount++;
     }
     return s;
   }

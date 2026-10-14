@@ -3,27 +3,28 @@ import { CURRENT_REV_SQL } from "./revisionRepository.js";
 
 // Sammlung pro Person (Tabelle collection). Änderungsart „collection“, id = Karten-ID.
 // section = Ordner (Tabelle sections), position = eigene Reihenfolge (Drag & Drop),
-// trade = Tauschen (null = automatisch, wenn doppelt; true = anbieten; false = behalten).
-// ponytail: eine noch nicht aktualisierte App schickt section/position/trade nicht mit und setzt sie so zurück –
+// trade = Tauschen (null = automatisch, wenn doppelt; true = anbieten; false = behalten),
+// copies = Exemplare mit eigenem Zustand/Sprache/Kaufpreis (JSON, null = alle gleich; condition/language/paid = das erste).
+// ponytail: eine noch nicht aktualisierte App schickt section/position/trade/copies nicht mit und setzt sie so zurück –
 // sie lädt sich beim Öffnen aber sofort neu, das Fenster ist klein.
 
 const UPSERT = `
-  INSERT INTO collection (user_id, card_id, qty, condition, language, paid, added, section, position, trade, updated, deleted, rev)
+  INSERT INTO collection (user_id, card_id, qty, condition, language, paid, added, section, position, trade, copies, updated, deleted, rev)
   SELECT ?2, value ->> 'id', value ->> '$.data.qty', value ->> '$.data.cond', value ->> '$.data.lang',
          value ->> '$.data.paid', value ->> '$.data.added', value ->> '$.data.section', value ->> '$.data.position',
-         value ->> '$.data.trade', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
+         value ->> '$.data.trade', value ->> '$.data.copies', value ->> 'updated', value ->> 'deleted', ${CURRENT_REV_SQL}
   FROM json_each(?1)
   WHERE value ->> 'type' = 'collection'
   ON CONFLICT (user_id, card_id) DO UPDATE SET
     qty = excluded.qty, condition = excluded.condition, language = excluded.language, paid = excluded.paid,
     added = excluded.added, section = excluded.section, position = excluded.position, trade = excluded.trade,
-    updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
+    copies = excluded.copies, updated = excluded.updated, deleted = excluded.deleted, rev = excluded.rev
   WHERE excluded.updated > collection.updated`;
 
 // Zwei Teile statt „rev > ?1 OR id IN (…)“: so liest die Datenbank nur Geändertes (Index auf Person + Stand) und die
 // gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
 const ROWS = `
-  SELECT c.card_id AS id, c.qty, c.condition, c.language, c.paid, c.added, c.section, c.position, c.trade, c.updated, c.deleted, ${CARD_COLUMNS}
+  SELECT c.card_id AS id, c.qty, c.condition, c.language, c.paid, c.added, c.section, c.position, c.trade, c.copies, c.updated, c.deleted, ${CARD_COLUMNS}
   FROM collection c LEFT JOIN cards k ON k.id = c.card_id`;
 const CHANGED = `
   ${ROWS} WHERE c.user_id = ?3 AND c.rev > ?1
@@ -66,7 +67,7 @@ export class CollectionRepository {
       deleted: row.deleted,
       data: row.deleted
         ? null
-        : { qty: row.qty, cond: row.condition, lang: row.language, paid: row.paid, added: row.added, section: row.section, position: row.position, trade: row.trade == null ? null : Boolean(row.trade), card: cardFromRow(row) },
+        : { qty: row.qty, cond: row.condition, lang: row.language, paid: row.paid, added: row.added, section: row.section, position: row.position, trade: row.trade == null ? null : Boolean(row.trade), copies: row.copies ? JSON.parse(row.copies) : null, card: cardFromRow(row) },
     };
   }
 }

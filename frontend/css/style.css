@@ -655,6 +655,16 @@ select.field { padding-right: 8px; }
 .sheet-part { margin-top: 16px; padding: 14px; border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .stepper { display: flex; align-items: center; gap: 14px; margin: 6px 0 4px; }
 .stepper .btn { width: 52px; padding: 0; font-size: 24px; }
+/* Exemplare einzeln (Kartenansicht): oben Nr. · Sprache · Zustand · ×, darunter der Kaufpreis */
+.copies { margin-top: 10px; }
+.copies summary { display: flex; align-items: center; min-height: 44px; font-weight: 800; color: var(--muted); cursor: pointer; }
+.copy-row { display: grid; grid-template-columns: 1.2em 1fr 1fr 40px; gap: 6px; align-items: center; margin-top: 8px; }
+.copy-row + .copy-row { padding-top: 8px; border-top: 1px solid var(--line); }
+.copy-row .field { min-height: 40px; padding: 6px 8px; }
+.copy-row input.field { grid-column: 2 / 4; grid-row: 2; }
+.copy-n { font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.copy-del { grid-column: 4; grid-row: 1; width: 40px; min-height: 40px; padding: 0; }
+.copy-del svg { width: 16px; height: 16px; }
 .stepper output { min-width: 40px; text-align: center; font-family: var(--font-head); font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .checks { display: flex; flex-direction: column; gap: 2px; }

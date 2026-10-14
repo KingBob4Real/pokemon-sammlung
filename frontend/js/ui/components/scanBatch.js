@@ -273,9 +273,8 @@ export function batchReview(body, ctx, { listId, onScanMore }) {
     else {
       ctx.store.batch(() => {
         for (const it of ready) {
-          const owned = collection.quantity(it.card.id);
-          collection.setQuantity(it.card, owned + it.qty);
-          if (!owned) collection.update(it.card.id, { cond: cond.value, lang: lang.value || LANGUAGE_NAMES[it.rec?.language] || "Deutsch" });
+          // neue Exemplare mit den Angaben der Serie (ohne Kaufpreis) – vorhandene bleiben, wie sie sind
+          collection.addCopies(it.card, it.qty, { cond: cond.value, lang: lang.value || LANGUAGE_NAMES[it.rec?.language] || "Deutsch" });
         }
         if (section.value) collection.setSection(cards, section.value);
         if (list.value) lists.addCards(list.value, cards);

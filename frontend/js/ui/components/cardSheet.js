@@ -1,9 +1,10 @@
-import { CARDMARKET_LANGUAGES, CONDITIONS, LANGUAGES } from "../../config.js";
+import { CARDMARKET_LANGUAGES, CONDITIONS, LANGUAGES, MAX_COPIES } from "../../config.js";
 import { h, ICONS } from "../../core/dom.js";
 import { fmtDate, fmtEur, fmtPriceInput, parseEuro, positive } from "../../core/format.js";
 import { cardNumber } from "../../domain/card.js";
 import { cardmarketUrl } from "../../domain/price.js";
 import { TRADE_CHOICES } from "../../domain/trade.js";
+import { copiesOf } from "../../services/collectionService.js";
 import { ask } from "./ask.js";
 import { cardImg, imageFor } from "./cardTile.js";
 import { holo } from "./holo.js";
@@ -62,8 +63,11 @@ export function cardHead(card, prices, language = () => "Deutsch") {
   return { elements, drawPrices };
 }
 
+const choice = (options, value) => h("select", { class: "field" }, options.map((o) => h("option", { selected: value === o }, o)));
+const priceInput = (value, label) => h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", "aria-label": label, value: fmtPriceInput(value) });
+
 /**
- * Kartenansicht: Kopf (Bild, Preise), Sammlung (Anzahl, Zustand, Sprache, Kaufpreis) und Listen.
+ * Kartenansicht: Kopf (Bild, Preise), Sammlung (Anzahl, Zustand, Sprache, Kaufpreis – ab 2 Stück auch je Exemplar) und Listen.
  * Gibt eine Funktion zurück, die die Preise neu zeichnet, sobald sie geladen sind.
  */
 export function renderCardSheet(body, card, ctx) {
@@ -72,9 +76,9 @@ export function renderCardSheet(body, card, ctx) {
 
   // --- Sammlung ---
   const qtyOut = h("output", {}, String(entry?.qty || 0));
-  const cond = h("select", { class: "field" }, CONDITIONS.map((c) => h("option", { selected: (entry?.cond || "Near Mint") === c }, c)));
-  const lang = h("select", { class: "field" }, LANGUAGES.map((l) => h("option", { selected: (entry?.lang || "Deutsch") === l }, l)));
-  const paid = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "z. B. 12,50 €", value: fmtPriceInput(entry?.paid) });
+  const cond = choice(CONDITIONS, entry?.cond || "Near Mint");
+  const lang = choice(LANGUAGES, entry?.lang || "Deutsch");
+  const paid = priceInput(entry?.paid);
   // Ordner: eigene Fächer der Sammlung („Ordner 1“ …); „+ Neuer Ordner …“ legt einen an
   const section = h("select", { class: "field" }, [
     h("option", { value: "" }, "Kein Ordner"),
@@ -111,11 +115,59 @@ export function renderCardSheet(body, card, ctx) {
     });
   };
   const remove = h("button", { type: "button", class: "btn btn-ghost danger", onclick: removeAll }, "Aus der Sammlung entfernen");
+  // Exemplare (ab 2 Stück): jedes mit eigener Sprache, eigenem Zustand und Kaufpreis, z. B. eins auf Englisch.
+  // Unterscheiden sie sich, ersetzen die Zeilen die Felder „für alle“; sind sie wieder gleich, kommen diese zurück.
+  const forAll = h("div", {}, [h("label", { class: "label" }, ["Zustand", cond]), h("label", { class: "label" }, ["Sprache", lang]), h("label", { class: "label" }, ["Kaufpreis pro Stück", paid])]);
+  const copyBox = h("details", { class: "copies" });
+  const copyTitle = h("summary");
+  const showSplit = () => {
+    const e = collection.entry(card.id);
+    forAll.hidden = Boolean(e?.copies);
+    copyTitle.textContent = e?.copies ? `${e.qty} Exemplare, einzeln erfasst` : "Exemplare einzeln erfassen (z. B. eins auf Englisch)";
+    cond.value = e?.cond || "Near Mint";
+    lang.value = e?.lang || "Deutsch";
+    if (document.activeElement !== paid) paid.value = fmtPriceInput(e?.paid);
+  };
+  const copyRow = (c, i) => {
+    const l = choice(LANGUAGES, c.lang || "Deutsch");
+    const k = choice(CONDITIONS, c.cond || "Near Mint");
+    const p = priceInput(c.paid, `Kaufpreis Exemplar ${i + 1}`);
+    l.setAttribute("aria-label", `Sprache Exemplar ${i + 1}`);
+    k.setAttribute("aria-label", `Zustand Exemplar ${i + 1}`);
+    const set = (patch) => {
+      collection.setCopy(card.id, i, patch);
+      showSplit();
+      ctx.refresh();
+    };
+    l.addEventListener("change", () => (set({ lang: l.value }), head.drawPrices()));
+    k.addEventListener("change", () => set({ cond: k.value }));
+    p.addEventListener("input", () => {
+      const n = parseEuro(p.value);
+      if (!Number.isNaN(n)) set({ paid: n || null });
+    });
+    p.addEventListener("blur", () => (p.value = fmtPriceInput(positive(copiesOf(collection.entry(card.id))[i]?.paid))));
+    p.addEventListener("keydown", (e) => e.key === "Enter" && p.blur());
+    const drop = () => {
+      collection.removeCopy(card.id, i);
+      syncFields();
+      ctx.afterChange(false);
+    };
+    return h("div", { class: "copy-row" }, [h("span", { class: "copy-n" }, `${i + 1}.`), l, k, p, h("button", { type: "button", class: "btn btn-ghost copy-del", "aria-label": `Exemplar ${i + 1} herausnehmen`, onclick: drop, html: ICONS.close })]);
+  };
+  const drawCopies = () => {
+    const e = collection.entry(card.id);
+    copyBox.hidden = !e || e.qty < 2 || e.qty > MAX_COPIES;
+    if (copyBox.hidden) return;
+    copyBox.open ||= Boolean(e.copies);
+    copyBox.replaceChildren(copyTitle, ...copiesOf(e).map(copyRow));
+    showSplit();
+  };
   const syncFields = () => {
     const qty = collection.quantity(card.id);
     qtyOut.textContent = String(qty);
     for (const f of fields) f.disabled = qty === 0;
     remove.hidden = qty === 0;
+    drawCopies();
   };
   const step = (delta) => {
     const next = collection.quantity(card.id) + delta;
@@ -137,6 +189,7 @@ export function renderCardSheet(body, card, ctx) {
   });
   paid.addEventListener("blur", () => (paid.value = fmtPriceInput(positive(collection.entry(card.id)?.paid))));
   paid.addEventListener("keydown", (e) => e.key === "Enter" && paid.blur());
+  for (const f of [cond, lang, paid]) f.addEventListener("change", drawCopies); // „für alle“ geändert → die Zeilen zeigen es
 
   // --- Listen ---
   const listBox = h("div", { class: "checks" });
@@ -179,9 +232,8 @@ export function renderCardSheet(body, card, ctx) {
         qtyOut,
         h("button", { type: "button", class: "btn", "aria-label": "Eine mehr", onclick: () => step(1) }, "+"),
       ]),
-      h("label", { class: "label" }, ["Zustand", cond]),
-      h("label", { class: "label" }, ["Sprache", lang]),
-      h("label", { class: "label" }, ["Kaufpreis pro Stück", paid]),
+      forAll,
+      copyBox,
       h("label", { class: "label" }, ["Ordner", section]),
       h("label", { class: "label" }, ["Tauschen", trade]),
       h("div", { class: "buttons" }, [remove]),
