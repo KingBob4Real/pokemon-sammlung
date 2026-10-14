@@ -1,3 +1,4 @@
+import { APP_VERSION, IS_DEV } from "../../config.js";
 import { h } from "../../core/dom.js";
 import { deliverFile } from "../../core/files.js";
 import { describeError } from "../../core/errors.js";
@@ -97,7 +98,7 @@ Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch 
           },
         }, "Nach Update suchen"),
       ]),
-      h("p", { class: "muted small" }, `Version ${updates.currentVersion || "?"}`),
+      h("p", { class: "muted small" }, `Version ${APP_VERSION}${IS_DEV ? " · Dev" : ""}`),
     ]),
     panel("Zu den Preisen", [
       h("p", {}, "Der Marktwert ist der Cardmarket-Durchschnitt der letzten 7 Tage aus der TCGdex-API (fehlt er: 30 Tage; Trend und „ab“ zählen nicht). Er mischt alle Sprachen und Zustände. Echte Preise für Karten in deiner Sprache ab Excellent zeigt der Cardmarket-Link in der Kartenansicht."),

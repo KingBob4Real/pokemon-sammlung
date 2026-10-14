@@ -1,6 +1,6 @@
 # Veröffentlicht das Backend bei Cloudflare (Datenbank-Migrationen + Worker), sobald sich backend/ ändert.
-# main → Live-Backend, develop → Dev-Backend (wrangler.toml, [env.dev]). Aus release.yml heraus bestimmt `ziel` (dev/live),
-# welcher Branch wohin geht.
+# main → Live-Backend, develop → Dev-Backend (wrangler.toml, [env.dev]). Aus deploy.yml heraus bestimmt `ziel` (dev/live),
+# welcher Branch wohin geht (develop bzw. main – deploy.yml hat sie vorher auf den gewählten Branch gesetzt).
 # Braucht das Repository-Secret CLOUDFLARE_API_TOKEN – ohne Token wird nur gewarnt, nichts veröffentlicht.
 name: Backend zu Cloudflare
 
@@ -20,19 +20,19 @@ on:
 permissions:
   contents: read
 
-# Ziel: aus release.yml, sonst vom Branch (main = live, alles andere = dev). Pro Ziel immer nur ein Deploy auf einmal.
+# Ziel: aus deploy.yml, sonst vom Branch (main = live, alles andere = dev). Pro Ziel immer nur ein Deploy auf einmal.
 concurrency:
   group: backend-${{ inputs.ziel || (github.ref_name == 'main' && 'live' || 'dev') }}
   cancel-in-progress: false
 
 jobs:
   check:
-    name: "🔑 Vorbereitung: Cloudflare-Token prüfen"
+    name: "Vorbereitung: Cloudflare-Token prüfen"
     runs-on: ubuntu-latest
     outputs:
       ready: ${{ steps.token.outputs.ready }}
     steps:
-      - name: "🔑 Secret CLOUDFLARE_API_TOKEN vorhanden?"
+      - name: "Secret CLOUDFLARE_API_TOKEN vorhanden?"
         id: token
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -44,7 +44,7 @@ jobs:
           fi
 
   deploy:
-    name: "🚀 Deployment: Worker + Datenbank (${{ inputs.ziel || (github.ref_name == 'main' && 'live' || 'dev') }})"
+    name: "Deployment: Worker + Datenbank (${{ inputs.ziel || (github.ref_name == 'main' && 'live' || 'dev') }})"
     needs: check
     if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
@@ -55,11 +55,11 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       ZIEL: ${{ inputs.ziel || (github.ref_name == 'main' && 'live' || 'dev') }}
     steps:
-      - name: "📥 Checkout: ${{ inputs.ziel == 'live' && 'main' || inputs.ziel == 'dev' && 'develop' || github.ref_name }}"
+      - name: "Checkout: ${{ inputs.ziel == 'live' && 'main' || inputs.ziel == 'dev' && 'develop' || github.ref_name }}"
         uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ziel == 'live' && 'main' || inputs.ziel == 'dev' && 'develop' || '' }}
-      - name: "🎯 Ziel bestimmen: Dev oder Live"
+      - name: "Ziel bestimmen: Dev oder Live"
         run: |
           if [ "$ZIEL" = live ]; then
             echo "STAGE=" >> "$GITHUB_ENV"
@@ -69,23 +69,23 @@ jobs:
             echo "URL=https://pokemon-sammlung-dev.pokemon-sammlung-backend.workers.dev/" >> "$GITHUB_ENV"
           fi
           echo "Ziel: $ZIEL"
-      - name: "🧰 Setup: Node 24 mit npm-Cache"
+      - name: "Setup: Node 24 mit npm-Cache"
         uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: backend/package-lock.json
-      - name: "📦 Build: Abhängigkeiten installieren (npm ci)"
+      - name: "Build: Abhängigkeiten installieren (npm ci)"
         run: npm ci
-      - name: "🧪 Test: Backend ohne Netz"
+      - name: "Test: Backend ohne Netz"
         run: for t in test/*.test.mjs; do echo "▶ $t"; node "$t"; done
-      - name: "🗄️ Deployment: Datenbank-Migrationen (D1)"
+      - name: "Deployment: Datenbank-Migrationen (D1)"
         run: npx wrangler d1 migrations apply DB --remote $STAGE
-      - name: "🚀 Deployment: Worker veröffentlichen"
+      - name: "Deployment: Worker veröffentlichen"
         run: npx wrangler deploy $STAGE
-      - name: "🔎 Kontrolle: Backend antwortet"
+      - name: "Kontrolle: Backend antwortet"
         run: |
           sleep 15
           curl -fsS "$URL"
-          echo "### ⚙️ Backend ($ZIEL) veröffentlicht" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Backend ($ZIEL) veröffentlicht" >> "$GITHUB_STEP_SUMMARY"
           echo "Commit \`$(git rev-parse --short HEAD)\` · $URL" >> "$GITHUB_STEP_SUMMARY"
