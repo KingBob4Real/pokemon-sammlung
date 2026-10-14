@@ -1,5 +1,7 @@
 import { h } from "../../core/dom.js";
+import { shareText } from "../../core/files.js";
 import { fmtEur, plural } from "../../core/format.js";
+import { cardNumber } from "../../domain/card.js";
 import { orderOf, positionBetween } from "../../domain/sorting.js";
 import { links } from "../router.js";
 import { ask, confirmDialog } from "../components/ask.js";
@@ -50,6 +52,12 @@ export function render(main, ctx, listId) {
     lists.remove(listId);
     location.hash = links.lists;
   };
+  // Teilen, was gerade zu sehen ist (Filter, Sortierung) – z. B. „Fehlend“ für die Kartenbörse oder Leute ohne App
+  const share = async () => {
+    const title = `${list.name}${{ missing: " – fehlt mir noch", owned: " – habe ich" }[filter] ?? ""}`;
+    const line = (i) => `${filter === "all" && collection.has(i.card.id) ? "✓ " : ""}${i.card.name} ${cardNumber(i.card)} · ${i.card.setName}`;
+    if ((await shareText(title, shown.map(line).join("\n"))) === "copied") ctx.notify(`${plural(shown.length, "Karte", "Karten")} kopiert – zum Einfügen z. B. in WhatsApp.`, { type: "success" });
+  };
   const setPref = (name) => (value) => {
     prefs.set(name, value);
     ctx.render();
@@ -96,6 +104,7 @@ export function render(main, ctx, listId) {
     h("div", { class: "buttons" }, [
       h("a", { class: "btn", href: links.addTo(listId) }, "+ Hinzufügen"),
       items.length ? selection.toggle() : null,
+      shown.length && !selecting ? h("button", { type: "button", class: "btn btn-ghost", onclick: share }, "Teilen") : null,
     ]),
     h("div", { class: "toolbar split" }, [segmented(FILTERS, filter, setPref("listFilter"), "Karten anzeigen"), sortSelect(sorters, SORT_KEYS, sortKey, setPref("listSort"))]),
     items.length > 1 && !selecting
