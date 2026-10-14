@@ -182,6 +182,17 @@ Jeder Push mit Änderungen in `backend/` spielt neue Datenbank-Migrationen ein u
 
 Ohne Secret läuft der Workflow durch, warnt nur und veröffentlicht nichts. Von Hand geht es weiterhin mit `npm run db:migrate` und `npm run deploy` im Ordner `backend/`.
 
+## Release in einem Lauf (GitHub Action „Release“)
+
+**Actions → „Release“ → Run workflow:** bei „Use workflow from“ **main** lassen (GitHub Pages veröffentlicht nur Läufe von main) und das Ziel wählen:
+
+| Ziel | Branch | Backend | Seite |
+| --- | --- | --- | --- |
+| `dev` | `develop` | `pokemon-sammlung-dev` | <https://pokekiste.app/dev/> |
+| `live` | `main` | `pokemon-sammlung` | <https://pokekiste.app/> |
+
+Ablauf (`release.yml`): 🎯 Start → 🧪 Test (Frontend + Backend des Ziel-Branches) → ⚙️ Backend (Token prüfen, `npm ci`, Tests, Migrationen, Worker, Kontrolle) → 🌐 Frontend (Build: Live-Tests, Dateien, Version, Preisliste, Hochladen → Deployment → Kontrolle: Live und Dev liefern die neue Version). Backend immer vor dem Frontend, damit neue Datenbank-Spalten da sind, bevor die App sie schickt. Die Action veröffentlicht, was auf GitHub liegt – vorher pushen (für Live: `develop` bzw. den Release-Branch in `main` mergen). Die Schritte stehen in `test.yml`, `backend.yml` und `pages.yml`; die laufen weiter auch einzeln bei jedem Push. Die Seite enthält immer `main` unter `/` und `develop` unter `/dev/` – ein Dev-Release baut Live unverändert mit.
+
 ## Backend einrichten (einmalig)
 
 Voraussetzung: kostenloses Cloudflare-Konto. Im Ordner `backend/`:

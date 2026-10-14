@@ -1,20 +1,35 @@
 # Tests ohne Netz bei jedem Push (jeder Branch) – ein rotes Kreuz am Commit, bevor etwas auf Dev oder live geht.
-# Veröffentlicht wird in pages.yml bzw. backend.yml; dort laufen die Tests vor dem Veröffentlichen noch einmal.
+# Auch Teil von release.yml (dort mit dem Branch, der veröffentlicht wird). Veröffentlicht wird in pages.yml bzw.
+# backend.yml; dort laufen die Tests vor dem Veröffentlichen noch einmal.
 name: Tests
 
 on:
   push:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Branch, der getestet wird (leer = der des Laufs)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
   test:
+    name: "🧪 Test: Frontend + Backend"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - name: "📥 Checkout: ${{ inputs.ref || github.ref_name }}"
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - name: "🧰 Setup: Node 24"
+        uses: actions/setup-node@v7
         with:
           node-version: 24
-      - run: for t in frontend/test/*.test.mjs backend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
+      - name: "🧪 Test: Frontend (Katalog, Sammlung, Speicher, Personen, Scanner)"
+        run: for t in frontend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
+      - name: "🧪 Test: Backend (Sicherheit, Exemplare)"
+        run: for t in backend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done

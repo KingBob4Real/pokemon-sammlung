@@ -1,6 +1,7 @@
 # Veröffentlicht frontend/ auf GitHub Pages: main unter /, develop unter /dev/ – ein Pages-Auftritt für beide.
 # Pages nimmt nur Läufe von main an (Umgebungsschutz) → ein Push auf develop stößt einen Lauf auf main an.
-# Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Preise für Karten, die TCGdex nicht zuordnet).
+# Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Cardmarkets Preisliste von heute).
+# Auch Teil von release.yml (Frontend nach dem Backend).
 # Achtung: Zeitplan und Ablauf kommen immer aus der Datei auf main – Änderungen hier wirken erst nach dem Merge.
 name: Frontend auf GitHub Pages
 
@@ -11,6 +12,7 @@ on:
   schedule:
     - cron: "30 4 * * *" # Cardmarket erneuert seine Preisliste nachts
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -23,46 +25,57 @@ concurrency:
 
 jobs:
   trigger:
+    name: "↪️ Weiterleiten: Lauf auf main starten"
     if: github.ref_name != 'main'
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
+      - name: "↪️ pages.yml auf main starten (nur main darf veröffentlichen)"
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
         env:
           GH_TOKEN: ${{ github.token }}
 
-  deploy:
+  build:
+    name: "🏗️ Build: Seite für Live (/) und Dev (/dev/)"
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      live: ${{ steps.version.outputs.main }}
+      dev: ${{ steps.version.outputs.develop }}
     steps:
-      # ganze Geschichte: die Version unten braucht den letzten Commit, der frontend/ geändert hat
-      - uses: actions/checkout@v7
+      # ganze Geschichte: die Version braucht den letzten Commit, der frontend/ geändert hat
+      - name: "📥 Checkout: main (Live)"
+        uses: actions/checkout@v7
         with: { ref: main, path: main, fetch-depth: 0 }
-      - uses: actions/checkout@v7
+      - name: "📥 Checkout: develop (Dev)"
+        uses: actions/checkout@v7
         with: { ref: develop, path: develop, fetch-depth: 0 }
-      - uses: actions/setup-node@v7
+      - name: "🧰 Setup: Node 24"
+        uses: actions/setup-node@v7
         with:
           node-version: 24
-      # Live nur mit grünen Tests (Dev zeigt Fehler nur an – dort wird getestet)
-      - run: cd main && for t in frontend/test/*.test.mjs; do node "$t"; done
-      - run: cp -r main/frontend site && cp -r develop/frontend site/dev
+      # Live nur mit grünen Tests (Dev wird in test.yml bei jedem Push getestet)
+      - name: "🧪 Test: Live-Frontend (main)"
+        run: cd main && for t in frontend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
+      - name: "🏗️ Build: Dateien zusammenstellen (main → /, develop → /dev/)"
+        run: cp -r main/frontend site && cp -r develop/frontend site/dev
       # Version (?v= in index.html) = Zeitpunkt der letzten Änderung an frontend/ – ändert sich nur mit dem Code, nicht beim
       # täglichen Neubau. Neue Version → der Service Worker wirft die gespeicherten App-Dateien weg (sw.js), Geräte laden neu.
-      - name: Version setzen
+      - name: "🏷️ Build: Version setzen (?v=)"
+        id: version
         run: |
+          echo "### 🌐 Frontend" >> "$GITHUB_STEP_SUMMARY"
           for branch in main develop; do
             out=site; [ "$branch" = develop ] && out=site/dev
             v=$(git -C "$branch" log -1 --format=%ct -- frontend)
             sed -i -E "s/\?v=[0-9]+/?v=$v/g" "$out/index.html"
             grep -q "main.js?v=$v" "$out/index.html"
-            echo "$branch: v=$v"
+            echo "$branch=$v" >> "$GITHUB_OUTPUT"
+            echo "- \`$branch\` → \`${out#site}/\` · Version $v · Commit \`$(git -C "$branch" rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
           done
-      # Fehlt die Preisliste mal, wird trotzdem veröffentlicht – die App kommt ohne die Datei aus
-      - name: Cardmarket-Preise für Karten ohne TCGdex-Zuordnung
+      # Fehlt die Preisliste mal, wird trotzdem veröffentlicht – die App fragt dann wie früher TCGdex
+      - name: "💶 Build: Cardmarket-Preisliste von heute"
         continue-on-error: true
         run: |
           for branch in main develop; do
@@ -71,8 +84,41 @@ jobs:
               node "$branch/scripts/cardmarket.mjs" prices "$branch/scripts/cardmarket-map.json" "$out/data/cardmarket-prices.json"
             fi
           done
-      - uses: actions/upload-pages-artifact@v5
+      - name: "📦 Build: Seite hochladen"
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
-      - id: deployment
+
+  deploy:
+    name: "🚀 Deployment: GitHub Pages"
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: "🚀 Deployment: Seite veröffentlichen"
+        id: deployment
         uses: actions/deploy-pages@v5
+
+  verify:
+    name: "🔎 Kontrolle: Seite liefert die neue Version"
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: "🔎 Live und Dev liefern die neue Version (bis zu 5 Minuten, der Zwischenspeicher braucht etwas)"
+        env:
+          URL: ${{ needs.deploy.outputs.url }}
+          LIVE: ${{ needs.build.outputs.live }}
+          DEV: ${{ needs.build.outputs.dev }}
+        run: |
+          for path in "/:$LIVE" "/dev/:$DEV"; do
+            page="${URL%/}${path%%:*}"; want="main.js?v=${path#*:}"
+            for i in $(seq 1 20); do
+              curl -fsS "$page?kontrolle=$RANDOM" | grep -q "$want" && { echo "✓ $page liefert $want"; continue 2; }
+              sleep 15
+            done
+            echo "::error::$page liefert nach 5 Minuten noch nicht $want"; exit 1
+          done
