@@ -20,7 +20,7 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 - [✨ Auf einen Blick](#-auf-einen-blick)
 - [📱 Funktionen](#-funktionen) – [Suche & Sets](#suche--sets) · [Sammlung & Ordner](#sammlung--ordner) · [Mehrere Karten auf einmal](#mehrere-karten-auf-einmal) · [Listen](#listen) · [Scannen](#scannen) · [Tauschen](#tauschen) · [Marktwert & Wertverlauf](#marktwert--wertverlauf) · [Wer sammelt?](#wer-sammelt) · [Bedienung, offline & Updates](#bedienung-offline--updates)
 - [🔧 Entwicklung](#-entwicklung) – Aufbau, lokal starten, Tests, erweitern
-- [🚀 Veröffentlichen](#-veröffentlichen) – Live & Dev, Deploy mit einem Klick, Workflows
+- [🚀 Veröffentlichen](#-veröffentlichen) – Live & Dev, Versionen, Deploy mit einem Klick, Workflows
 - [💾 Backend & Daten](#-backend--daten) – Datenbank, Personen, Sicherheit, Speicher
 - [🧰 Einrichtung (einmalig)](#-einrichtung-einmalig)
 - [🔬 Hintergrund & Notizen](#-hintergrund--notizen)
@@ -245,7 +245,19 @@ Der Smoke-Test prüft Sync, Trennung zwischen Personen, Tauschen, Exemplare, Sca
 
 Die Dev-App hat eigene Daten (eigene Datenbank, eigener Speicher im Browser) – Testen dort berührt die echte Sammlung nie. Echte Daten zum Testen: in der Live-App unter „Mehr“ exportieren, in der Dev-App importieren.
 
-**Ablauf:** pro Feature ein Branch von `main` (`feature/<name>`) → auf Dev testen → was raus soll, in einen Release-Branch (`release/<name>`) → auf Dev prüfen → live. Backend immer vor dem Frontend, damit neue Datenbank-Spalten da sind, bevor die App sie schickt.
+**Ablauf:** pro Feature ein Branch von `main` (`feature/<name>`) → auf Dev testen → was raus soll, in einen Release-Branch (`release/<version>`, Version dort hochzählen) → auf Dev prüfen → live. Backend immer vor dem Frontend, damit neue Datenbank-Spalten da sind, bevor die App sie schickt.
+
+### Versionen
+
+Die App zählt ab **0.0.1** nach dem Schema *vorne.Mitte.hinten* – die Version steht in `frontend/js/config.js` (`APP_VERSION`) und unter „Mehr“ in der App:
+
+| Was kommt raus | Neue Version | Beispiel |
+| --- | --- | --- |
+| Fix | hinten +1 | 0.0.1 → 0.0.2 |
+| Feature | Mitte +1, hinten 0 | 0.0.2 → 0.1.0 |
+| etwas richtig Großes | vorne +1, Rest 0 | 0.4.3 → 1.0.0 |
+
+Hochgezählt wird im Release-Branch (`release/<version>`, z. B. `release/0.1.0`), bevor er auf Dev geht. Das technische `?v=` in `index.html` ist davon unabhängig und wird automatisch gesetzt (siehe unten).
 
 ### Deploy mit einem Klick
 
@@ -261,7 +273,7 @@ flowchart LR
 | Stage | Was mit dem Branch passiert | Ziel |
 | --- | --- | --- |
 | `dev` | `develop` wird auf den Branch gesetzt | Dev-Backend + pokekiste.app/dev/ |
-| `prod` | Branch wird in `main` gemergt („Release: &lt;Branch&gt;“) | Live-Backend + pokekiste.app |
+| `prod` | Branch wird in `main` gemergt („Release 0.1.0: &lt;Branch&gt;“) | Live-Backend + pokekiste.app |
 
 - **Warum develop/main mitwandern:** Die Seite wird jeden Tag neu aus `main` (`/`) und `develop` (`/dev/`) gebaut – sonst wäre der Deploy beim nächsten Neubau wieder weg.
 - **Dev** überschreibt `develop`, bricht aber ab, wenn dort Commits liegen, die es in keinem anderen Branch gibt – nichts geht verloren.

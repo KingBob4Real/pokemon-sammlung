@@ -50,6 +50,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          ver=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' frontend/js/config.js) # Version der App (config.js)
           if [ "$STAGE" = dev ]; then
             # Nichts verlieren: Commits auf develop, die weder im Branch noch in einem anderen Branch stecken → abbrechen
             others=$(git for-each-ref --format='%(refname)' refs/remotes/origin | grep -v -e '/develop$' -e '/HEAD$')
@@ -69,11 +70,11 @@ jobs:
             fi
             sha=$(git rev-parse HEAD)
             git switch -q -c deploy-main origin/main
-            git merge --no-ff -q -m "Release: $BRANCH" "$sha" # main ist enthalten → kein Konflikt möglich
+            git merge --no-ff -q -m "Release $ver: $BRANCH" "$sha" # main ist enthalten → kein Konflikt möglich
             git push origin HEAD:main
-            echo "main → $(git rev-parse --short HEAD) (Release: $BRANCH)"
+            echo "main → $(git rev-parse --short HEAD) (Release $ver: $BRANCH)"
           fi
-          echo "## Deploy \`$BRANCH\` → $STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Deploy \`$BRANCH\` → $STAGE · Version $ver" >> "$GITHUB_STEP_SUMMARY"
           echo "Stage-Branch \`$([ "$STAGE" = dev ] && echo develop || echo main)\` → \`$(git rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
 
   backend:
