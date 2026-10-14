@@ -182,16 +182,23 @@ Jeder Push mit Änderungen in `backend/` spielt neue Datenbank-Migrationen ein u
 
 Ohne Secret läuft der Workflow durch, warnt nur und veröffentlicht nichts. Von Hand geht es weiterhin mit `npm run db:migrate` und `npm run deploy` im Ordner `backend/`.
 
-## Release in einem Lauf (GitHub Action „Release“)
+## Deploy: beliebigen Branch auf Dev oder Prod (GitHub Action „Deploy“)
 
-**Actions → „Release“ → Run workflow:** bei „Use workflow from“ **main** lassen (GitHub Pages veröffentlicht nur Läufe von main) und das Ziel wählen:
+**Actions → „Deploy“ → Run workflow:** bei „Use workflow from“ den **Branch** wählen (z. B. `feature/xyz`, `release/…`), darunter die **Stage**:
 
-| Ziel | Branch | Backend | Seite |
+| Stage | Was mit dem Branch passiert | Backend | Seite |
 | --- | --- | --- | --- |
-| `dev` | `develop` | `pokemon-sammlung-dev` | <https://pokekiste.app/dev/> |
-| `live` | `main` | `pokemon-sammlung` | <https://pokekiste.app/> |
+| `dev` | `develop` wird auf den Branch gesetzt | `pokemon-sammlung-dev` | <https://pokekiste.app/dev/> |
+| `prod` | Branch wird in `main` gemergt („Release: <Branch>“) | `pokemon-sammlung` | <https://pokekiste.app/> |
 
-Ablauf (`release.yml`): 🎯 Start → 🧪 Test (Frontend + Backend des Ziel-Branches) → ⚙️ Backend (Token prüfen, `npm ci`, Tests, Migrationen, Worker, Kontrolle) → 🌐 Frontend (Build: Live-Tests, Dateien, Version, Preisliste, Hochladen → Deployment → Kontrolle: Live und Dev liefern die neue Version). Backend immer vor dem Frontend, damit neue Datenbank-Spalten da sind, bevor die App sie schickt. Die Action veröffentlicht, was auf GitHub liegt – vorher pushen (für Live: `develop` bzw. den Release-Branch in `main` mergen). Die Schritte stehen in `test.yml`, `backend.yml` und `pages.yml`; die laufen weiter auch einzeln bei jedem Push. Die Seite enthält immer `main` unter `/` und `develop` unter `/dev/` – ein Dev-Release baut Live unverändert mit.
+Ablauf (`deploy.yml`): 🧪 Test (Frontend + Backend des Branches) → 🔀 Stage (develop bzw. main setzen) → ⚙️ Backend (Token prüfen, `npm ci`, Tests, Migrationen, Worker, Kontrolle) → 🌐 Frontend (Build: Live-Tests, Dateien, Version, Preisliste, Hochladen → Deployment → Kontrolle: / und /dev/ liefern die neue Version). Backend immer vor dem Frontend, damit neue Datenbank-Spalten da sind, bevor die App sie schickt.
+
+- **Warum develop/main mitwandern:** Die Seite wird jeden Tag neu aus `main` (`/`) und `develop` (`/dev/`) gebaut – sonst wäre der Deploy beim nächsten Neubau wieder weg.
+- **Dev** überschreibt `develop`, bricht aber ab, wenn dort Commits liegen, die es in keinem anderen Branch gibt (nichts geht verloren).
+- **Prod** geht nur, wenn der Branch `main` schon enthält (sonst erst `main` in den Branch mergen) – so geht genau das live, was getestet wurde.
+- Vorher den Branch pushen – deployt wird, was auf GitHub liegt. Den Workflow gibt es in jedem Branch, der von `main` abzweigt.
+- **Einmalig nötig:** Settings → Environments → **github-pages** → *Deployment branches and tags* → **No restriction**. Sonst darf nur ein Lauf von `main` die Seite veröffentlichen und das Frontend scheitert bei anderen Branches.
+- `test.yml`, `backend.yml` und `pages.yml` laufen weiter auch einzeln bei jedem Push; `deploy.yml` ruft sie nur auf.
 
 ## Backend einrichten (einmalig)
 

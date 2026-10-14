@@ -1,0 +1,98 @@
+# Deploy: einen beliebigen Branch auf Dev oder Prod bringen – Test, Build, Backend und Frontend in einem Lauf.
+# Starten: Actions → „Deploy“ → Run workflow → bei „Use workflow from“ den Branch wählen, darunter die Stage.
+#   dev  → develop wird auf den Branch gesetzt → Dev-Backend + pokekiste.app/dev/
+#   prod → der Branch wird in main gemergt     → Live-Backend + pokekiste.app
+# Warum develop/main mitwandern: Die Seite wird jeden Tag neu aus main (/) und develop (/dev/) gebaut – ohne das wäre der
+# Deploy beim nächsten Neubau wieder weg. Pushes dieses Laufs (GitHub-Token) starten keine weiteren Läufe.
+# Die Schritte stehen in test.yml, backend.yml und pages.yml; die laufen weiter auch einzeln bei jedem Push.
+# Einmalig nötig: Settings → Environments → github-pages → Deployment branches → „No restriction“, sonst darf nur main
+# die Seite veröffentlichen.
+name: Deploy
+
+run-name: "Deploy ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'Prod' || 'Dev' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "Stage: dev (develop → pokekiste.app/dev/) oder prod (main → pokekiste.app)"
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+# was die aufgerufenen Abläufe brauchen (Pages veröffentlichen); push auf develop/main nur im Job „stage“
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write
+
+# pro Stage immer nur ein Deploy auf einmal
+concurrency:
+  group: deploy-${{ inputs.stage }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: "🧪 Test"
+    uses: ./.github/workflows/test.yml
+
+  stage:
+    name: "🔀 Stage: ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'main' || 'develop' }}"
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      STAGE: ${{ inputs.stage }}
+      BRANCH: ${{ github.ref_name }}
+    steps:
+      - name: "📥 Checkout: ${{ github.ref_name }} mit allen Branches"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: "🔀 ${{ inputs.stage == 'prod' && 'main: Branch hineinmergen' || 'develop: auf den Branch setzen' }}"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ "$STAGE" = dev ]; then
+            # Nichts verlieren: Commits auf develop, die weder im Branch noch in einem anderen Branch stecken → abbrechen
+            others=$(git for-each-ref --format='%(refname)' refs/remotes/origin | grep -v -e '/develop$' -e '/HEAD$')
+            lost=$(git rev-list origin/develop --not HEAD $others)
+            if [ -n "$lost" ]; then
+              echo "::error::Auf develop liegen Commits, die es sonst nirgends gibt – erst in einen Branch übernehmen:"
+              git log --oneline --no-walk $lost
+              exit 1
+            fi
+            git push --force origin HEAD:develop
+            echo "develop → $(git rev-parse --short HEAD) ($BRANCH)"
+          else
+            # Live geht genau das, was getestet wurde: der Branch muss main schon enthalten
+            if ! git merge-base --is-ancestor origin/main HEAD; then
+              echo "::error::main hat Commits, die $BRANCH nicht hat – erst main in $BRANCH mergen, dann nochmal deployen."
+              exit 1
+            fi
+            sha=$(git rev-parse HEAD)
+            git switch -q -c deploy-main origin/main
+            git merge --no-ff -q -m "Release: $BRANCH" "$sha" # main ist enthalten → kein Konflikt möglich
+            git push origin HEAD:main
+            echo "main → $(git rev-parse --short HEAD) (Release: $BRANCH)"
+          fi
+          echo "## 🚀 Deploy \`$BRANCH\` → $STAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "Stage-Branch: \`$([ "$STAGE" = dev ] && echo develop || echo main)\` → \`$(git rev-parse --short HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
+
+  backend:
+    name: "⚙️ Backend"
+    needs: stage
+    uses: ./.github/workflows/backend.yml
+    with:
+      ziel: ${{ inputs.stage == 'prod' && 'live' || 'dev' }}
+    secrets: inherit
+
+  frontend:
+    name: "🌐 Frontend"
+    needs: backend
+    uses: ./.github/workflows/pages.yml
+    with:
+      direkt: true
+    secrets: inherit

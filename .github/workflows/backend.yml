@@ -1,6 +1,6 @@
 # Veröffentlicht das Backend bei Cloudflare (Datenbank-Migrationen + Worker), sobald sich backend/ ändert.
-# main → Live-Backend, develop → Dev-Backend (wrangler.toml, [env.dev]). Aus release.yml heraus bestimmt `ziel` (dev/live),
-# welcher Branch wohin geht.
+# main → Live-Backend, develop → Dev-Backend (wrangler.toml, [env.dev]). Aus deploy.yml heraus bestimmt `ziel` (dev/live),
+# welcher Branch wohin geht (develop bzw. main – deploy.yml hat sie vorher auf den gewählten Branch gesetzt).
 # Braucht das Repository-Secret CLOUDFLARE_API_TOKEN – ohne Token wird nur gewarnt, nichts veröffentlicht.
 name: Backend zu Cloudflare
 
@@ -20,7 +20,7 @@ on:
 permissions:
   contents: read
 
-# Ziel: aus release.yml, sonst vom Branch (main = live, alles andere = dev). Pro Ziel immer nur ein Deploy auf einmal.
+# Ziel: aus deploy.yml, sonst vom Branch (main = live, alles andere = dev). Pro Ziel immer nur ein Deploy auf einmal.
 concurrency:
   group: backend-${{ inputs.ziel || (github.ref_name == 'main' && 'live' || 'dev') }}
   cancel-in-progress: false

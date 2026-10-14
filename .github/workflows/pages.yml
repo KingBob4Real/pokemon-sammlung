@@ -1,7 +1,7 @@
 # Veröffentlicht frontend/ auf GitHub Pages: main unter /, develop unter /dev/ – ein Pages-Auftritt für beide.
 # Pages nimmt nur Läufe von main an (Umgebungsschutz) → ein Push auf develop stößt einen Lauf auf main an.
 # Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Cardmarkets Preisliste von heute).
-# Auch Teil von release.yml (Frontend nach dem Backend).
+# Auch Teil von deploy.yml (Frontend nach dem Backend).
 # Achtung: Zeitplan und Ablauf kommen immer aus der Datei auf main – Änderungen hier wirken erst nach dem Merge.
 name: Frontend auf GitHub Pages
 
@@ -13,20 +13,27 @@ on:
     - cron: "30 4 * * *" # Cardmarket erneuert seine Preisliste nachts
   workflow_dispatch:
   workflow_call:
+    inputs:
+      direkt:
+        description: "Direkt bauen und veröffentlichen, egal von welchem Branch gestartet (deploy.yml)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Alle Läufe, die veröffentlichen, teilen sich eine Gruppe (es gibt nur eine Seite); der neueste gewinnt – er baut
+# ohnehin den aktuellen Stand von main und develop.
 concurrency:
-  group: pages-${{ github.ref_name }}
+  group: pages-${{ (github.ref_name == 'main' || inputs.direkt) && 'deploy' || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   trigger:
     name: "↪️ Weiterleiten: Lauf auf main starten"
-    if: github.ref_name != 'main'
+    if: github.ref_name != 'main' && !inputs.direkt
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -38,7 +45,7 @@ jobs:
 
   build:
     name: "🏗️ Build: Seite für Live (/) und Dev (/dev/)"
-    if: github.ref_name == 'main'
+    if: github.ref_name == 'main' || inputs.direkt
     runs-on: ubuntu-latest
     outputs:
       live: ${{ steps.version.outputs.main }}
