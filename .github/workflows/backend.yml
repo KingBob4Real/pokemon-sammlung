@@ -52,6 +52,7 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
+      - run: for t in test/*.test.mjs; do node "$t"; done
       - name: Datenbank-Migrationen
         run: npx wrangler d1 migrations apply DB --remote $STAGE
       - name: Worker veröffentlichen
