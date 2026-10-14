@@ -13,16 +13,16 @@ permissions:
 
 jobs:
   test:
-    name: "🧪 Test: Frontend + Backend"
+    name: "Test: Frontend + Backend"
     runs-on: ubuntu-latest
     steps:
-      - name: "📥 Checkout: ${{ github.ref_name }}"
+      - name: "Checkout: ${{ github.ref_name }}"
         uses: actions/checkout@v7
-      - name: "🧰 Setup: Node 24"
+      - name: "Setup: Node 24"
         uses: actions/setup-node@v7
         with:
           node-version: 24
-      - name: "🧪 Test: Frontend (Katalog, Sammlung, Speicher, Personen, Scanner)"
+      - name: "Test: Frontend (Katalog, Sammlung, Speicher, Personen, Scanner)"
         run: for t in frontend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
-      - name: "🧪 Test: Backend (Sicherheit, Exemplare)"
+      - name: "Test: Backend (Sicherheit, Exemplare)"
         run: for t in backend/test/*.test.mjs; do echo "▶ $t"; node "$t"; done
