@@ -2,7 +2,7 @@
 
 // Version der App (steht unter „Mehr“). Bei jedem Release hochzählen: Fix → hinten +1 (0.0.2), Feature → Mitte +1 und
 // hinten 0 (0.1.0), großer Umbau → vorne +1, Rest 0 (1.0.0). Das technische ?v= in index.html setzt der Pages-Workflow selbst.
-export const APP_VERSION = "0.0.1";
+export const APP_VERSION = "0.1.0";
 
 export const TCGDEX_API = "https://api.tcgdex.net/v2";
 // Dev-Stufe: der develop-Branch liegt unter …/dev/ (siehe .github/workflows/pages.yml) – eigenes Backend, eigener Speicher.
