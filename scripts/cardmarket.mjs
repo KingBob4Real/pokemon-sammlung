@@ -5,7 +5,8 @@
 //     Zuordnung TCGdex-Karte → Cardmarket-Produkt ergänzen (scripts/cardmarket-map.json). Prüft nur Sets, die noch nicht
 //     drinstehen – nach neuen Sets erneut ausführen und committen. Erster Lauf: eine Anfrage pro Karte (~20.000, ~10 min).
 //   node scripts/cardmarket.mjs prices <map.json> <out.json>
-//     Preise dieser Karten aus der aktuellen Preisliste (läuft täglich im Pages-Workflow, Ergebnis liegt neben der App).
+//     Preise dieser Karten aus der aktuellen Preisliste, dazu die Preise aller Einzelkarten nach Produkt-ID (läuft täglich
+//     im Pages-Workflow, Ergebnis liegt neben der App).
 //
 // Zuordnung: Set → Cardmarket-Erweiterung über die Karten, die TCGdex schon zuordnet; dann Name + Attacken/Fähigkeiten im
 // selben Set. Doppeldrucke (normal + Full Art, gleicher Name und gleiche Attacken) nur in Sets, in denen Cardmarket die
@@ -173,9 +174,16 @@ async function writePrices(mapPath, outPath) {
     const g = byId.get(id);
     if (g) prices[card] = { id, avg1: first(g.avg1, g["avg1-holo"]), avg7: first(g.avg7, g["avg7-holo"]), avg30: first(g.avg30, g["avg30-holo"]), low: first(g.low, g["low-holo"]) };
   }
+  // Alle Einzelkarten (Kategorie 51): Produkt → [Ø 1, Ø 7, Ø 30, ab]. Damit erneuert die App bekannte Karten mit einer
+  // Datei statt einer TCGdex-Anfrage pro Karte (services/priceService.js). ~560 KB gezippt.
+  const products = {};
+  for (const g of guide.priceGuides) {
+    if (g.idCategory === 51) products[g.idProduct] = [first(g.avg1, g["avg1-holo"]), first(g.avg7, g["avg7-holo"]), first(g.avg30, g["avg30-holo"]), first(g.low, g["low-holo"])];
+  }
+  const updated = new Date(guide.createdAt).toISOString(); // „…+0200“ liest Safari nicht
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, JSON.stringify({ updated: guide.createdAt, prices }));
-  console.log(`${Object.keys(prices).length} Preise → ${outPath} (Preisliste vom ${guide.createdAt})`);
+  fs.writeFileSync(outPath, JSON.stringify({ updated, prices, products }));
+  console.log(`${Object.keys(prices).length} Ersatz-Preise, ${Object.keys(products).length} Produkte → ${outPath} (Preisliste vom ${updated})`);
 }
 
 // Nur direkt aufgerufen (nicht beim Import im Test)

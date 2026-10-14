@@ -3,12 +3,15 @@ import { marketValue, toPrice } from "../domain/price.js";
 
 // Fehlt die Karte in einer Sprache (404), ist das kein Netzproblem – weiter mit der anderen
 const notFound = (e) => (e?.status === 404 ? null : Promise.reject(e));
+const LIST_MAX_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 
 /**
  * Cardmarket-Richtwerte über TCGdex, pro Karte zwischengespeichert (alle Personen teilen sich den Speicher).
  * request(ids) lädt fehlende/alte Preise im Hintergrund (6 parallel) und meldet "update".
  * Klappt in einem Durchlauf gar nichts (TCGdex weg), meldet sie "error"; gespeicherte Werte bleiben.
- * TCGdex liefert Preise nur pro Karte – Listen-Endpunkte und GraphQL haben kein `pricing` (geprüft 10.10.2026).
+ * TCGdex liefert Preise nur pro Karte – Listen-Endpunkte und GraphQL haben kein `pricing` (geprüft 10.10.2026). Darum
+ * fragt nur eine neue Karte TCGdex (Seltenheit, Pokédex-Nummer, Cardmarket-Produkt); danach kommt ihr Preis jeden Tag aus
+ * Cardmarkets Preisliste neben der App (eine Datei für alle Karten).
  */
 export class PriceService extends EventTarget {
   #queue = new Set();
@@ -98,6 +101,17 @@ export class PriceService extends EventTarget {
   // gefragt – die deutsche Anfrage wäre wieder leer. Cardmarket-Produkt und Preis sind in beiden Sprachen dieselben.
   async #fetch(id) {
     const prev = this.prices[id];
+    // Bekannte Karte (Cardmarket-Produkt gemerkt): Preis aus Cardmarkets Preisliste von heute – eine Datei für alle Karten
+    // statt einer TCGdex-Anfrage pro Karte. Seltenheit und Pokédex-Nummer bleiben. Ist die Liste älter als 2 Tage
+    // (Pages-Lauf ausgefallen), fragt die App wie bisher TCGdex.
+    if (prev?.cardmarketId) {
+      const list = await this.#list();
+      const row = Date.now() - Date.parse(list.updated) < LIST_MAX_AGE_MS && list.products?.[prev.cardmarketId];
+      if (row) {
+        const [avg1, avg7, avg30, low] = row;
+        return { ...prev, avg1, avg7, avg30, low, at: Date.now(), updated: list.updated };
+      }
+    }
     const de = prev?.en ? null : await this.tcgdex.card(id, "de").catch(notFound);
     if (de?.pricing?.cardmarket) return toPrice(de);
     const en = await this.tcgdex.card(id, "en").catch(notFound);
@@ -109,9 +123,14 @@ export class PriceService extends EventTarget {
 
   // TCGdex ordnet die Karte keinem Cardmarket-Produkt zu (Namen mit ♀/♂/◇/’ …) → Preis aus Cardmarkets Preisliste, sonst ohne
   async #fromCardmarketList(id, price) {
-    const list = await (this.#extra ??= this.extraPrices());
+    const list = await this.#list();
     const found = list.prices[id];
     return found ? { ...price, avg1: found.avg1, avg7: found.avg7, avg30: found.avg30, low: found.low, cardmarketId: found.id, updated: list.updated, extra: true } : price;
+  }
+
+  // Cardmarkets Preisliste, einmal pro Sitzung geladen
+  #list() {
+    return (this.#extra ??= this.extraPrices());
   }
 
   #notify() {
