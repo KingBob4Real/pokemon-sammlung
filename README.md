@@ -212,9 +212,9 @@ flowchart LR
 | Workflow | Auslöser | Was er tut |
 | --- | --- | --- |
 | `test.yml` – **Tests** | jeder Push, jeder Branch | alle Tests ohne Netz |
-| `backend.yml` – **Backend zu Cloudflare** | Push auf `main`/`develop` mit Änderungen in `backend/` | Token prüfen → `npm ci` → Tests → Migrationen → Worker → Kontrolle |
-| `pages.yml` – **Frontend auf GitHub Pages** | Push auf `main`/`develop` mit Änderungen in `frontend/` oder `scripts/`, täglich 04:30 UTC | Build (`main` → `/`, `develop` → `/dev/`, Version, Cardmarket-Preisliste) → Deployment → Kontrolle |
-| `deploy.yml` – **Deploy** | von Hand, beliebiger Branch | siehe oben |
+| `backend.yml` – **Backend zu Cloudflare** | aus Deploy (oder von Hand) | Token prüfen → `npm ci` → Tests → Migrationen → Worker → Kontrolle |
+| `pages.yml` – **Frontend auf GitHub Pages** | aus Deploy, täglich 04:30 UTC | Build (`main` → `/`, `develop` → `/dev/`, Version, Cardmarket-Preisliste) → Deployment → Kontrolle |
+| `deploy.yml` – **Deploy** | Push/Merge auf `main` (→ prod) oder `develop` (→ dev) mit Änderungen an App oder Workflows; von Hand für jeden Branch | siehe oben |
 
 - **Version `?v=`:** setzt der Pages-Workflow selbst (Zeitpunkt des letzten Commits in `frontend/`). Neue Version → der Service Worker wirft die gespeicherten App-Dateien weg. **Nicht von Hand hochzählen.**
 - **Von Hand**, im Ordner `backend/`: `npx wrangler d1 migrations apply DB --remote [--env dev]`, dann `npx wrangler deploy [--env dev]`; vor einer Live-Migration `npx wrangler d1 time-travel info DB` notieren (Wiederherstellung bis 7 Tage zurück). Frontend auf Dev: `git push origin <branch>:develop`.

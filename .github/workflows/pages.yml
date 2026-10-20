@@ -1,14 +1,10 @@
 # Veröffentlicht frontend/ auf GitHub Pages: main unter /, develop unter /dev/ – ein Pages-Auftritt für beide.
-# Pages nimmt nur Läufe von main an (Umgebungsschutz) → ein Push auf develop stößt einen Lauf auf main an.
-# Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist (Cardmarkets Preisliste von heute).
-# deploy.yml startet nach dem Backend einen Lauf hiervon auf main und wartet ihn ab.
+# Pages nimmt nur Läufe von main an (Umgebungsschutz). Täglich neu gebaut, damit data/cardmarket-prices.json frisch ist
+# (Cardmarkets Preisliste von heute). Bei Push auf main/develop startet deploy.yml nach dem Backend einen Lauf hiervon auf main.
 # Achtung: Zeitplan und Ablauf kommen immer aus der Datei auf main – Änderungen hier wirken erst nach dem Merge.
 name: Frontend auf GitHub Pages
 
 on:
-  push:
-    branches: [main, develop]
-    paths: ["frontend/**", "scripts/**", ".github/workflows/pages.yml"]
   schedule:
     - cron: "30 4 * * *" # Cardmarket erneuert seine Preisliste nachts
   workflow_dispatch:
@@ -23,18 +19,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  trigger:
-    name: "Weiterleiten: Lauf auf main starten"
-    if: github.ref_name != 'main'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: "pages.yml auf main starten (nur main darf veröffentlichen)"
-        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
-        env:
-          GH_TOKEN: ${{ github.token }}
-
   build:
     name: "Build: Seite für Live (/) und Dev (/dev/)"
     if: github.ref_name == 'main'

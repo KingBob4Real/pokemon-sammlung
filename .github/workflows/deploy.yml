@@ -1,16 +1,20 @@
 # Deploy: einen beliebigen Branch auf Dev oder Prod bringen – Test, Build, Backend und Frontend in einem Lauf.
-# Starten: Actions → „Deploy“ → Run workflow → bei „Use workflow from“ den Branch wählen (z. B. feature/xyz), darunter die Stage.
+# Starten: von selbst bei jedem Push/Merge auf main (→ prod) oder develop (→ dev) – oder von Hand: Actions → „Deploy“ →
+# Run workflow → bei „Use workflow from“ den Branch wählen (z. B. feature/xyz), darunter die Stage.
 #   dev  → develop wird auf den Branch gesetzt → Dev-Backend + pokekiste.app/dev/
 #   prod → der Branch wird in main gemergt     → Live-Backend + pokekiste.app
 # Warum develop/main mitwandern: Die Seite wird immer aus main (/) und develop (/dev/) gebaut – auch jeden Tag neu. Ohne
 # das wäre der Deploy beim nächsten Neubau wieder weg. Pushes dieses Laufs (GitHub-Token) starten keine weiteren Läufe.
 # Frontend: GitHub Pages veröffentlicht nur Läufe von main – darum startet Deploy pages.yml auf main und wartet ihn ab.
-# Die Schritte stehen in test.yml, backend.yml und pages.yml; die laufen weiter auch einzeln bei jedem Push.
+# Die Schritte stehen in test.yml, backend.yml und pages.yml. Bei einem Push ist „Stage“ leer: der Branch ist schon main/develop.
 name: Deploy
 
-run-name: "Deploy ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'Prod' || 'Dev' }}"
+run-name: "Deploy ${{ github.ref_name }} → ${{ (inputs.stage || (github.ref_name == 'main' && 'prod' || 'dev')) == 'prod' && 'Prod' || 'Dev' }}"
 
 on:
+  push:
+    branches: [main, develop]
+    paths: ["backend/**", "frontend/**", "scripts/**", ".github/workflows/**"]
   workflow_dispatch:
     inputs:
       stage:
@@ -33,20 +37,20 @@ jobs:
     uses: ./.github/workflows/test.yml
 
   stage:
-    name: "Stage: ${{ github.ref_name }} → ${{ inputs.stage == 'prod' && 'main' || 'develop' }}"
+    name: "Stage: ${{ github.ref_name }} → ${{ (inputs.stage || (github.ref_name == 'main' && 'prod' || 'dev')) == 'prod' && 'main' || 'develop' }}"
     needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
-      STAGE: ${{ inputs.stage }}
+      STAGE: ${{ (inputs.stage || (github.ref_name == 'main' && 'prod' || 'dev')) }}
       BRANCH: ${{ github.ref_name }}
     steps:
       - name: "Checkout: ${{ github.ref_name }} mit allen Branches"
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - name: "${{ inputs.stage == 'prod' && 'Merge: Branch in main' || 'Push: develop auf den Branch setzen' }}"
+      - name: "${{ env.STAGE == 'prod' && 'Merge: Branch in main' || 'Push: develop auf den Branch setzen' }}"
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -82,7 +86,7 @@ jobs:
     needs: stage
     uses: ./.github/workflows/backend.yml
     with:
-      ziel: ${{ inputs.stage == 'prod' && 'live' || 'dev' }}
+      ziel: ${{ (inputs.stage || (github.ref_name == 'main' && 'prod' || 'dev')) == 'prod' && 'live' || 'dev' }}
     secrets: inherit
 
   frontend:

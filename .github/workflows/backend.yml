@@ -1,13 +1,10 @@
-# Veröffentlicht das Backend bei Cloudflare (Datenbank-Migrationen + Worker), sobald sich backend/ ändert.
+# Veröffentlicht das Backend bei Cloudflare (Datenbank-Migrationen + Worker) – aus deploy.yml (Push auf main/develop) oder von Hand.
 # main → Live-Backend, develop → Dev-Backend (wrangler.toml, [env.dev]). Aus deploy.yml heraus bestimmt `ziel` (dev/live),
 # welcher Branch wohin geht (develop bzw. main – deploy.yml hat sie vorher auf den gewählten Branch gesetzt).
 # Braucht das Repository-Secret CLOUDFLARE_API_TOKEN – ohne Token wird nur gewarnt, nichts veröffentlicht.
 name: Backend zu Cloudflare
 
 on:
-  push:
-    branches: [main, develop]
-    paths: ["backend/**", ".github/workflows/backend.yml"]
   workflow_dispatch:
   workflow_call:
     inputs:
