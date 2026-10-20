@@ -7,32 +7,12 @@ import { confirmDialog } from "../components/ask.js";
 import { forgetChoice } from "../components/profilePicker.js";
 import { panel } from "../components/widgets.js";
 
-// Ansicht „Mehr“: Konto & Sync-Stand (Person wechseln, abmelden), Sicherung, unter „Erweitert“ der Sync-Schlüssel, Hinweise zu Preisen
+// Ansicht „Mehr“: Konto & Sync-Stand (Person wechseln, abmelden), Sicherung, Hinweise zu Preisen.
+// Schlüssel und Sitzungen sieht der Nutzer nie – angemeldet wird nur über „Wer sammelt?“.
 export function render(main, ctx) {
   const { sync, backup, updates } = ctx;
   ctx.setTitle("Mehr");
-
-  // --- Sync ---
-  const key = h("input", { type: "password", class: "field", value: sync.config.key, placeholder: "XXXX-XXXX-XXXX-XXXX-XXXX", autocomplete: "off", autocapitalize: "characters", spellcheck: "false" });
   const status = h("p", { class: "muted" });
-  const keyNote = h("p", { class: "field-note", role: "alert" });
-  const showKey = () => (key.type = key.type === "password" ? "text" : "password");
-  const copyKey = () => navigator.clipboard?.writeText(key.value).then(() => (status.textContent = "Schlüssel kopiert."), () => {});
-  const save = async () => {
-    // anderer Schlüssel = andere Person → Daten dieses Geräts gehören nicht dazu
-    if (sync.isOtherKey(key.value) && !ctx.store.isEmpty) {
-      const unsaved = sync.pendingCount ? `
-
-${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen – die bleiben und gehen zur neuen Person mit.` : "";
-      const question = `Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden durch die der neuen Person ersetzt (im Backend bleibt alles erhalten).${unsaved}`;
-      if (!(await confirmDialog(question, { ok: "Schlüssel wechseln", danger: true }))) return;
-    }
-    keyNote.textContent = "";
-    sync.configure(key.value).then((problem) => {
-      if (problem) keyNote.textContent = problem;
-      else key.value = sync.config.key;
-    });
-  };
 
   // --- Sicherung ---
   const file = h("input", { type: "file", accept: ".json,application/json", hidden: true });
@@ -56,18 +36,6 @@ ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hoc
       h("div", { class: "buttons" }, [
         h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"),
         h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file]),
-      ]),
-    ]),
-    // Selten gebraucht: Notfall-Zugang per Schlüssel – zugeklappt
-    h("details", { class: "panel advanced" }, [
-      h("summary", {}, h("h2", {}, "Erweitert")),
-      h("h3", {}, "Sync-Schlüssel"),
-      h("p", {}, "Anmelden geht oben unter „Wer sammelt?“ per Antippen. Hier nur, falls du lieber deinen Sync-Schlüssel nutzt – er gilt immer, auch wenn du dein Passwort vergessen hast."),
-      h("label", { class: "label" }, ["Sync-Schlüssel", h("div", { class: "toolbar tight" }, [key, h("button", { type: "button", class: "btn btn-ghost", onclick: showKey }, "Anzeigen")])]),
-      keyNote,
-      h("div", { class: "buttons" }, [
-        h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
-        h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
       ]),
     ]),
     panel("App", [
@@ -110,7 +78,7 @@ function syncStatusText(sync) {
     case "busy":
       return "Synchronisiere …";
     case "error":
-      return `Problem: ${sync.config.error}`;
+      return `Problem: ${sync.config.error}${pending}`;
     default: {
       const who = sync.config.user ? `Verbunden als ${sync.config.user} · ` : "";
       return sync.config.at ? `${who}Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
@@ -142,9 +110,9 @@ function accountPanel(ctx, status) {
 
   // Abmelden, z. B. auf einem geliehenen Handy: Sitzung beenden, Daten der Person vom Gerät, danach „Wer sammelt?“
   const logout = async () => {
-    const noPassword = me.locked ? "" : " Du hast noch kein Passwort – danach kommst du nur mit dem Sync-Schlüssel wieder rein.";
+    if (!me.locked) return (note.textContent = "Leg erst ein Passwort fest – ohne kommst du auf diesem Gerät nicht wieder rein.");
     const unsaved = sync.pendingCount ? ` Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen und gehen dabei verloren.` : "";
-    if (!(await confirmDialog(`Auf diesem Gerät abmelden? Deine Sammlung und Listen verschwinden von diesem Gerät, im Backend bleibt alles.${noPassword}${unsaved}`, { ok: "Abmelden", danger: true }))) return;
+    if (!(await confirmDialog(`Auf diesem Gerät abmelden? Deine Sammlung und Listen verschwinden von diesem Gerät, im Backend bleibt alles.${unsaved}`, { ok: "Abmelden", danger: true }))) return;
     await profiles.logout();
     forgetChoice();
     location.reload();
@@ -157,7 +125,7 @@ function accountPanel(ctx, status) {
   const old = h("input", { type: "password", class: "field", placeholder: "Bisheriges Passwort", "aria-label": "Bisheriges Passwort", autocomplete: "current-password" });
   const fresh = h("input", { type: "password", class: "field", placeholder: "Neues Passwort (mind. 4 Zeichen)", "aria-label": "Neues Passwort", autocomplete: "new-password" });
   const setButton = h("button", { type: "button", class: "btn" }, me.locked ? "Passwort ändern" : "Passwort festlegen");
-  setButton.addEventListener("click", () => run(setButton, () => profiles.setPassword(fresh.value, old.value), "Passwort gespeichert. Andere Geräte von dir sind jetzt abgemeldet."));
+  setButton.addEventListener("click", () => run(setButton, () => profiles.setPassword(fresh.value, old.value), me.locked ? "Passwort geändert. Andere Geräte fragen einmal nach dem neuen." : "Passwort gespeichert."));
 
   return panel("Wer sammelt?", [
     h("p", {}, `Angemeldet als ${me.name}.`),
@@ -165,7 +133,7 @@ function accountPanel(ctx, status) {
     h("div", { class: "buttons" }, [switchButton, h("button", { type: "button", class: "btn btn-ghost danger", onclick: logout }, "Abmelden")]),
     h("label", { class: "label" }, ["Dein Name", h("div", { class: "toolbar tight" }, [name, renameButton])]),
     h("h3", { class: "label" }, "Passwort"),
-    h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Ändern geht nur mit dem bisherigen." : "Du hast noch kein Passwort – auf einem neuen Gerät kommst du so nur mit dem Sync-Schlüssel rein. Leg eins fest, es wird bei jedem Wechsel zu dir abgefragt."),
+    h("p", { class: "muted" }, me.locked ? "Dein Profil ist mit Passwort geschützt. Gefragt wird es nur auf einem neuen Gerät; ändern geht nur mit dem bisherigen." : "Du hast noch kein Passwort – ohne kommst du auf einem neuen Gerät nicht rein. Leg eins fest; gefragt wird es nur einmal pro Gerät."),
     me.locked ? h("label", { class: "label" }, ["Bisheriges Passwort", old]) : null,
     h("label", { class: "label" }, ["Neues Passwort", fresh]),
     note,

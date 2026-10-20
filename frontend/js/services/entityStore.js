@@ -170,16 +170,6 @@ export class EntityStore extends EventTarget {
     this.#persist();
   }
 
-  // Beim Schlüsselwechsel: Hochgeladenes vom Gerät (liegt im Backend), der nächste Sync holt die Daten der neuen Person.
-  // Noch nicht Hochgeladenes bleibt und geht dabei mit hoch – so geht nichts verloren (gegen deren Stand: neuere gewinnt).
-  reset() {
-    for (const k of this.#items.keys()) if (!this.#dirty.has(k)) this.#items.delete(k);
-    this.#base.clear();
-    this.#rev = 0;
-    this.#persist();
-    this.dispatchEvent(new Event("remote"));
-  }
-
   get isEmpty() {
     return this.#items.size === 0;
   }

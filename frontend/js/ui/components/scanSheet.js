@@ -23,7 +23,7 @@ let picker = null; // unsichtbares Datei-Feld: Foto-App oder Mediathek, falls di
 export function startScan(ctx, { listId = null, pick = null } = {}) {
   if (!navigator.onLine) return ctx.notify("Zum Scannen braucht es Internet.", { type: "info" });
   if (!ctx.scanner.ready) {
-    return ctx.notify("Zum Scannen bitte erst unter „Mehr“ den Sync-Schlüssel eintragen.", { type: "info", action: { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } });
+    return ctx.notify("Zum Scannen bitte erst anmelden.", { type: "info", action: { label: "Anmelden", run: ctx.openProfiles } });
   }
   if (!navigator.mediaDevices?.getUserMedia) return pickPhoto((file) => singleFromFile(ctx, file, listId, pick));
   ctx.openSheet((body, sheet) => cameraStep(body, sheet, listId, pick));

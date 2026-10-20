@@ -87,8 +87,9 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 
 ### Wer sammelt?
 
-- Profilauswahl wie bei Netflix: antippen + Passwort meldet an. Noch kein Passwort? Einmal mit dem Sync-Schlüssel anmelden („Mehr“ → „Erweitert“) und eins festlegen.
-- Jede Person hat auf dem Gerät eigene Daten. Unter „Mehr“: Namen und Passwort ändern (neues Passwort = alle anderen Geräte abgemeldet) und „Abmelden“ (löscht die Daten der Person vom Gerät, im Backend bleibt alles).
+- Profilauswahl wie bei Netflix: antippen + Passwort meldet an – einmal pro Person und Gerät, danach wechselt man dort ohne Passwort. Schlüssel sieht und ändert in der App niemand.
+- Noch kein Passwort? Auf einem Gerät, auf dem man schon angemeldet ist, unter „Mehr“ eins festlegen (ohne Passwort kein „Abmelden“ – man käme nicht wieder rein).
+- Jede Person hat auf dem Gerät eigene Daten. Unter „Mehr“: Namen und Passwort ändern (neues Passwort → andere Geräte fragen einmal danach, ihre Daten bleiben) und „Abmelden“ (löscht die Daten der Person vom Gerät, im Backend bleibt alles).
 - 5 falsche Versuche → 15 Minuten Pause.
 
 ### Offline, Updates & Sicherung
@@ -241,7 +242,7 @@ Cloudflare D1 (SQLite), Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstel
 
 ### Personen & Schlüssel
 
-Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. Der Schlüssel ist der Notfall-Zugang („Mehr“ → „Erweitert“), angemeldet wird per Antippen und Passwort. Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/` (für Dev jeweils `--env dev`):
+Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. Die App zeigt keine Schlüssel; angemeldet wird per Antippen und Passwort. Der Schlüssel ist nur noch dein Admin-Zugang (Skripte, Smoke-Test, Passwort zurücksetzen). Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/` (für Dev jeweils `--env dev`):
 
 ```bash
 npm run user:add -- "Max"                      # neue Person, Schlüssel in .keys/max.txt
@@ -249,8 +250,9 @@ npm run user:add -- "Max" --id max             # gleiche ID nochmal = neuer Schl
 npm run user:add -- "Max" --id max --key-file ../.keys/max.txt --env dev   # Person auf Dev, gleicher Schlüssel wie live
 npm run user:list
 
-# Passwort vergessen? Zurücksetzen – danach mit dem Sync-Schlüssel anmelden und ein neues festlegen
+# Passwort vergessen? Zurücksetzen und mit dem Schlüssel ein neues setzen (Geräte fragen danach einmal das neue ab)
 npx wrangler d1 execute DB --remote --command "UPDATE users SET password_hash = NULL, failed_logins = 0 WHERE id = 'lucas'"
+curl -X POST https://pokemon-sammlung.pokemon-sammlung-backend.workers.dev/me/password -H "Authorization: Bearer $(cat ../.keys/lucas.txt)" -H "Content-Type: application/json" -d '{"password":"neues-passwort"}'
 
 node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Listen der alten Checkliste für diese Person
 ```

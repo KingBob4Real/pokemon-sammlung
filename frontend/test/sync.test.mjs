@@ -147,14 +147,14 @@ await c.run();
 assert.equal(c.sync.state, "ok");
 assert.equal(serverData("ok-1").qty, 2);
 
-// --- Schlüssel wechseln (z. B. Anmeldung abgelaufen): noch nicht Hochgeladenes bleibt und geht zur neuen Person mit
+// --- Anmeldung abgelaufen: Änderungen bleiben auf dem Gerät, die App weiß, dass sie neu anmelden muss
 server.fail.push(401);
 await c.put("neu-im-browser", { ...entry, card: { id: "neu-im-browser" } });
 await c.run();
-assert.equal(c.store.pendingCount, 1);
-await c.act((store, sync) => sync.configure("ANDERER"));
-assert.ok(c.store.get("collection", "neu-im-browser"), "bleibt auf dem Gerät");
-assert.ok(server.rows.has("collection:neu-im-browser"), "und ist oben");
-assert.equal(c.store.pendingCount, 0);
+assert.equal(c.sync.config.loggedOut, true);
+assert.equal(c.store.pendingCount, 1, "nichts verloren");
+await c.run(); // neu angemeldet
+assert.equal(c.sync.config.loggedOut, false);
+assert.ok(server.rows.has("collection:neu-im-browser"), "und jetzt oben");
 
 console.log("Abgleich ok");

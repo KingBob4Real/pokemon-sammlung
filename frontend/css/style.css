@@ -472,14 +472,6 @@ select.field { padding-right: 8px; }
   box-shadow: var(--shadow);
 }
 .panel h2 { font-size: 19px; font-weight: 600; margin-bottom: 6px; }
-/* „Erweitert“ unter Mehr: natives <details>, zugeklappt */
-.advanced summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: -8px 0; list-style: none; cursor: pointer; }
-.advanced summary::-webkit-details-marker { display: none; }
-.advanced summary h2 { margin: 0; }
-.advanced summary::after { content: "›"; font-size: 26px; font-weight: 800; color: var(--muted); transition: transform 0.2s ease; }
-.advanced[open] summary { margin-bottom: 4px; }
-.advanced[open] summary::after { transform: rotate(90deg); }
-.advanced h3 { margin: 16px 0 2px; font-size: 16px; font-weight: 600; }
 .panel p { margin: 6px 0; font-size: 14px; }
 .label { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .field-note { margin: 6px 2px 0; font-size: 13px; font-weight: 800; color: #d6336c; }

@@ -16,7 +16,7 @@ export class ScanService {
     this.shrinkPhoto = shrinkPhoto;
   }
 
-  // Scannen geht nur mit Sync-Schlüssel (das Backend zählt pro Person)
+  // Scannen geht nur angemeldet (das Backend zählt pro Person)
   get ready() {
     return this.sync.enabled;
   }

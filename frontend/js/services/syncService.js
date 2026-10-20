@@ -1,14 +1,11 @@
 import { describeError } from "../core/errors.js";
 import { objOr, plural } from "../core/format.js";
 
-// Schlüssel in Form „XXXX-XXXX-…“ bringen (Groß/klein und Leerzeichen egal)
-export const normalizeKey = (key) => (String(key).toUpperCase().replace(/[^A-Z0-9]/g, "").match(/.{1,4}/g) || []).join("-");
-
 // Wartezeit bis zum nächsten Versuch nach einem vorübergehenden Fehler (Netz weg, Server-Problem)
 const RETRY_DELAYS_MS = [10_000, 30_000, 60_000, 120_000, 300_000];
 
 /**
- * Gleicht den lokalen Speicher mit dem Backend ab – mit dem Schlüssel einer Person.
+ * Gleicht den lokalen Speicher mit dem Backend ab – mit der Anmeldung einer Person (setzt „Wer sammelt?“, nie der Nutzer).
  * Zustand: off (nicht eingerichtet), offline, busy, error, pending (Änderungen warten), ok. Meldet "status".
  * Vorübergehende Fehler werden automatisch später nochmal versucht. Lehnt der Server einen einzelnen
  * Eintrag ab, bleibt dieser nur auf dem Gerät und der Rest synchronisiert weiter.
@@ -27,7 +24,7 @@ export class SyncService extends EventTarget {
     this.storage = storage;
     this.storageKey = storageKey;
     this.batchSize = batchSize;
-    this.config = { url: "", key: "", user: "", at: 0, error: "", offset: 0, ...objOr(storage.get(storageKey, {})) };
+    this.config = { url: "", key: "", user: "", at: 0, error: "", offset: 0, loggedOut: false, ...objOr(storage.get(storageKey, {})) };
     this.config.url = defaultUrl; // fest – die Adresse ist in der App nicht mehr einstellbar
     store.clockOffset = Number.isSafeInteger(this.config.offset) ? this.config.offset : 0;
   }
@@ -46,35 +43,6 @@ export class SyncService extends EventTarget {
     if (this.#busy) return "busy";
     if (this.config.error) return "error";
     return this.store.pendingCount ? "pending" : "ok";
-  }
-
-  // Wechsel zum Schlüssel einer (womöglich) anderen Person? Dann gehören die Daten auf dem Gerät nicht dazu.
-  isOtherKey(key) {
-    return Boolean(this.config.key) && normalizeKey(key) !== this.config.key;
-  }
-
-  // → null wenn übernommen, sonst der Grund (dann bleibt alles wie es war)
-  async configure(key) {
-    const next = { ...this.config, key: normalizeKey(key), error: "" };
-    if (!next.key) return "Bitte den Sync-Schlüssel eintragen.";
-    if (this.isOtherKey(key)) {
-      // Erst prüfen, ob der neue Schlüssel gilt – ein Tippfehler darf das Gerät nicht leeren
-      try {
-        await this.api.sync(next, 0, []);
-      } catch (e) {
-        const { kind, message } = describeError(e);
-        return kind === "auth" ? "Dieser Schlüssel stimmt nicht – nichts geändert." : `${message} Nichts geändert.`;
-      }
-      this.store.reset(); // im Backend bleibt alles, das Gerät holt die Daten der neuen Person; Nicht-Hochgeladenes geht mit
-      next.user = "";
-      next.at = 0;
-    }
-    this.config = next;
-    this.#attempt = 0;
-    this.#lastProblem = "";
-    this.#save();
-    await this.run();
-    return null;
   }
 
   schedule(ms = 1500) {
@@ -114,12 +82,14 @@ export class SyncService extends EventTarget {
       }
       this.config.at = Date.now();
       this.config.error = "";
+      this.config.loggedOut = false;
       this.#attempt = 0;
       this.#lastProblem = "";
     } catch (e) {
       const problem = describeError(e);
       if (problem.retry) problem.message += " Neuer Versuch läuft automatisch.";
       this.config.error = problem.message;
+      this.config.loggedOut = problem.kind === "auth"; // Anmeldung abgelaufen → „Wer sammelt?“ meldet neu an, die Daten bleiben
       if (problem.message !== this.#lastProblem) this.#report(problem);
       this.#lastProblem = problem.message;
       // vorübergehend? Dann später von selbst nochmal (immer längere Pausen)

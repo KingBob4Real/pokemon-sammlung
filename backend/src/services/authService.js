@@ -7,7 +7,7 @@ const LOCK_MS = 15 * 60 * 1000;
 const hex = (bytes) => [...new Uint8Array(bytes)].map((b) => b.toString(16).padStart(2, "0")).join("");
 const random = (n) => hex(crypto.getRandomValues(new Uint8Array(n)));
 // Sitzung im selben Format wie ein Sync-Schlüssel (XXXX-XXXX-…), nur länger: 24 Zeichen = 120 Bit.
-// So behandelt die App sie überall gleich (z. B. das Feld „Sync-Schlüssel“ unter „Mehr“).
+// So behandelt die App sie überall gleich.
 const KEY_CHARS = "ABCDEFGHJKMNPQRSTVWXYZ0123456789";
 const newSession = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => KEY_CHARS[b & 31]).join("").match(/.{4}/g).join("-");
 
@@ -51,12 +51,12 @@ export class AuthService {
 
   // → { token, user: { id, name } } | { status, error }
   // Ohne Passwort kein Anmelden: die App ist öffentlich, sonst könnte jeder die Person antippen und übernehmen.
-  // Dann bleibt der Sync-Schlüssel (Notfall-Zugang) – damit angemeldet, legt man ein Passwort fest.
+  // Ein Gerät, das schon angemeldet ist, legt dann eins fest (oder der Admin mit dem Schlüssel, siehe README).
   async login(id, password, now = Date.now()) {
     const user = await this.users.find(id);
     if (!user) return { status: 404, error: "Diese Person gibt es nicht." };
     if (!user.password_hash) {
-      return { status: 403, error: `${user.name} hat noch kein Passwort. Auf einem Gerät, auf dem ${user.name} angemeldet ist, unter „Mehr“ eins festlegen – oder hier unter „Mehr“ → „Erweitert“ mit dem Sync-Schlüssel anmelden.` };
+      return { status: 403, error: `${user.name} hat noch kein Passwort. Auf einem Gerät, auf dem ${user.name} angemeldet ist, unter „Mehr“ eins festlegen.` };
     }
     const denied = await this.#check(user, password, now);
     if (denied) return denied;

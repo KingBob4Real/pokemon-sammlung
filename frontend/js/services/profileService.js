@@ -4,9 +4,9 @@ import { isObj } from "../core/format.js";
 
 /**
  * „Wer sammelt?“ – wie die Profilauswahl bei Netflix. Die Personen kommen vom Backend, sind also auf jedem
- * Gerät da. Antippen + Passwort meldet dieses Gerät an (eigene Sitzung, kein Sync-Schlüssel nötig); das Passwort
- * wird bei jedem Wechsel zu der Person abgefragt (wie die PIN bei Netflix). Ohne Passwort lehnt das Backend ab – die App
- * ist öffentlich. Wer schon angemeldet ist, wechselt ohne Passwort weiter (bis er eins festlegt).
+ * Gerät da. Antippen + Passwort meldet dieses Gerät an (eigene Sitzung; Schlüssel sieht der Nutzer nie) – einmal pro Person
+ * und Gerät, danach wechselt man dort ohne Passwort. Ohne Passwort lehnt das Backend das erste Anmelden ab – die App ist
+ * öffentlich. Ist die Anmeldung abgelaufen (Passwort woanders geändert), fragt die App einmal neu; die Daten bleiben.
  * Jede Person hat auf dem Gerät eigene Daten (eigener Speicher-Platz); wer zuerst da war, behält die bisherigen ("").
  * Gespeichert: { active: Person-ID, slots: { Person-ID: Speicher-Platz }, people: [{ id, name, locked }] }
  * Wechseln = Person merken und die App neu laden, damit alles mit deren Daten startet.
@@ -69,17 +69,18 @@ export class ProfileService {
   }
 
   // Zu einer Person wechseln → {} (geklappt, App neu laden) | { needPassword } | { error }
-  async choose(id, password = "") {
+  // relogin: die Anmeldung dieses Geräts ist abgelaufen (z. B. Passwort woanders geändert) → neu anmelden, Daten bleiben
+  async choose(id, password = "", relogin = false) {
     const person = this.people.find((p) => p.id === id);
     if (!person) return { error: "Diese Person gibt es nicht mehr." };
     const slot = this.#slotFor(id);
     const saved = this.storage.get(this.keysOf(slot).sync, null);
-    // Schon angemeldet und ohne Passwort → einfach wechseln (geht auch offline)
-    if (person.locked || !saved?.key) {
+    // Auf diesem Gerät schon angemeldet → einfach wechseln, ohne Passwort (geht auch offline)
+    if (relogin || !saved?.key) {
       if (person.locked && !password) return { needPassword: true };
       try {
         const { token, user } = await this.api.login(this.url, id, password);
-        this.storage.set(this.keysOf(slot).sync, { at: 0, ...saved, url: this.url, key: token, user: user.name, userId: user.id, error: "" });
+        this.storage.set(this.keysOf(slot).sync, { at: 0, ...saved, url: this.url, key: token, user: user.name, userId: user.id, error: "", loggedOut: false });
         // die alte Sitzung dieses Geräts beenden – sonst sammelt jeder Wechsel zu einer Person mit Passwort eine an
         if (saved?.key) this.api.logout({ url: this.url, key: saved.key }).catch(() => {});
       } catch (e) {

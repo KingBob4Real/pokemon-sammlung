@@ -54,10 +54,11 @@ export function showProfiles(ctx, { start = false } = {}) {
   const form = h("form", { class: "toolbar tight profiles-add", hidden: true }, [password, go]);
 
   async function choose(person, pw = "") {
-    if (person.id === profiles.active) return done();
+    const relogin = person.id === profiles.active && ctx.sync.config.loggedOut; // abgemeldet → neu anmelden, Daten bleiben
+    if (person.id === profiles.active && !relogin) return done();
     note.textContent = "";
     go.disabled = true;
-    const result = await profiles.choose(person.id, pw);
+    const result = await profiles.choose(person.id, pw, relogin);
     go.disabled = false;
     if (result.needPassword) {
       asking = person;

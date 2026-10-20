@@ -58,19 +58,23 @@ assert.deepEqual(await profiles.choose("lucas", "geheim"), {});
 assert.equal(fresh().slot, "", "erste Person nutzt die bisherigen Speicher-Namen, nach Neustart noch aktiv");
 assert.equal(storage.get("ps.sync").key, "token-lucas-1", "Sitzung statt Sync-Schlüssel gespeichert");
 
-// Lukas ist auf dem Gerät schon angemeldet (z. B. von früher) → Wechsel ohne neuen Login; zu Lucas immer mit Passwort
+// Auf dem Gerät schon angemeldet → wechseln ohne Passwort, auch zu einer Person mit Passwort (einmal pro Gerät reicht)
 storage.set("ps.owner.sync", { key: "token-owner-alt" });
 profiles = fresh();
 const before = logins;
 assert.deepEqual(await profiles.choose("owner"), {});
-assert.equal(logins, before, "kein neuer Login nötig");
 assert.equal(profiles.slot, "owner", "eigener Platz");
-assert.deepEqual(await profiles.choose("lucas"), { needPassword: true }, "geschützt: bei jedem Wechsel fragen");
-assert.deepEqual(await profiles.choose("lucas", "geheim"), {});
+assert.deepEqual(await profiles.choose("lucas"), {}, "zurück zu Lucas ohne Passwort");
+assert.equal(logins, before, "kein neuer Login nötig");
+
+// Anmeldung abgelaufen (Passwort woanders geändert): einmal neu anmelden, gleicher Platz – die Daten bleiben
+storage.set("ps.entities", { x: 1 });
+assert.deepEqual(await profiles.choose("lucas", "", true), { needPassword: true });
+assert.deepEqual(await profiles.choose("lucas", "geheim", true), {});
+assert.deepEqual([profiles.slot, storage.get("ps.sync").key, storage.get("ps.entities")], ["", "token-lucas-2", { x: 1 }], "neue Sitzung, Daten noch da");
 assert.deepEqual(loggedOut, ["token-lucas-1"], "neue Anmeldung beendet die alte Sitzung dieses Geräts");
 
 // Abmelden: Sitzung im Backend beenden, eigene Daten der Person weg, Daten der anderen bleiben, danach niemand aktiv
-storage.set("ps.entities", { x: 1 });
 storage.set("ps.prices.v4", { y: 1 });
 await profiles.logout();
 assert.equal(loggedOut.at(-1), "token-lucas-2", "Sitzung beendet");

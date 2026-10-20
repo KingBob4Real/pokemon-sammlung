@@ -12,7 +12,7 @@ export function describeError(error) {
     return { kind: "storage", retry: false, message: "Der Speicher auf diesem Gerät ist voll. Bitte eine Sicherung exportieren." };
   }
   const status = error?.status;
-  if (status === 401) return { kind: "auth", retry: false, message: "Der Sync-Schlüssel stimmt nicht. Bitte unter „Mehr“ prüfen." };
+  if (status === 401) return { kind: "auth", retry: false, message: "Du bist auf diesem Gerät abgemeldet (z. B. Passwort woanders geändert). Bitte neu anmelden – deine Daten bleiben." };
   if (status === 404) return { kind: "notFound", retry: false, message: "Nicht gefunden. Ist die Adresse richtig?" };
   if (status === 400 || status === 413) return { kind: "rejected", retry: false, message: error?.body?.error || "Die Daten wurden abgelehnt." };
   if (status === 429) return { kind: "server", retry: true, message: "Gerade zu viele Anfragen." };
