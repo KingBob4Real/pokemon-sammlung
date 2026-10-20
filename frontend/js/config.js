@@ -2,7 +2,7 @@
 
 // Version der App (steht unter „Mehr“). Bei jedem Release hochzählen: Fix → hinten +1 (0.0.2), Feature → Mitte +1 und
 // hinten 0 (0.1.0), großer Umbau → vorne +1, Rest 0 (1.0.0). Das technische ?v= in index.html setzt der Pages-Workflow selbst.
-export const APP_VERSION = "0.0.1";
+export const APP_VERSION = "0.1.0";
 
 export const TCGDEX_API = "https://api.tcgdex.net/v2";
 // Dev-Stufe: der develop-Branch liegt unter …/dev/ (siehe .github/workflows/pages.yml) – eigenes Backend, eigener Speicher.
@@ -31,7 +31,7 @@ const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen
 export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
 
 // Speicher-Namen, die einer Person allein gehören – beim Abmelden fliegen genau diese vom Gerät (services/profileService.js)
-export const PERSONAL_KEYS = ["entities", "dirty", "rev", "sync", "prefs", "history", "trade"];
+export const PERSONAL_KEYS = ["entities", "dirty", "base", "rev", "sync", "prefs", "history", "trade"];
 
 // Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel, Einstellungen und Wertverlauf gehören ihr allein,
 // Preise, Sets und Bild-Ersatz teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
@@ -40,6 +40,7 @@ export function storageKeys(profile = "") {
   return {
     entities: `${own}entities.v1`,
     dirty: `${own}dirty.v1`,
+    base: `${own}base.v1`, // Stand vor eigenen, noch nicht hochgeladenen Änderungen (services/entityStore.js, Zusammenführen)
     rev: `${own}rev.v1`,
     sync: `${own}sync.v1`,
     prefs: `${own}prefs.v1`,
@@ -48,9 +49,6 @@ export function storageKeys(profile = "") {
     prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
     sets: `${P}sets.v4`, // v4: Kartenzahl = Deutsch oder Englisch, was mehr hat (v3: deutsche + englische Sets, Serie je Set)
     images: `${P}images.v1`, // Karten-ID + Größe → Bild-Adresse, die geklappt hat, oder "" (ui/components/cardTile.js)
-    // von der alten Checkliste (gleiche Domain, im selben Browser lesbar)
-    legacyOwned: "pkc.owned.v1",
-    legacyPrices: "pkc.ownPrices.v1",
   };
 }
 

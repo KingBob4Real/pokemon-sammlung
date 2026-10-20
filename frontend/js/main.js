@@ -54,14 +54,24 @@ sync.addEventListener("status", () => profiles.remember(sync.config.userId, sync
 const trade = new TradeService(new TradeApi(fetchJson), sync, collection, lists);
 const tradeDraft = new TradeDraftService(storage, STORAGE_KEYS.trade, collection);
 const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto);
-const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, storage, oldAppUrl: OLD_APP_URL, keys: STORAGE_KEYS });
+const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, oldAppUrl: OLD_APP_URL });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
 const setSorters = createSetSorters((id) => prices.value(id));
 const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
-const prefs = createPrefs(storage, STORAGE_KEYS.prefs, { collectionSort: "newest", collectionGroup: "none", listsSort: "custom", listSort: "order", listFilter: "all", setFilter: "all", scanMode: "single", scanLayout: "3x3", setSort: "numUp" });
+const prefs = createPrefs(storage, STORAGE_KEYS.prefs, {
+  collectionSort: "newest",
+  collectionGroup: "none",
+  listsSort: "custom",
+  listSort: "order",
+  listFilter: "all",
+  setFilter: "all",
+  scanMode: "single",
+  scanLayout: "3x3",
+  setSort: "numUp",
+});
 
-const app = new App({ store, sets, prices, collection, lists, history, trade, tradeDraft, catalog, sync, scanner, profiles, legacyImport, backup, sorters, setSorters, updates }, prefs);
+const app = new App({ store, sets, prices, collection, lists, history, trade, tradeDraft, catalog, sync, scanner, profiles, backup, sorters, setSorters, updates }, prefs);
 app.start();
 
 // Wertverlauf: Tageswert merken, sobald alle Preise der Sammlung frisch sind (beim Start oft schon, sonst nach dem Laden)

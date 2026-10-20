@@ -72,7 +72,8 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
       if (mine === seq) session.results = { query, cards };
     } catch (e) {
       const { kind, message } = describeError(e);
-      if (mine === seq) session.results = { query, error: kind === "offline" ? "Du bist offline – die Suche braucht Internet. Deine Sammlung und Listen gehen trotzdem." : `Die Kartensuche klappt gerade nicht. ${message}` };
+      const error = kind === "offline" ? "Du bist offline – die Suche braucht Internet. Deine Sammlung und Listen gehen trotzdem." : `Die Kartensuche klappt gerade nicht. ${message}`;
+      if (mine === seq) session.results = { query, error };
     }
     if (mine === seq && box.isConnected) showResults();
     else if (mine === seq) bar.done();
@@ -122,7 +123,8 @@ export function searchPanel(ctx, { session, tile, setHref, extra = null }) {
         h("div", { class: "buttons center" }, [h("button", { type: "button", class: "btn", onclick: () => ((session.results = null), run()) }, "Nochmal versuchen")])
       );
     }
-    if (!r.cards.length) return box.replaceChildren(...(setBlock.length ? setBlock : [emptyState(`Keine Karte gefunden für „${r.query}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer – oder Set-Kürzel und Nummer wie auf der Karte („MEW 199“, „BS 11“).")]));
+    const tip = "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer – oder Set-Kürzel und Nummer wie auf der Karte („MEW 199“, „BS 11“).";
+    if (!r.cards.length) return box.replaceChildren(...(setBlock.length ? setBlock : [emptyState(`Keine Karte gefunden für „${r.query}“.`, tip)]));
     box.replaceChildren(
       ...setBlock,
       setBlock.length ? h("h2", { class: "section-title" }, "Karten") : "",

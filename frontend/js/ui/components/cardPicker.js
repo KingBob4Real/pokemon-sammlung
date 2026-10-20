@@ -56,7 +56,8 @@ export function cardSearch(ctx, { query, onPick, live }) {
       const cards = await ctx.catalog.search(q);
       if (mine !== seq || !live()) return;
       choice = choiceGrid(ctx, cards.slice(0, SEARCH_RESULTS), onPick);
-      results.replaceChildren(cards.length ? choice.grid : emptyState(`Keine Karte gefunden für „${q}“.`, "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer oder Set-Kürzel („MEW 199“)."));
+      const tip = "Tipp: Name auf Deutsch oder Englisch, z. B. „Glurak“ oder „Charizard“, gern mit Nummer oder Set-Kürzel („MEW 199“).";
+      results.replaceChildren(cards.length ? choice.grid : emptyState(`Keine Karte gefunden für „${q}“.`, tip));
     } catch (e) {
       if (mine !== seq) return;
       const offline = describeError(e).kind === "offline";

@@ -32,7 +32,9 @@ export function render(main, ctx) {
     h("p", { class: "muted pad" }, "Angeboten wird, was doppelt ist – oder was ihr in der Kartenansicht unter „Tauschen“ selbst festlegt. Was in Listen steht und fehlt, zählt als Wunsch. Die Sprache zählt nicht."),
     h("details", { class: "trade-all" }, [
       h("summary", {}, `Was du anbietest (${mine.length})`),
-      mine.length ? h("div", { class: "grid" }, mine.map((e) => cardTile(e.card, { mode: "view" }))) : h("p", { class: "muted pad" }, "Nichts – keine Karte doppelt und keine auf „Tauschen: Ja“."),
+      mine.length
+        ? h("div", { class: "grid" }, mine.map((e) => cardTile(e.card, { mode: "view" })))
+        : h("p", { class: "muted pad" }, "Nichts – keine Karte doppelt und keine auf „Tauschen: Ja“."),
     ]),
     status,
     body

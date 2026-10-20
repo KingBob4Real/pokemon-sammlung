@@ -39,7 +39,16 @@ export function tradeCalculator(ctx) {
     const link = h("a", { class: "link-button", target: "_blank", rel: "noopener" }, "Auf Cardmarket ↗");
     const qty = h("output", {}, String(it.qty));
     const step = (d) => (tradeDraft.change(side, card.id, { qty: it.qty + d }), draw());
-    const own = h("input", { type: "text", class: "field", inputmode: "decimal", autocomplete: "off", enterkeyhint: "done", placeholder: "Eigener Preis", "aria-label": `Eigener Preis für ${card.name}`, value: fmtPriceInput(it.own) });
+    const own = h("input", {
+      type: "text",
+      class: "field",
+      inputmode: "decimal",
+      autocomplete: "off",
+      enterkeyhint: "done",
+      placeholder: "Eigener Preis",
+      "aria-label": `Eigener Preis für ${card.name}`,
+      value: fmtPriceInput(it.own),
+    });
     own.addEventListener("input", () => {
       const n = parseEuro(own.value);
       if (Number.isNaN(n)) return; // Tippfehler ignorieren
@@ -101,7 +110,11 @@ export function tradeCalculator(ctx) {
           sheet.close();
         },
       });
-      body.replaceChildren(h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: sheet.close, html: ICONS.close }), h("div", { class: "sheet-head" }, [h("h2", {}, title)]), ...found.elements);
+      body.replaceChildren(
+        h("button", { type: "button", class: "sheet-close", "aria-label": "Schließen", onclick: sheet.close, html: ICONS.close }),
+        h("div", { class: "sheet-head" }, [h("h2", {}, title)]),
+        ...found.elements
+      );
       found.elements[0].querySelector("input").autofocus = true; // showModal fokussiert sonst den Schließen-Knopf
       return found.update;
     });

@@ -19,7 +19,7 @@ const UPSERT = `
 // gerade gesendeten Einträge (Primärschlüssel) – mit OR las sie bei jedem Sync alle Zeilen der Person (D1 zählt gelesene Zeilen).
 const ROWS = `
   SELECT i.id, i.list_id, i.added, i.position, i.updated, i.deleted, ${CARD_COLUMNS}
-  FROM list_items i LEFT JOIN cards k ON k.id = i.card_id`;
+  FROM list_items i LEFT JOIN cards k ON k.user_id = i.user_id AND k.id = i.card_id`;
 const CHANGED = `
   ${ROWS} WHERE i.user_id = ?3 AND i.rev > ?1
   UNION
@@ -31,7 +31,7 @@ const MISSING = `
   SELECT DISTINCT i.user_id, ${CARD_COLUMNS}
   FROM list_items i
   JOIN lists l ON l.user_id = i.user_id AND l.id = i.list_id AND l.deleted = 0
-  JOIN cards k ON k.id = i.card_id
+  JOIN cards k ON k.user_id = i.user_id AND k.id = i.card_id
   WHERE i.user_id != ?1 AND i.deleted = 0
     AND NOT EXISTS (SELECT 1 FROM collection c WHERE c.user_id = i.user_id AND c.card_id = i.card_id AND c.deleted = 0 AND c.qty > 0)`;
 
