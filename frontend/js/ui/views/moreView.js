@@ -23,7 +23,7 @@ export function render(main, ctx) {
     if (sync.isOtherKey(key.value) && !ctx.store.isEmpty) {
       const unsaved = sync.pendingCount ? `
 
-Achtung: ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen und gehen dabei verloren.` : "";
+${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hochgeladen – die bleiben und gehen zur neuen Person mit.` : "";
       const question = `Das ist ein anderer Schlüssel. Die Daten auf diesem Gerät werden durch die der neuen Person ersetzt (im Backend bleibt alles erhalten).${unsaved}`;
       if (!(await confirmDialog(question, { ok: "Schlüssel wechseln", danger: true }))) return;
     }

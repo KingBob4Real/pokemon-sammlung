@@ -65,7 +65,7 @@ export class SyncService extends EventTarget {
         const { kind, message } = describeError(e);
         return kind === "auth" ? "Dieser Schlüssel stimmt nicht – nichts geändert." : `${message} Nichts geändert.`;
       }
-      this.store.reset(); // im Backend bleibt alles, das Gerät holt die Daten der neuen Person
+      this.store.reset(); // im Backend bleibt alles, das Gerät holt die Daten der neuen Person; Nicht-Hochgeladenes geht mit
       next.user = "";
       next.at = 0;
     }

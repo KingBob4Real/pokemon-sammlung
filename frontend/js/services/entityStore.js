@@ -170,10 +170,10 @@ export class EntityStore extends EventTarget {
     this.#persist();
   }
 
-  // Gerät leeren (z. B. beim Wechsel zu einer anderen Person); der nächste Sync holt alles neu
+  // Beim Schlüsselwechsel: Hochgeladenes vom Gerät (liegt im Backend), der nächste Sync holt die Daten der neuen Person.
+  // Noch nicht Hochgeladenes bleibt und geht dabei mit hoch – so geht nichts verloren (gegen deren Stand: neuere gewinnt).
   reset() {
-    this.#items.clear();
-    this.#dirty.clear();
+    for (const k of this.#items.keys()) if (!this.#dirty.has(k)) this.#items.delete(k);
     this.#base.clear();
     this.#rev = 0;
     this.#persist();
