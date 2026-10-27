@@ -1,4 +1,4 @@
-// Zugriff aufs eigene Backend für „Wer sammelt?“: Personen, Anmelden, Passwort, Name.
+// Zugriff aufs eigene Backend für „Wer sammelt?“: Personen, Anmelden, Name.
 const base = (url) => url.replace(/\/+$/, "");
 
 export class AccountApi {
@@ -6,19 +6,14 @@ export class AccountApi {
     this.fetchJson = fetchJson;
   }
 
-  // → { people: [{ id, name, locked }] }
+  // → { people: [{ id, name }] }
   people(url) {
     return this.fetchJson(`${base(url)}/people`);
   }
 
-  // → { token, user: { id, name } }; Fehler 401 (Passwort falsch/fehlt), 403 (noch kein Passwort), 429 (zu viele Versuche)
-  login(url, id, password) {
-    return this.#post(url, "/login", { id, password });
-  }
-
-  // password leer = entfernen; oldPassword nötig, wenn es schon eins gibt
-  setPassword({ url, key }, password, oldPassword) {
-    return this.#post(url, "/me/password", { password, oldPassword }, key);
+  // → { token, user: { id, name } }
+  login(url, id) {
+    return this.#post(url, "/login", { id });
   }
 
   // beendet die Sitzung dieses Geräts (mit dem Sync-Schlüssel: nichts zu beenden)

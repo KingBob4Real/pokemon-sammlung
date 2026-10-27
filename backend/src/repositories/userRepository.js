@@ -1,5 +1,5 @@
 // Personen (Tabelle users) und ihre Geräte-Sitzungen (Tabelle sessions).
-// Gespeichert sind nur Hashes: vom Sync-Schlüssel, von Sitzungen und vom Passwort.
+// Gespeichert sind nur Hashes: vom Sync-Schlüssel und von Sitzungen.
 
 // Schlüssel → Hash (hex). Wird auch vom Skript zum Anlegen neuer Personen benutzt.
 export async function hashKey(key) {
@@ -25,37 +25,19 @@ export class UserRepository {
       .first();
   }
 
-  // → [{ id, name, locked }] in der Reihenfolge, in der die Personen angelegt wurden
+  // → [{ id, name }] in der Reihenfolge, in der die Personen angelegt wurden
   async all() {
-    const { results } = await this.db.prepare("SELECT id, name, password_hash IS NOT NULL AS locked FROM users ORDER BY created").all();
-    return results.map((r) => ({ id: r.id, name: r.name, locked: Boolean(r.locked) }));
+    const { results } = await this.db.prepare("SELECT id, name FROM users ORDER BY created").all();
+    return results;
   }
 
-  // → { id, name, password_hash }
+  // → { id, name }
   find(id) {
-    return this.db.prepare("SELECT id, name, password_hash FROM users WHERE id = ?1").bind(id).first();
+    return this.db.prepare("SELECT id, name FROM users WHERE id = ?1").bind(id).first();
   }
 
   rename(id, name) {
     return this.db.prepare("UPDATE users SET name = ?2 WHERE id = ?1").bind(id, name).run();
-  }
-
-  // Neues Passwort (oder null = keins) und alle anderen Sitzungen dieser Person beenden
-  setPassword(id, passwordHash, keepSession) {
-    return this.db.batch([
-      this.db.prepare("UPDATE users SET password_hash = ?2, failed_logins = 0 WHERE id = ?1").bind(id, passwordHash),
-      this.db.prepare("DELETE FROM sessions WHERE user_id = ?1 AND token_hash IS NOT ?2").bind(id, keepSession),
-    ]);
-  }
-
-  // Anmeldeversuch zählen, bevor das Passwort geprüft wird → false = gesperrt (maxFails Versuche, letzter vor < lockMs).
-  // Prüfen und Hochzählen in einer Anweisung: gleichzeitige Versuche sehen so immer den neuesten Zähler.
-  async loginAttempt(id, now, maxFails, lockMs) {
-    const row = await this.db
-      .prepare("UPDATE users SET failed_logins = failed_logins + 1, failed_at = ?2 WHERE id = ?1 AND (failed_logins < ?3 OR ?2 - failed_at >= ?4) RETURNING id")
-      .bind(id, now, maxFails, lockMs)
-      .first();
-    return row != null;
   }
 
   // Abmelden: genau diese Sitzung beenden
@@ -63,11 +45,8 @@ export class UserRepository {
     return this.db.prepare("DELETE FROM sessions WHERE token_hash = ?1").bind(tokenHash).run();
   }
 
-  // Anmeldung geklappt: Fehlversuche vergessen, Sitzung für dieses Gerät anlegen
+  // Sitzung für dieses Gerät anlegen
   startSession(id, tokenHash, now) {
-    return this.db.batch([
-      this.db.prepare("UPDATE users SET failed_logins = 0 WHERE id = ?1").bind(id),
-      this.db.prepare("INSERT INTO sessions (token_hash, user_id, created) VALUES (?1, ?2, ?3)").bind(tokenHash, id, now),
-    ]);
+    return this.db.prepare("INSERT INTO sessions (token_hash, user_id, created) VALUES (?1, ?2, ?3)").bind(tokenHash, id, now).run();
   }
 }

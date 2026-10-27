@@ -38,7 +38,7 @@ Alles auf **Deutsch**, **fürs iPhone** (Safari und Home-Bildschirm-App), **kost
 
 **Bei Cloudflare** (Gratis-Tarif „Workers Free“, Stand Oktober 2026 – bitte in der Cloudflare-Doku nachprüfen, Zahlen ändern sich):
 - **Workers AI:** 10.000 Neurons/Tag gratis, Reset 00:00 UTC. Im Gratis-Tarif gibt es **keine Überziehung** – darüber schlagen Anfragen mit Fehler fehl. Mit **Workers Paid** (mind. 5 US-$/Monat) kostet es darüber **0,011 US-$ je 1.000 Neurons** (≈ 0,00008 $ pro Scan, 1.000 Scans ≈ 8 Cent).
-- **Workers:** 100.000 Anfragen/Tag, **10 ms CPU-Zeit pro Anfrage** (Warten auf die KI zählt nicht als CPU; das Passwort-Hashing im Login ist bewusst auf ~4 ms ausgelegt).
+- **Workers:** 100.000 Anfragen/Tag, **10 ms CPU-Zeit pro Anfrage** (Warten auf die KI zählt nicht als CPU).
 - **D1 (Datenbank):** 5 Mio. gelesene Zeilen/Tag, 100.000 geschriebene Zeilen/Tag, 5 GB Speicher gesamt.
 - **Workers Logs:** im Gratis-Tarif 3 Tage Aufbewahrung.
 - Eigene Grenze der App: Foto max. 1,5 MB Base64, Zeitlimit 30 s.

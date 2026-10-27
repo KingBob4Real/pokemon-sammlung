@@ -964,13 +964,9 @@ button.back { padding: 0; border: 0; background: none; font: inherit; font-weigh
 }
 .profile:active .profile-avatar { transform: scale(0.94); }
 .profile.is-current .profile-avatar { box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--text); }
-.profile-avatar { position: relative; }
-.profile-lock { position: absolute; right: -6px; bottom: -6px; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 17px; background: var(--surface); box-shadow: var(--shadow); }
-.profile.is-asking .profile-avatar { box-shadow: 0 0 0 4px var(--bg), 0 0 0 7px var(--focus); }
 .profiles-text { max-width: 420px; margin: 0; text-align: center; }
 .profiles .field-note { max-width: 420px; margin: 0; text-align: center; }
 .profile-name { font-weight: 800; font-size: 15px; text-align: center; overflow-wrap: anywhere; }
-.profiles-add { width: 100%; max-width: 420px; }
 
 /* ===== Hinweise & Fehler ===== */
 .toast {
