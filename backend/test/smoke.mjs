@@ -163,33 +163,17 @@ const { people } = await (await fetch(`${base}/people`)).json();
 const me = people.find((p) => p.id === start.body.userId);
 assert.ok(me && me.name === start.body.user, "Person steht in der Liste, Sync nennt ihre ID");
 
-// Anmelden & Passwort – setzt kurz ein Passwort und meldet dabei andere Geräte dieser Person ab.
-// Darum nur auf Wunsch und am besten mit einer Test-Person: SMOKE_ACCOUNTS=1 node test/smoke.mjs <Dev-URL> <Test-Schlüssel>
-if (process.env.SMOKE_ACCOUNTS === "1" && !me.locked) {
+// Anmelden per Antippen, Abmelden, Name – nur auf Wunsch: SMOKE_ACCOUNTS=1 node test/smoke.mjs <URL> <Schlüssel>
+if (process.env.SMOKE_ACCOUNTS === "1") {
   const id = me.id;
-  assert.equal((await post("/login", { id })).status, 403, "ohne Passwort kein Anmelden per Antippen");
-  assert.equal((await post("/me/password", { password: "abc" }, key)).status, 400, "zu kurzes Passwort abgelehnt");
-  assert.equal((await post("/me/password", { password: "test-1234" }, key)).status, 200, "Passwort festlegen mit dem Sync-Schlüssel");
-  assert.ok((await (await fetch(`${base}/people`)).json()).people.find((p) => p.id === id).locked, "Person ist jetzt gesperrt");
-  assert.equal((await post("/login", { id })).status, 401, "ohne Passwort kein Zutritt");
-  assert.equal((await post("/login", { id, password: "falsch" })).status, 401, "falsches Passwort");
-  const a = await post("/login", { id, password: "test-1234" });
-  assert.equal(a.status, 200, "richtiges Passwort");
-  const other = (await post("/login", { id, password: "test-1234" })).body.token; // zweites Gerät
+  const a = await post("/login", { id });
+  assert.equal(a.status, 200, "Antippen meldet an");
   assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "Sitzung gilt wie der Schlüssel");
-  assert.equal((await post("/me/password", { password: "neu-12345" }, a.body.token)).status, 401, "ändern ohne altes Passwort geht nicht");
-  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "falsch" }, a.body.token)).status, 401, "ändern mit falschem alten geht nicht");
-  assert.equal((await post("/me/password", { password: "neu-12345", oldPassword: "test-1234" }, a.body.token)).status, 200, "ändern mit dem alten Passwort");
-  assert.equal((await call({ since: 0, changes: [] }, other)).status, 401, "anderes Gerät wurde abgemeldet");
-  assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 200, "dieses Gerät bleibt angemeldet");
-  assert.equal((await call({ since: 0, changes: [] })).status, 200, "Sync-Schlüssel gilt weiter");
-  assert.equal((await post("/me/password", { password: "" }, a.body.token)).status, 401, "entfernen nur mit altem Passwort");
-  assert.equal((await post("/me/password", { password: "", oldPassword: "neu-12345" }, a.body.token)).status, 200, "Passwort wieder weg (nur der Test, die App bietet das nicht an)");
   assert.equal((await post("/logout", {}, a.body.token)).status, 200, "abmelden");
   assert.equal((await call({ since: 0, changes: [] }, a.body.token)).status, 401, "abgemeldetes Gerät kommt nicht mehr rein");
   assert.equal((await post("/me/name", { name: "Smoke-Name" }, key)).body.name, "Smoke-Name", "Name ändern");
   await post("/me/name", { name: me.name }, key);
-  console.log("Anmelden & Passwort ok");
+  console.log("Anmelden ok");
 }
 
 // Karten-Scanner

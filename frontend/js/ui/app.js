@@ -400,7 +400,7 @@ export class App {
 
   #onSyncProblem(problem) {
     if (problem.kind === "offline") return; // dafür gibt es den Offline-Hinweis
-    // Abgemeldet (z. B. Passwort woanders gesetzt) → neu anmelden; falsche Adresse → „Mehr“
+    // Abgemeldet → neu anmelden; falsche Adresse → „Mehr“
     const toSettings =
       problem.kind === "auth" ? { label: "Anmelden", run: () => showProfiles(this.ctx) } : problem.kind === "notFound" ? { label: "Zu „Mehr“", run: () => (location.hash = "#mehr") } : null;
     const retry = problem.kind === "rejected" ? null : { label: "Nochmal", run: () => this.services.sync.run() };

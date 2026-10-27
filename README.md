@@ -33,7 +33,7 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 | 📷 | **Scannen** | Karte fotografieren → erkannt → in der Sammlung. Auch Serien und ganze Ordnerseiten |
 | 🔁 | **Tauschen** | Tauschrechner mit Cardmarket-Werten, dazu: wer hat doppelt, was dir fehlt |
 | 💶 | **Marktwert** | Cardmarket Ø 7 Tage, Wertverlauf, Gestiegen & Gefallen |
-| 👤 | **Wer sammelt?** | Profile wie bei Netflix, mit Passwort, Abmelden auf fremden Geräten |
+| 👤 | **Wer sammelt?** | Profile wie bei Netflix, Abmelden auf fremden Geräten |
 | 📱 | **App** | Vom Home-Bildschirm, offline, Updates von selbst, Holo-Karten zum Neigen |
 
 ### Suche & Sets
@@ -87,9 +87,8 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 
 ### Wer sammelt?
 
-- Profilauswahl wie bei Netflix: antippen + Passwort meldet an. Noch kein Passwort? Einmal mit dem Sync-Schlüssel anmelden („Mehr“ → „Erweitert“) und eins festlegen.
-- Jede Person hat auf dem Gerät eigene Daten. Unter „Mehr“: Namen und Passwort ändern (neues Passwort = alle anderen Geräte abgemeldet) und „Abmelden“ (löscht die Daten der Person vom Gerät, im Backend bleibt alles).
-- 5 falsche Versuche → 15 Minuten Pause.
+- Profilauswahl wie bei Netflix: antippen meldet an, ohne Passwort.
+- Jede Person hat auf dem Gerät eigene Daten. Unter „Mehr“: Namen ändern und „Abmelden“ (löscht die Daten der Person vom Gerät, im Backend bleibt alles).
 
 ### Offline, Updates & Sicherung
 
@@ -155,7 +154,7 @@ Nach Änderungen an JS/CSS hält der Service Worker lokal die alten Dateien (`?v
 | Backend: Sicherheit, Exemplare, Abgleich (echte SQL auf SQLite) | `node backend/test/<security\|copies\|sync>.test.mjs` | jeder Push, vor jedem Backend-Deploy |
 | Smoke gegen ein laufendes Backend | `node backend/test/smoke.mjs <URL> <Schlüssel> [Schlüssel B]` | von Hand nach einem Deploy |
 
-Der Smoke-Test prüft Sync, Trennung zwischen Personen, Tauschen, Exemplare, Scan und Bilder. Mit `SMOKE_ACCOUNTS=1` auch Anmelden, Passwort und Abmelden – setzt kurz ein Passwort und meldet andere Geräte ab, darum nur mit einer Test-Person. Gegen Live nur mit dem eigenen Schlüssel.
+Der Smoke-Test prüft Sync, Trennung zwischen Personen, Tauschen, Exemplare, Scan und Bilder. Mit `SMOKE_ACCOUNTS=1` auch Anmelden, Abmelden und Name ändern. Gegen Live nur mit dem eigenen Schlüssel.
 
 ### Erweitern
 
@@ -231,7 +230,7 @@ Cloudflare D1 (SQLite), Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstel
 | `collection` | Sammlung: Anzahl, Zustand, Sprache, Kaufpreis, Ordner (`section`), eigene Reihenfolge (`position`), Tauschen (`trade`, leer = wenn doppelt), Exemplare (`copies`, leer = alle gleich) |
 | `lists` · `list_items` | eigene Listen und welche Karte in welcher Liste |
 | `sections` | Ordner der Sammlung |
-| `users` · `sessions` | Personen (Hash des Schlüssels, Passwort-Hash, Fehlversuche) und angemeldete Geräte |
+| `users` · `sessions` | Personen (Hash des Schlüssels; `password_hash`, `failed_*` ungenutzt) und angemeldete Geräte |
 | `scan_usage` | Scans pro Person und Tag (fürs Tageslimit) |
 
 - Alles außer `users` gehört je einer Person (`user_id`). Jede Zeile hat `updated` (neueste Änderung gewinnt), `deleted` und `rev` (Server-Stand). Ein Gerät schickt `POST /sync` mit seinen Änderungen und seinem letzten Stand und bekommt alles Neue dieser Person zurück; gelesen werden nur geänderte Zeilen, denn D1 zählt gelesene Zeilen.
@@ -241,7 +240,7 @@ Cloudflare D1 (SQLite), Gratis-Tarif: 500 MB pro Datenbank, 7 Tage Wiederherstel
 
 ### Personen & Schlüssel
 
-Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. Der Schlüssel ist der Notfall-Zugang („Mehr“ → „Erweitert“), angemeldet wird per Antippen und Passwort. Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/` (für Dev jeweils `--env dev`):
+Schlüssel liegen nur lokal in `.keys/<id>.txt` (nicht in Git); in der Datenbank steht nur ihr Hash. Der Schlüssel ist der Notfall-Zugang („Mehr“ → „Erweitert“), angemeldet wird per Antippen. Neue Personen erscheinen automatisch in der Auswahl. Im Ordner `backend/` (für Dev jeweils `--env dev`):
 
 ```bash
 npm run user:add -- "Max"                      # neue Person, Schlüssel in .keys/max.txt
@@ -249,17 +248,13 @@ npm run user:add -- "Max" --id max             # gleiche ID nochmal = neuer Schl
 npm run user:add -- "Max" --id max --key-file ../.keys/max.txt --env dev   # Person auf Dev, gleicher Schlüssel wie live
 npm run user:list
 
-# Passwort vergessen? Zurücksetzen – danach mit dem Sync-Schlüssel anmelden und ein neues festlegen
-npx wrangler d1 execute DB --remote --command "UPDATE users SET password_hash = NULL, failed_logins = 0 WHERE id = 'lucas'"
-
 node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Listen der alten Checkliste für diese Person
 ```
 
 ### Sicherheit
 
-- **Anmelden nur mit Passwort:** „Wer sammelt?“ zeigt alle Namen öffentlich; ohne Passwort lehnt `POST /login` ab – sonst könnte jeder eine Person übernehmen und aussperren.
-- **Fehlversuche:** Nach 5 falschen Passwörtern ist die Person 15 Minuten gesperrt, danach ein Versuch pro 15 Minuten. Gezählt wird vor dem Prüfen und atomar in der Datenbank.
-- **Sitzungen** laufen nicht ab. Ein verlorenes Gerät meldet man ab, indem man das Passwort ändert (beendet alle anderen Sitzungen).
+- **Anmelden ohne Passwort:** „Wer sammelt?“ zeigt alle Namen öffentlich, `POST /login` mit der ID reicht – wer die App-Adresse kennt, kann jede Person antippen.
+- **Sitzungen** laufen nicht ab; „Abmelden“ beendet die des eigenen Geräts.
 - **Bilder:** Kartenbilder nimmt das Backend nur von `https://assets.tcgdex.net/` an (die anderen sehen deine Karten beim Tauschen). `GET /img` baut die Adresse selbst aus geprüften Teilen und reicht nur PNG/JPEG/WebP durch.
 - **Frontend:** Content-Security-Policy in `index.html` – nur eigene Skripte, Verbindungen nur zu TCGdex, dem Backend (Live, Dev, lokal) und der alten Checkliste.
 
