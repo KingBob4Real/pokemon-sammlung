@@ -156,4 +156,4 @@ window.addEventListener("error", (e) => log.error("app", "Unerwarteter Fehler", 
 window.addEventListener("unhandledrejection", (e) => log.error("app", "Unbehandelter Fehler (Promise)", { error: e.reason }));
 if (IS_DEV) document.documentElement.dataset.stage = "dev"; // grauer Kopf statt rot
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch((e) => log.warn("app", "Service Worker nicht registriert – kein Offline-Betrieb", { error: e }));
-navigator.storage?.persist?.().then((granted) => !granted && log.info("app", "Browser kann gespeicherte Daten bei Platzmangel löschen (persist abgelehnt)"), () => {});
+navigator.storage?.persist?.().catch(() => {});

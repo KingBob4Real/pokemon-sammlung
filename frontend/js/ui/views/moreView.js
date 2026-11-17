@@ -147,8 +147,10 @@ function takeOverSection(ctx) {
     note.textContent = "Übertrage …";
     const problem = await sync.takeOver({ fromRescue });
     button.disabled = false;
-    note.textContent = problem ?? "";
-    if (!problem) ctx.notify("Übertragen. Die anderen Geräte zeigen den Stand, sobald sie das nächste Mal abgleichen.", { type: "success" });
+    note.textContent = "";
+    // als Hinweis unten – render() baut die Ansicht neu, ein Text hier ginge verloren
+    if (problem) ctx.notify(`Übertragen ging nicht: ${problem}`, { type: "error" });
+    else ctx.notify("Übertragen. Die anderen Geräte zeigen den Stand, sobald sie das nächste Mal abgleichen.", { type: "success" });
     ctx.render();
   };
   const current = h("button", { type: "button", class: "btn btn-ghost danger" }, "Stand dieses Geräts übertragen");

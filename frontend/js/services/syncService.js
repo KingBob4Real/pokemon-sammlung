@@ -100,7 +100,7 @@ export class SyncService extends EventTarget {
   // Abholen, was andere Geräte geändert haben – außer die letzte Anfrage ist kürzer als minGap her
   // (Fokus und Sichtbarkeit melden sich oft kurz nacheinander).
   pull(minGap = 0) {
-    if (this.#busy || Date.now() - this.#lastContact < minGap) return;
+    if (this.#busy || Date.now() - this.#lastContact < minGap) return Promise.resolve();
     return this.run();
   }
 
@@ -108,13 +108,22 @@ export class SyncService extends EventTarget {
   // Pause von schedule() – im Hintergrund hält das Handy Zeitgeber an, die Änderung käme sonst erst beim nächsten
   // Öffnen an und die anderen Geräte sähen sie so lange nicht.
   flush() {
-    if (!this.store.pendingCount) return;
+    if (!this.store.pendingCount) return Promise.resolve();
     return this.run({ background: true });
   }
 
-  // background: läuft beim Verlassen der App – Anfragen mit keepalive, Probleme erst beim nächsten Mal melden
-  async run({ background = false } = {}) {
-    if (!this.enabled || this.#busy || !navigator.onLine) return this.#notify();
+  // background: läuft beim Verlassen der App – Anfragen mit keepalive, Probleme erst beim nächsten Mal melden.
+  // Läuft schon ein Abgleich, kommt dessen Ende zurück (was unterwegs dazukam, schiebt er selbst nach).
+  run(options) {
+    if (!this.enabled || !navigator.onLine) return Promise.resolve(this.#notify());
+    if (this.#busy) return this.#current ?? Promise.resolve();
+    this.#current = this.#run(options).finally(() => (this.#current = null));
+    return this.#current;
+  }
+
+  #current = null; // laufender Abgleich
+
+  async #run({ background = false } = {}) {
     clearTimeout(this.#timer);
     this.#busy = true;
     this.#notify();
@@ -206,7 +215,9 @@ export class SyncService extends EventTarget {
   async takeOver({ fromRescue = false } = {}) {
     if (!this.enabled) return "Erst unter „Wer sammelt?“ anmelden.";
     if (!navigator.onLine) return describeError(null).message;
-    if (this.#busy) return "Gerade läuft ein Abgleich – bitte gleich nochmal.";
+    // Ein laufender Abgleich (z. B. vom Fokus aufs Fenster) wird erst abgewartet
+    while (this.#current) await this.#current;
+    if (this.#busy) return "Das Übertragen läuft schon.";
     this.#busy = true;
     let counts;
     try {

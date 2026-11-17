@@ -285,6 +285,14 @@ const visible = (d) => JSON.stringify(d.store.all("collection").sort((x, y) => x
 assert.equal(visible(web), visible(phone), "Browser zeigt genau den Stand des Handys");
 assert.equal(web.store.get("collection", "t-a").qty, 5);
 
+// Übertragen, während gerade ein Abgleich läuft (z. B. Fokus aufs Fenster): wartet ihn ab statt abzubrechen
+t += 1000;
+await phone.put("t-d", { ...entry, card: { id: "t-d" } });
+const running = phone.sync.run();
+assert.equal(await phone.act((store, sync) => sync.takeOver()), null, "kein „läuft gerade“");
+await running;
+assert.ok(server.rows.has("collection:t-d"));
+
 // --- keepalive nur für kleine Anfragen (Browser erlauben 64 KiB), sonst normal
 const { SyncApi } = await import("../js/data/syncApi.js");
 const seen = [];
