@@ -1,3 +1,4 @@
+import { silentLog } from "../core/log.js";
 import { tradeMatches } from "../domain/trade.js";
 
 /**
@@ -8,7 +9,8 @@ import { tradeMatches } from "../domain/trade.js";
 export class TradeService {
   last = null; // { people, at }
 
-  constructor(api, sync, collection, lists) {
+  constructor(api, sync, collection, lists, log = silentLog) {
+    this.log = log;
     this.api = api;
     this.sync = sync;
     this.collection = collection;
@@ -16,7 +18,14 @@ export class TradeService {
   }
 
   async load() {
-    const { people } = await this.api.trade(this.sync.config);
+    let people;
+    try {
+      ({ people } = await this.sync.call((config) => this.api.trade(config)));
+    } catch (e) {
+      this.log.warn("trade", "Tauschdaten nicht abrufbar", { status: e.status ?? null, message: e.body?.error ?? e.message });
+      throw e;
+    }
+    this.log.info("trade", "Tauschdaten geladen", { people: people.length, offers: people.reduce((n, p) => n + p.offers.length, 0), missing: people.reduce((n, p) => n + p.missing.length, 0) });
     this.last = { people, at: Date.now() };
     return this.last;
   }

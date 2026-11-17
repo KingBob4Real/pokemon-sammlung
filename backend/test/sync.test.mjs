@@ -3,11 +3,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { numberedParams } from "./numberedParams.mjs";
 import { createApp } from "../src/index.js";
+import { setLogSink } from "../src/http/log.js";
 import { hashKey } from "../src/repositories/userRepository.js";
 
 // D1 im Kleinen auf SQLite im Speicher; batch() ist wie bei D1 eine Transaktion
-const sqlite = new DatabaseSync(":memory:");
+const sqlite = numberedParams(new DatabaseSync(":memory:"));
 const stmt = (sql, args = []) => ({
   sql,
   args,
@@ -51,6 +53,9 @@ sqlite.exec("DELETE FROM collection; DELETE FROM list_items; DELETE FROM cards;"
 for (const [id, name] of [["tim", "Tim"], ["max", "Max"]]) {
   sqlite.prepare("INSERT INTO users (id, name, key_hash, created) VALUES (?, ?, ?, 0)").run(id, name, await hashKey(`KEY-${id}`));
 }
+// Protokoll abfangen statt ausgeben – und prüfen, was darin steht
+const logs = [];
+setLogSink((entry) => logs.push(entry));
 const app = createApp({ DB: db });
 const sync = async (who, since, changes) => {
   const res = await app.handle(new Request("https://x/sync", { method: "POST", headers: { Authorization: `Bearer KEY-${who}` }, body: JSON.stringify({ since, changes }) }));
@@ -95,5 +100,26 @@ assert.equal((await sync("tim", deleted.rev, [])).changes.length, 0, "nichts Neu
 const bad = await sync("tim", 0, [entry(400, { card: card("Glurak") }), { ...entry(401, { card: card("") }), id: "base1-4" }]);
 assert.equal(bad.status, 400);
 assert.equal(bad.index, 1);
+assert.equal(bad.reason, "collection.card.name", "Grund: welches Feld");
+assert.ok(logs.some((l) => l.event === "sync_rejected" && l.user === "tim" && l.reason === "collection.card.name" && l.index === 1), "Ablehnung steht im Protokoll");
+
+// --- Protokoll
+assert.ok(logs.some((l) => l.event === "sync" && l.user === "tim" && l.sent === 1 && l.newerOnServer === 1), "veralteter Stand: Protokoll sagt, dass der Server den neueren behalten hat");
+assert.equal(logs.find((l) => l.event === "auth_failed").reason, "unknown_key");
+assert.ok(!JSON.stringify(logs).includes("KEY-"), "nie Schlüssel im Protokoll");
+assert.ok(logs.some((l) => l.event === "request" && l.path === "/sync" && l.status === 200 && l.user === "tim" && l.auth === "sync_key"), "jede Anfrage mit Person");
+
+// Geräte-Protokoll: geht auch mit kaputter Anmeldung, wird gekürzt, nie gespeichert
+const postLog = (key, body) => app.handle(new Request("https://x/log", { method: "POST", headers: key ? { Authorization: `Bearer ${key}` } : {}, body: JSON.stringify(body) }));
+logs.length = 0;
+const deviceLog = { device: "handy-1", person: "tim", version: "0.2.0", entries: [{ t: 1, l: "warn", a: "sync", m: "x".repeat(900), d: { status: 401 } }, { l: "quatsch", a: "app", m: "Start" }] };
+assert.equal((await postLog("KEY-tim", deviceLog)).status, 200);
+assert.equal((await postLog("ALT-UND-UNGUELTIG", deviceLog)).status, 200, "auch mit ungültiger Anmeldung");
+const lines = logs.filter((l) => l.event === "device");
+assert.equal(lines.length, 4);
+assert.deepEqual([lines[0].user, lines[0].level, lines[0].msg.length, lines[1].level], ["tim", "warn", 500, "info"]);
+assert.equal(lines[2].user, null, "ungültige Anmeldung: user = null, person sagt das Gerät");
+assert.equal((await postLog(null, { entries: Array.from({ length: 101 }, () => ({ m: "x" })) })).status, 413);
+setLogSink(null);
 
 console.log("Abgleich ok");

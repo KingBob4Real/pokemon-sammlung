@@ -3,11 +3,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { numberedParams } from "./numberedParams.mjs";
 import { CollectionRepository } from "../src/repositories/collectionRepository.js";
 import { parseSyncRequest } from "../src/validation/changeValidator.js";
 
 // D1 im Kleinen auf SQLite im Speicher, mit allen Migrationen
-const sqlite = new DatabaseSync(":memory:");
+const sqlite = numberedParams(new DatabaseSync(":memory:"));
 for (const f of fs.readdirSync(new URL("../migrations/", import.meta.url)).sort()) sqlite.exec(fs.readFileSync(new URL(`../migrations/${f}`, import.meta.url), "utf8"));
 sqlite.exec("INSERT INTO meta (k, v) VALUES ('rev', 1) ON CONFLICT (k) DO UPDATE SET v = 1");
 const stmt = (sql, args = []) => ({ bind: (...a) => stmt(sql, a), run: () => sqlite.prepare(sql).run(...args), all: () => ({ results: sqlite.prepare(sql).all(...args) }) });

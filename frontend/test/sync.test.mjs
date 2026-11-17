@@ -40,11 +40,18 @@ const serverData = (id) => server.rows.get(`collection:${id}`).data;
 function device(clockSkew = 0, batchSize = 500) {
   const mem = new Map();
   const storage = { get: (k, f) => (mem.has(k) ? structuredClone(mem.get(k)) : f), set: (k, v) => (mem.set(k, structuredClone(v)), true), remove: (k) => mem.delete(k) };
-  const api = { sync: (config, since, changes, opts) => (server.keepalive.push(Boolean(opts?.keepalive)), server.sync(since, changes)) };
+  // server.keys: gültige Anmeldungen (fehlt = alle gültig) – sonst 401 wie im Backend
+  const api = {
+    sync: async (config, since, changes, opts) => {
+      server.keepalive.push(Boolean(opts?.keepalive));
+      if (server.keys && !server.keys.has(config.key)) throw Object.assign(new Error("HTTP 401"), { status: 401, body: { error: "Falscher Sync-Schlüssel" } });
+      return server.sync(since, changes);
+    },
+  };
   const dev = {
     start() {
       dev.store = new EntityStore(storage, storageKeys());
-      dev.sync = new SyncService(dev.store, api, storage, "sync", "https://backend", batchSize);
+      dev.sync = new SyncService(dev.store, api, storage, "sync", "https://backend", batchSize, { relogin: (owner) => (dev.relogin ? dev.relogin(owner) : null) });
       dev.sync.config.key = "TIM";
       return dev;
     },
@@ -200,6 +207,83 @@ await handy.run();
 assert.deepEqual(handyProblems, ["server"], "zurück in der App: jetzt melden");
 await handy.run();
 assert.equal(serverData("ok-4").qty, 6, "und danach geht es hoch");
+
+// --- Lukas' Fall: Die Sitzung des Handys gibt es im Backend nicht mehr (früher: Passwort auf einem anderen Gerät gesetzt
+// → alle anderen Sitzungen beendet). Bisher hing das Gerät dann für immer mit 401 fest und lud nichts mehr hoch.
+const phone = device();
+const web = device();
+await phone.run();
+await web.run();
+server.keys = new Set(["TIM"]); // der Browser ist gültig angemeldet …
+phone.sync.config.key = "ALTE-SITZUNG"; // … das Handy nicht mehr
+const relogins = [];
+phone.relogin = async (owner) => (relogins.push(owner), server.keys.add("NEUE-SITZUNG"), { key: "NEUE-SITZUNG", user: "Tim", userId: "tim" });
+t += 1000;
+await phone.put("vom-handy", { ...entry, card: { id: "vom-handy" } });
+await phone.run();
+assert.deepEqual(relogins, ["tim"], "neu angemeldet – für die Person, der die Daten gehören");
+assert.equal(phone.sync.config.key, "NEUE-SITZUNG");
+assert.equal(phone.sync.state, "ok");
+assert.ok(server.rows.has("collection:vom-handy"), "Abgehaktes vom Handy ist oben");
+assert.ok(phone.store.rescue, "Stand von vor der Reparatur ist gesichert");
+await web.run();
+assert.ok(web.store.get("collection", "vom-handy"), "und im Browser zu sehen");
+
+// Neue Anmeldung gehört jemand anderem: nichts übernehmen, nie unter einer fremden Person hochladen
+const other = device();
+await other.run();
+other.sync.config.key = "KAPUTT";
+other.relogin = async () => (server.keys.add("FREMD"), { key: "FREMD", user: "Max", userId: "max" });
+t += 1000;
+await other.put("nicht-zu-max", { ...entry, card: { id: "nicht-zu-max" } });
+await other.run();
+assert.equal(other.sync.state, "error");
+assert.equal(server.rows.has("collection:nicht-zu-max"), false);
+assert.notEqual(other.sync.config.key, "FREMD");
+
+// Netz weg genau beim Neu-Anmelden: später von selbst nochmal (statt als „falscher Schlüssel“ liegen zu bleiben)
+const flaky = device();
+await flaky.run();
+flaky.sync.config.key = "WEG";
+flaky.relogin = async () => Promise.reject(new TypeError("Failed to fetch"));
+timers.length = 0;
+await flaky.run();
+assert.equal(flaky.sync.state, "error");
+assert.deepEqual(timers, [10_000], "neuer Versuch nach 10 s");
+
+// --- Gesicherten Stand übertragen: der Browser ändert danach noch etwas, das Handy will trotzdem seinen alten Stand
+t += 1000;
+await web.put("vom-handy", { qty: 9 });
+await web.run();
+await phone.run();
+assert.equal(phone.store.get("collection", "vom-handy").qty, 9, "Handy hat die Änderung vom Browser geholt");
+assert.equal(await phone.act((store, sync) => sync.takeOver({ fromRescue: true })), null);
+assert.equal(serverData("vom-handy").qty, 1, "Stand von vor der Reparatur ist wieder oben");
+assert.equal(phone.store.get("collection", "vom-handy").qty, 1);
+assert.equal(phone.store.rescue, null, "Sicherung ist danach weg");
+
+// --- Stand des Handys für alle: Server und Browser zeigen danach genau, was das Handy hat
+server.keys = null;
+t += 1000;
+await web.put("t-a", { ...entry, qty: 1, card: { id: "t-a" } });
+await web.put("t-b", { ...entry, card: { id: "t-b" } });
+await web.run();
+await phone.run();
+t += 1000;
+await phone.put("t-a", { qty: 5 }); // Handy ändert …
+t += 1000;
+await web.put("t-a", { qty: 2 }); // … der Browser später auch – wäre sonst neuer und gewönne
+await web.run();
+await phone.act((store) => store.put("collection", "t-b", null)); // Handy löscht t-b …
+await phone.put("t-c", { ...entry, card: { id: "t-c" } }); // … und hat t-c
+assert.equal(await phone.act((store, sync) => sync.takeOver()), null);
+assert.equal(serverData("t-a").qty, 5, "Handy gewinnt");
+assert.equal(server.rows.get("collection:t-b").deleted, 1, "was das Handy nicht hat, ist gelöscht");
+assert.ok(server.rows.has("collection:t-c"));
+await web.run();
+const visible = (d) => JSON.stringify(d.store.all("collection").sort((x, y) => x.id.localeCompare(y.id)));
+assert.equal(visible(web), visible(phone), "Browser zeigt genau den Stand des Handys");
+assert.equal(web.store.get("collection", "t-a").qty, 5);
 
 // --- keepalive nur für kleine Anfragen (Browser erlauben 64 KiB), sonst normal
 const { SyncApi } = await import("../js/data/syncApi.js");

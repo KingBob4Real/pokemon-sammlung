@@ -50,13 +50,22 @@ export function showProfiles(ctx, { start = false } = {}) {
   const note = h("p", { class: "field-note", role: "alert" });
 
   async function choose(person) {
-    if (person.id === profiles.active) return done();
+    // Die eigene Person nochmal antippen: hängt der Sync, neu versuchen (er meldet das Gerät bei Bedarf selbst neu an).
+    // Ist das Gerät für sie gar nicht angemeldet, unten wie beim Wechseln anmelden.
+    if (person.id === profiles.active && ctx.sync.enabled) {
+      if (ctx.sync.state === "error") {
+        ctx.log?.info("profile", "Eigene Person angetippt – Sync wird neu versucht", { person: person.id });
+        ctx.sync.run();
+      }
+      return done();
+    }
     note.textContent = "";
     const result = await profiles.choose(person.id);
     if (result.error) {
       note.textContent = result.error;
       return;
     }
+    ctx.log?.info("profile", "Person gewählt – App lädt neu", { person: person.id });
     markChosen();
     location.reload(); // neu starten, damit alles mit den Daten dieser Person läuft
   }

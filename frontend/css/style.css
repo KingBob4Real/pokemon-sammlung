@@ -1070,3 +1070,11 @@ main.view-enter > :not(.action-bar) { animation: view-enter 0.22s var(--ease-out
   *, *::before, *::after { transition: none !important; animation: none !important; }
   .sheet-art.tilt { transform: none; }
 }
+
+/* Protokoll unter „Mehr“ (ui/views/moreView.js → logPanel) */
+.log-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 50vh; overflow: auto; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.log-list li { padding: 3px 0; border-top: 1px solid var(--line, rgba(127, 127, 127, 0.2)); }
+.log-list .log-time, .log-list .log-data, .log-list .log-person { color: var(--muted); }
+.log-list .log-area { font-weight: 700; }
+.log-list .log-warn .log-area { color: #c77800; }
+.log-list .log-error .log-area, .log-list .log-error { color: #d03a2f; }

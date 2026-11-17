@@ -11,9 +11,9 @@ export class AccountApi {
     return this.fetchJson(`${base(url)}/people`);
   }
 
-  // → { token, user: { id, name } }
-  login(url, id) {
-    return this.#post(url, "/login", { id });
+  // → { token, user: { id, name } }. reason fürs Protokoll im Backend: "choose" (angetippt) oder "relogin" (Sitzung ungültig)
+  login(url, id, reason = "choose") {
+    return this.#post(url, "/login", { id, reason });
   }
 
   // beendet die Sitzung dieses Geräts (mit dem Sync-Schlüssel: nichts zu beenden)

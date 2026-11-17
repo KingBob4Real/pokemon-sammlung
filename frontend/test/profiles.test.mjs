@@ -14,12 +14,14 @@ const fail = (status, error) => Promise.reject(Object.assign(new Error(error), {
 // Kleines Backend: Antippen meldet an
 const people = [{ id: "owner", name: "Lukas" }, { id: "lucas", name: "Lucas" }];
 let logins = 0;
+const loginReasons = [];
 const loggedOut = [];
 const api = {
   logout: async ({ key }) => (loggedOut.push(key), { ok: true }),
   people: async () => ({ people: structuredClone(people) }),
-  login: async (url, id) => {
+  login: async (url, id, reason = "choose") => {
     const p = people.find((x) => x.id === id);
+    loginReasons.push(reason);
     if (!p) return fail(404, "Diese Person gibt es nicht.");
     return { token: `token-${id}-${++logins}`, user: { id, name: p.name } };
   },
@@ -80,5 +82,14 @@ assert.deepEqual([profiles.active, profiles.slot], ["owner", ""]);
 await profiles.refresh();
 assert.equal((await profiles.rename("Lukas N.")).name, "Lukas N.");
 assert.equal(profiles.people[0].name, "Lukas N.");
+
+// Anmeldung erneuern (Sitzung im Backend gibt es nicht mehr): für die Person, der die Daten gehören, sonst die aktive
+loginReasons.length = 0;
+const renewed = await profiles.relogin("lucas");
+assert.deepEqual([renewed.userId, renewed.user, loginReasons], ["lucas", "Lucas", ["relogin"]], "neue Sitzung für die Daten-Person");
+assert.match(renewed.key, /^token-lucas-/);
+assert.equal((await profiles.relogin("")).userId, "owner", "ohne Hinweis: die aktive Person");
+assert.equal(await new ProfileService(new Map().set && { get: (k, f) => f, set: () => true, remove() {} }, "x", keysOf, api, "https://b").relogin(""), null, "niemand bekannt → null");
+await assert.rejects(profiles.relogin("geloescht"), (e) => e.status === 404, "gelöschte Person → Fehler");
 
 console.log("Personen ok");

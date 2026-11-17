@@ -170,6 +170,60 @@ export class EntityStore extends EventTarget {
     this.#persist();
   }
 
+  // Stand vor einer Reparatur der Anmeldung sichern (services/syncService.js). Nur einmal – eine ältere Sicherung bleibt,
+  // bis sie übertragen oder verworfen wird. → true, wenn jetzt gesichert wurde
+  saveRescue() {
+    if (this.rescue) return false;
+    return this.storage.set(this.keys.rescue, { at: Date.now(), items: Object.fromEntries(this.#items) });
+  }
+
+  // → { at, count } der gesicherten Einträge (ohne Gelöschte) oder null
+  get rescue() {
+    const saved = this.storage.get(this.keys.rescue, null);
+    if (!isObj(saved) || !Number.isSafeInteger(saved.at) || !isObj(saved.items)) return null;
+    return { at: saved.at, count: Object.values(saved.items).filter((e) => isValid(e) && !e.deleted).length };
+  }
+
+  dropRescue() {
+    this.storage.remove(this.keys.rescue);
+  }
+
+  /**
+   * Stand dieses Geräts wird der Stand für alle: jeder Eintrag, der auf dem Server (serverEntities = alles der Person)
+   * anders ist, geht neu hoch – neuer als dort, damit er gewinnt; was nur der Server hat, wird gelöscht.
+   * fromRescue: vorher den gesicherten Stand von vor der Reparatur zurückholen. → { upload, remove, unchanged }
+   */
+  takeOver(serverEntities, { fromRescue = false } = {}) {
+    if (fromRescue) {
+      const saved = objOr(this.storage.get(this.keys.rescue, null)?.items);
+      this.#items = new Map(Object.entries(saved).filter(([k, e]) => isValid(e) && keyOf(e.type, e.id) === k));
+      this.#dirty.clear();
+      this.#base.clear();
+    }
+    const server = new Map();
+    for (const e of serverEntities) if (isValid(e)) server.set(keyOf(e.type, e.id), e);
+    const now = Date.now() + this.clockOffset;
+    const counts = { upload: 0, remove: 0, unchanged: 0 };
+    for (const [k, e] of server) {
+      if (!this.#items.has(k) && !e.deleted) this.#items.set(k, { type: e.type, id: e.id, data: null, deleted: 1, updated: 0 });
+    }
+    for (const [k, e] of this.#items) {
+      const s = server.get(k);
+      const gone = Boolean(e.deleted);
+      if (s ? Boolean(s.deleted) === gone && (gone || same(s.data, e.data)) : gone) {
+        counts.unchanged++;
+        continue;
+      }
+      this.#items.set(k, { ...e, updated: Math.max(now, (s?.updated ?? 0) + 1, e.updated + 1) });
+      this.#base.set(k, s ?? null); // gegen genau diesen Server-Stand – sonst führte der Sync dessen Felder wieder hinein
+      this.#dirty.add(k);
+      counts[gone ? "remove" : "upload"]++;
+    }
+    this.#commit();
+    if (fromRescue) this.dispatchEvent(new Event("remote"));
+    return counts;
+  }
+
   // Beim Schlüsselwechsel: Hochgeladenes vom Gerät (liegt im Backend), der nächste Sync holt die Daten der neuen Person.
   // Noch nicht Hochgeladenes bleibt und geht dabei mit hoch – so geht nichts verloren (gegen deren Stand: neuere gewinnt).
   reset() {

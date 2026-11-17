@@ -7,6 +7,7 @@
 import { LIMITLESS_IMAGES, SCAN_MAX_TOKENS, SCAN_MODEL, SCANS_PER_DAY, SCANS_PER_DAY_TOTAL, TCGDEX_API, TCGPLAYER_IMAGES } from "./config.js";
 import { AuthController } from "./controllers/authController.js";
 import { ImageController } from "./controllers/imageController.js";
+import { LogController } from "./controllers/logController.js";
 import { ScanController } from "./controllers/scanController.js";
 import { SyncController } from "./controllers/syncController.js";
 import { requireUser } from "./http/auth.js";
@@ -45,6 +46,7 @@ export function createApp(env) {
   const scanController = new ScanController(scanService);
   const authController = new AuthController(new AuthService(users));
   const imageController = new ImageController({ limitless: LIMITLESS_IMAGES, tcgdex: TCGDEX_API, tcgplayer: TCGPLAYER_IMAGES });
+  const logController = new LogController(users);
 
   return new Router()
     .get("/", () => json({ ok: true, app: "pokemon-sammlung" }))
@@ -59,7 +61,9 @@ export function createApp(env) {
     .get("/people", () => authController.people())
     .post("/login", (request) => authController.login(request))
     .post("/logout", requireUser(users, (request, user) => authController.logout(user)))
-    .post("/me/name", requireUser(users, (request, user) => authController.rename(request, user)));
+    .post("/me/name", requireUser(users, (request, user) => authController.rename(request, user)))
+    // Protokoll der Geräte → Cloudflare-Logs (auch ohne gültige Anmeldung, siehe logController.js)
+    .post("/log", (request) => logController.device(request));
 }
 
 export default {

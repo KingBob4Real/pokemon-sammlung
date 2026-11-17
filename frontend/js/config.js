@@ -2,7 +2,7 @@
 
 // Version der App (steht unter „Mehr“). Bei jedem Release hochzählen: Fix → hinten +1 (0.0.2), Feature → Mitte +1 und
 // hinten 0 (0.1.0), großer Umbau → vorne +1, Rest 0 (1.0.0). Das technische ?v= in index.html setzt der Pages-Workflow selbst.
-export const APP_VERSION = "0.1.2";
+export const APP_VERSION = "0.2.0";
 
 export const TCGDEX_API = "https://api.tcgdex.net/v2";
 // Dev-Stufe: der develop-Branch liegt unter …/dev/ (siehe .github/workflows/pages.yml) – eigenes Backend, eigener Speicher.
@@ -29,9 +29,10 @@ export const POCKET_SERIES = "tcgp"; // TCG Pocket = digitale Karten, ausblenden
 
 const P = IS_DEV ? "ps-dev." : "ps."; // gleiche Domain → Dev und Live trennen sich nur über den Namen
 export const PROFILES_KEY = `${P}profiles.v2`; // „Wer sammelt?“ auf diesem Gerät (services/profileService.js)
+export const LOG_KEY = `${P}log.v1`; // Protokoll des Geräts, alle Personen zusammen (core/log.js)
 
 // Speicher-Namen, die einer Person allein gehören – beim Abmelden fliegen genau diese vom Gerät (services/profileService.js)
-export const PERSONAL_KEYS = ["entities", "dirty", "base", "rev", "sync", "prefs", "history", "trade"];
+export const PERSONAL_KEYS = ["entities", "dirty", "base", "rev", "sync", "prefs", "history", "trade", "rescue"];
 
 // Speicher-Namen für eine Person: Sammlung, Listen, Sync-Schlüssel, Einstellungen und Wertverlauf gehören ihr allein,
 // Preise, Sets und Bild-Ersatz teilen sich alle. Person "" = die erste – ihre Daten bleiben unter den bisherigen Namen.
@@ -46,6 +47,7 @@ export function storageKeys(profile = "") {
     prefs: `${own}prefs.v1`,
     history: `${own}history.v1`, // Wertverlauf der Sammlung (services/historyService.js)
     trade: `${own}trade.v1`, // Tauschrechner: was ich gebe / bekomme (services/tradeDraftService.js)
+    rescue: `${own}rescue.v1`, // Stand vor einer Reparatur der Anmeldung (services/entityStore.js, „Stand übertragen“)
     prices: `${P}prices.v4`, // v4: englischer Preis, wo der deutsche fehlt (v3: Ø 7 Tage, v2: Pokédex-Nummer)
     sets: `${P}sets.v4`, // v4: Kartenzahl = Deutsch oder Englisch, was mehr hat (v3: deutsche + englische Sets, Serie je Set)
     images: `${P}images.v1`, // Karten-ID + Größe → Bild-Adresse, die geklappt hat, oder "" (ui/components/cardTile.js)

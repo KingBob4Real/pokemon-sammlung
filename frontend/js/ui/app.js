@@ -151,7 +151,12 @@ export class App {
     prices.addEventListener("update", () => this.refresh());
     // Preise: einmal pro Sitzung Bescheid geben, gespeicherte Werte bleiben sichtbar (offline meldet schon der Offline-Hinweis)
     prices.addEventListener("error", (e) => {
-      if (describeError(e.detail).kind !== "offline") this.#once("prices", () => this.toast.show("Preise sind gerade nicht abrufbar – es werden die gespeicherten gezeigt.", { type: "info" }));
+      if (describeError(e.detail).kind !== "offline") {
+        this.#once("prices", () => {
+          this.services.log?.warn("prices", "Preise nicht abrufbar – zeige gespeicherte", { error: e.detail });
+          this.toast.show("Preise sind gerade nicht abrufbar – es werden die gespeicherten gezeigt.", { type: "info" });
+        });
+      }
     });
     sync.addEventListener("status", () => this.#showSyncState());
     sync.addEventListener("problem", (e) => this.#onSyncProblem(e.detail));

@@ -89,6 +89,8 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 
 - Profilauswahl wie bei Netflix: antippen meldet an, ohne Passwort.
 - Jede Person hat auf dem Gerät eigene Daten. Unter „Mehr“: Namen ändern und „Abmelden“ (löscht die Daten der Person vom Gerät, im Backend bleibt alles).
+- **Anmeldung repariert sich selbst:** Gilt die Sitzung eines Geräts nicht mehr (401), meldet es sich für die Person, der seine Daten gehören, neu an und lädt Wartendes hoch – nie unter einer anderen Person. Vorher sichert es seinen Stand (siehe „Stand übertragen“). Früher hing so ein Gerät für immer fest: Bis 0.1.1 hat ein neues Passwort alle anderen Geräte der Person abgemeldet.
+- **Stand übertragen** („Mehr“ → „Erweitert“): Zeigt ein anderes Gerät etwas anderes, wird der Stand dieses Geräts der Stand für alle – was es hier nicht gibt, wird überall gelöscht. Nach einer Reparatur der Anmeldung lässt sich auch der gesicherte Stand von davor übertragen.
 
 ### Offline, Updates & Sicherung
 
@@ -98,6 +100,7 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 - Updates kommen von selbst beim Öffnen und bei jeder Rückkehr in die App (höchstens einmal pro Minute).
 - Fehler erscheinen als Hinweise unten; der Sync versucht es selbst erneut (10 s → 5 min).
 - **Sicherung:** „Mehr“ → Export/Import (JSON). Import nimmt auch die Export-Datei der alten Checkliste.
+- **Protokoll:** „Mehr“ → „Protokoll“ zeigt, was die App auf dem Gerät getan hat (Start, Abgleich, Anmelden, Scanner, Tauschen, Updates, Fehler) – kopieren, teilen oder ans Backend schicken. Warnungen und Fehler gehen von selbst ans Backend (siehe [Protokolle](#protokolle)).
 
 ## 🔧 Entwicklung
 
@@ -255,9 +258,19 @@ node scripts/import-legacy-lists.mjs <backend-adresse> ../.keys/<id>.txt   # Lis
 ### Sicherheit
 
 - **Anmelden ohne Passwort:** „Wer sammelt?“ zeigt alle Namen öffentlich, `POST /login` mit der ID reicht – wer die App-Adresse kennt, kann jede Person antippen.
-- **Sitzungen** laufen nicht ab; „Abmelden“ beendet die des eigenen Geräts.
+- **Sitzungen** laufen nicht ab; „Abmelden“ beendet die des eigenen Geräts. Gilt eine nicht mehr, meldet sich das Gerät selbst neu an (siehe „Wer sammelt?“).
+- **`POST /log`** nimmt Geräte-Protokolle auch ohne gültige Anmeldung an (höchstens 100 Einträge, 64 KB, gekürzt) und schreibt sie nur ins Cloudflare-Protokoll – gespeichert wird nichts.
 - **Bilder:** Kartenbilder nimmt das Backend nur von `https://assets.tcgdex.net/` an (die anderen sehen deine Karten beim Tauschen). `GET /img` baut die Adresse selbst aus geprüften Teilen und reicht nur PNG/JPEG/WebP durch.
 - **Frontend:** Content-Security-Policy in `index.html` – nur eigene Skripte, Verbindungen nur zu TCGdex, dem Backend (Live, Dev, lokal) und der alten Checkliste.
+
+### Protokolle
+
+Zwei Stellen, beide ohne Schlüssel, Sitzungen oder Fotos – nur IDs, Zahlen und Gründe:
+
+| Wo | Was | Ansehen |
+| --- | --- | --- |
+| **Gerät** (`core/log.js`) | Ringpuffer der letzten 400 Einträge im `localStorage` (`ps.log.v1`, alle Personen des Geräts): Start (Person, Speicher-Platz, Einträge, Wartendes), Abgleich mit Mengen und Dauer, 401 und Neu-Anmelden, abgelehnte Einträge mit Grund, Personenwechsel, Scanner, Tauschen, Updates, Sicherung, unerwartete Fehler | „Mehr“ → „Protokoll“ |
+| **Backend** (`src/http/log.js`) | eine JSON-Zeile pro Anfrage (`event: "request"`, Status, Dauer, Person, Sitzung oder Schlüssel) und pro Ereignis: `sync` (gesendet, geholt, `newerOnServer`), `sync_rejected` (Feld, z. B. `collection.card.img`), `auth_failed`, `login`/`logout`, `scan`, `crash`. Dazu die Geräte-Protokolle (`event: "device"`, über `POST /log`, geht auch mit ungültiger Anmeldung) | Cloudflare → Workers & Pages → `pokemon-sammlung` → Logs, filtern z. B. nach `user` oder `event` (3 Tage) |
 
 ### Speicher auf dem Gerät
 

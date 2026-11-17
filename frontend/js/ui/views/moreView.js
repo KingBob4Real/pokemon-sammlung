@@ -2,7 +2,7 @@ import { APP_VERSION, IS_DEV } from "../../config.js";
 import { h } from "../../core/dom.js";
 import { deliverFile } from "../../core/files.js";
 import { describeError } from "../../core/errors.js";
-import { fmtDateTime, plural } from "../../core/format.js";
+import { fmtDateTime, fmtTime, plural } from "../../core/format.js";
 import { confirmDialog } from "../components/ask.js";
 import { forgetChoice } from "../components/profilePicker.js";
 import { panel } from "../components/widgets.js";
@@ -42,8 +42,10 @@ ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hoc
     if (!chosen) return;
     try {
       const result = await backup.importFile(chosen);
+      ctx.log.info("backup", "Import", { ok: result.ok, message: result.message, size: chosen.size });
       ctx.notify(result.message, { type: result.ok ? "success" : "error" });
     } catch (e) {
+      ctx.log.error("backup", "Import fehlgeschlagen", { error: e, size: chosen.size });
       ctx.notifyError(e, { prefix: "Import fehlgeschlagen: " });
     }
     ctx.render();
@@ -54,7 +56,15 @@ ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hoc
     panel("Sicherung", [
       h("p", {}, "Alle Daten als Datei sichern oder eine Sicherung zurückholen. Import nimmt auch die Export-Datei der alten Checkliste."),
       h("div", { class: "buttons" }, [
-        h("button", { type: "button", class: "btn", onclick: () => deliverFile(backup.createFile()).then((ok) => ok && ctx.notify("Sicherung erstellt.", { type: "success" })) }, "Export (JSON)"),
+        h("button", {
+          type: "button",
+          class: "btn",
+          onclick: () =>
+            deliverFile(backup.createFile()).then((ok) => {
+              ctx.log.info("backup", ok ? "Sicherung erstellt" : "Sicherung abgebrochen", { entries: ctx.store.snapshot().length });
+              if (ok) ctx.notify("Sicherung erstellt.", { type: "success" });
+            }),
+        }, "Export (JSON)"),
         h("label", { class: "btn btn-ghost" }, ["Import (JSON)", file]),
       ]),
     ]),
@@ -69,7 +79,9 @@ ${plural(sync.pendingCount, "Änderung ist", "Änderungen sind")} noch nicht hoc
         h("button", { type: "button", class: "btn", onclick: save }, "Speichern & synchronisieren"),
         h("button", { type: "button", class: "btn btn-ghost", onclick: copyKey }, "Schlüssel kopieren"),
       ]),
+      ...takeOverSection(ctx),
     ]),
+    logPanel(ctx),
     panel("App", [
       h("p", {}, "Neue Versionen lädt die App automatisch, sobald du sie öffnest oder zu ihr zurückkehrst."),
       h("div", { class: "buttons" }, [
@@ -116,6 +128,115 @@ function syncStatusText(sync) {
       return sync.config.at ? `${who}Zuletzt synchronisiert: ${fmtDateTime(sync.config.at)}${pending}` : `Noch nicht synchronisiert${pending}`;
     }
   }
+}
+
+/**
+ * „Stand übertragen“: Zeigt ein anderes Gerät etwas anderes, wird der Stand dieses Geräts der Stand für alle
+ * (services/syncService.js → takeOver). Gab es eine Reparatur der Anmeldung, lässt sich auch der Stand von davor übertragen.
+ */
+function takeOverSection(ctx) {
+  const { sync, store } = ctx;
+  if (!sync.enabled) return [];
+  const note = h("p", { class: "field-note", role: "alert" });
+  const rescue = store.rescue;
+  const go = async (button, fromRescue) => {
+    const what = fromRescue ? `den gesicherten Stand vom ${fmtDateTime(rescue.at)} (${plural(rescue.count, "Eintrag", "Einträge")})` : "den Stand dieses Geräts";
+    const question = `Wirklich ${what} auf alle Geräte übertragen? Sammlung, Listen und Ordner sind danach überall genau so wie hier – was es hier nicht gibt, wird auch auf den anderen Geräten gelöscht.`;
+    if (!(await confirmDialog(question, { ok: "Übertragen", danger: true }))) return;
+    button.disabled = true;
+    note.textContent = "Übertrage …";
+    const problem = await sync.takeOver({ fromRescue });
+    button.disabled = false;
+    note.textContent = problem ?? "";
+    if (!problem) ctx.notify("Übertragen. Die anderen Geräte zeigen den Stand, sobald sie das nächste Mal abgleichen.", { type: "success" });
+    ctx.render();
+  };
+  const current = h("button", { type: "button", class: "btn btn-ghost danger" }, "Stand dieses Geräts übertragen");
+  current.addEventListener("click", () => go(current, false));
+  const parts = [
+    h("h3", {}, "Stand übertragen"),
+    h("p", {}, "Zeigt ein anderes Gerät etwas anderes als dieses? Dann hier den Stand dieses Geräts für alle übernehmen."),
+    h("div", { class: "buttons" }, [current]),
+  ];
+  if (rescue) {
+    const restore = h("button", { type: "button", class: "btn btn-ghost danger" }, "Gesicherten Stand übertragen");
+    restore.addEventListener("click", () => go(restore, true));
+    const drop = h("button", { type: "button", class: "btn btn-ghost" }, "Sicherung verwerfen");
+    drop.addEventListener("click", () => {
+      store.dropRescue();
+      ctx.log.info("store", "Sicherung von vor der Reparatur verworfen");
+      ctx.render();
+    });
+    parts.push(
+      h("p", {}, `Vor der Reparatur der Anmeldung am ${fmtDateTime(rescue.at)} hat dieses Gerät seinen Stand gesichert (${plural(rescue.count, "Eintrag", "Einträge")}). Fehlt seitdem etwas, lässt sich genau dieser Stand übertragen.`),
+      h("div", { class: "buttons" }, [restore, drop])
+    );
+  }
+  parts.push(note);
+  return parts;
+}
+
+// „Protokoll“: was die App auf diesem Gerät getan hat (core/log.js) – ansehen, kopieren/teilen, ans Backend schicken
+function logPanel(ctx) {
+  const { log, shipLog, profiles } = ctx;
+  const list = h("ol", { class: "log-list" });
+  const info = h("p", { class: "muted small" });
+  const draw = () => {
+    const entries = log.entries();
+    info.textContent = entries.length ? `${plural(entries.length, "Eintrag", "Einträge")} auf diesem Gerät (Gerät ${log.device}), neueste oben.` : "Noch nichts protokolliert.";
+    list.replaceChildren(
+      ...entries
+        .slice(-200)
+        .reverse()
+        .map((e) =>
+          h("li", { class: `log-${e.l}` }, [
+            h("span", { class: "log-time" }, fmtTime(e.t)),
+            " ",
+            h("span", { class: "log-area" }, e.a),
+            e.p ? h("span", { class: "log-person" }, ` ${e.p}`) : null,
+            " ",
+            e.m,
+            e.d === undefined ? null : h("span", { class: "log-data" }, ` ${JSON.stringify(e.d)}`),
+          ])
+        )
+    );
+  };
+  const text = () => log.text({ version: APP_VERSION, stage: IS_DEV ? "dev" : "live", person: profiles.active || "-", ua: navigator.userAgent });
+  const copy = () =>
+    (navigator.clipboard ? navigator.clipboard.writeText(text()) : Promise.reject(new Error("keine Zwischenablage"))).then(
+      () => ctx.notify("Protokoll kopiert.", { type: "success" }),
+      () => ctx.notify("Kopieren ging nicht – lieber „Teilen“.", { type: "error" })
+    );
+  const share = () => navigator.share({ title: "Protokoll Pokémon-Sammlung", text: text() }).catch(() => {});
+  const send = (e) => {
+    const button = e.currentTarget;
+    button.disabled = true;
+    shipLog({ all: true, force: true })
+      .then(
+        (n) => ctx.notify(n ? `${plural(n, "Eintrag", "Einträge")} ans Backend geschickt.` : "Nichts zu senden.", { type: "success" }),
+        (err) => ctx.notifyError(err, { prefix: "Senden ging nicht: " })
+      )
+      .finally(() => (button.disabled = false));
+  };
+  const clear = async () => {
+    if (!(await confirmDialog("Protokoll auf diesem Gerät leeren?", { ok: "Leeren" }))) return;
+    log.clear();
+    draw();
+  };
+  const panelEl = h("details", { class: "panel advanced" }, [
+    h("summary", {}, h("h2", {}, "Protokoll")),
+    h("p", {}, "Was die App auf diesem Gerät getan hat – Start, Abgleich, Anmelden, Fehler. Hilft, wenn etwas nicht synchron ist. Warnungen und Fehler gehen von selbst ans Backend."),
+    h("div", { class: "buttons" }, [
+      h("button", { type: "button", class: "btn btn-ghost", onclick: copy }, "Kopieren"),
+      navigator.share ? h("button", { type: "button", class: "btn btn-ghost", onclick: share }, "Teilen") : null,
+      h("button", { type: "button", class: "btn btn-ghost", onclick: send }, "Ans Backend senden"),
+      h("button", { type: "button", class: "btn btn-ghost", onclick: clear }, "Leeren"),
+    ]),
+    info,
+    list,
+  ]);
+  panelEl.addEventListener("toggle", () => panelEl.open && draw());
+  return panelEl;
 }
 
 // „Wer sammelt?“: wer angemeldet ist, Sync-Stand (status), Person wechseln, Name

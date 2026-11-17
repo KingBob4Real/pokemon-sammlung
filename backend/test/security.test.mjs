@@ -2,12 +2,13 @@
 // Anmelden per Antippen und Abmelden; Kartenbilder nur von TCGdex.
 import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
+import { numberedParams } from "./numberedParams.mjs";
 import { UserRepository } from "../src/repositories/userRepository.js";
 import { AuthService } from "../src/services/authService.js";
 import { parseSyncRequest } from "../src/validation/changeValidator.js";
 
 // D1 im Kleinen: prepare().bind().first()/run() und batch() auf SQLite im Speicher
-const sqlite = new DatabaseSync(":memory:");
+const sqlite = numberedParams(new DatabaseSync(":memory:"));
 sqlite.exec(`
   CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT, key_hash TEXT, created INTEGER);
   CREATE TABLE sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, created INTEGER NOT NULL);`);
@@ -42,5 +43,7 @@ const change = (img) => ({ since: 0, changes: [{ type: "collection", id: "base1-
 assert.ok(parseSyncRequest(change("https://assets.tcgdex.net/de/base/base1/4")).ok, "TCGdex-Bild geht durch");
 assert.ok(parseSyncRequest(change(null)).ok, "ohne Bild geht durch");
 assert.equal(parseSyncRequest(change("https://example.com/pixel.gif")).ok, false, "fremde Adresse wird abgelehnt");
+
+assert.equal(parseSyncRequest(change("https://example.com/pixel.gif")).reason, "collection.card.img", "Grund nennt das Feld");
 
 console.log("security ok");

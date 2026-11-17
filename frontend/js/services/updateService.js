@@ -1,12 +1,15 @@
+import { silentLog } from "../core/log.js";
+
 /**
  * Erkennt eine neue Version der App: holt index.html frisch und vergleicht die Versionsnummer von main.js (?v=).
  * Wichtig für die iPhone-App vom Home-Bildschirm – die hat keinen Neu-laden-Knopf.
  * Pro Version wird höchstens einmal neu geladen, damit es bei schlechtem Netz keine Schleife gibt.
  */
 export class UpdateService {
-  constructor(currentVersion, sessionStore = sessionStorage) {
+  constructor(currentVersion, sessionStore = sessionStorage, log = silentLog) {
     this.currentVersion = currentVersion;
     this.sessionStore = sessionStore;
+    this.log = log;
   }
 
   // → neuere Versionsnummer oder null
@@ -31,7 +34,9 @@ export class UpdateService {
     } catch {
       /* Privatmodus */
     }
+    if (latest && alreadyTried) this.log.warn("update", "Neue Version schon einmal geladen, kommt aber nicht an – kein neuer Versuch in dieser Sitzung", { current: this.currentVersion, latest });
     if (!latest || alreadyTried) return false;
+    this.log.info("update", "Neue Version – lade neu", { current: this.currentVersion, latest });
     location.reload();
     return true;
   }

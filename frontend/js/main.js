@@ -4,12 +4,14 @@
 //   domain/    reine Fachlogik (Karte, Preis, Sortierung)
 //   services/  Anwendungslogik (Sammlung, Listen, Preise, Sync …)
 //   ui/        Ansichten und Komponenten
-import { DEFAULT_BACKEND_URL, IMAGE_MEMORY_MS, IS_DEV, OLD_APP_URL, OLD_KEYS, POCKET_SERIES, PRICE_KEEP_MS, PRICE_TTL_MS, PROFILES_KEY, SETS_TTL_MS, storageKeys, SYNC_BATCH, TCGDEX_API } from "./config.js";
+import { APP_VERSION, DEFAULT_BACKEND_URL, IMAGE_MEMORY_MS, IS_DEV, LOG_KEY, OLD_APP_URL, OLD_KEYS, POCKET_SERIES, PRICE_KEEP_MS, PRICE_TTL_MS, PROFILES_KEY, SETS_TTL_MS, storageKeys, SYNC_BATCH, TCGDEX_API } from "./config.js";
 import { fetchJson } from "./core/http.js";
 import { shrinkPhoto } from "./core/image.js";
+import { Log } from "./core/log.js";
 import { storage } from "./core/storage.js";
 import { ScanApi } from "./data/scanApi.js";
 import { AccountApi } from "./data/accountApi.js";
+import { LogApi } from "./data/logApi.js";
 import { SyncApi } from "./data/syncApi.js";
 import { TradeApi } from "./data/tradeApi.js";
 import { TcgdexClient } from "./data/tcgdexClient.js";
@@ -35,10 +37,13 @@ import { App } from "./ui/app.js";
 import { useImageMemory } from "./ui/components/cardTile.js";
 import { createPrefs } from "./ui/prefs.js";
 
+// Protokoll zuerst – alles danach kann hineinschreiben (Ansehen unter „Mehr“ → „Protokoll“)
+const log = new Log(storage, LOG_KEY);
 const tcgdex = new TcgdexClient(TCGDEX_API, fetchJson);
 const syncApi = new SyncApi(fetchJson);
 // Wer sammelt? Jede Person auf dem Gerät hat ihren eigenen Speicher-Platz (siehe config.js)
-const profiles = new ProfileService(storage, PROFILES_KEY, storageKeys, new AccountApi(fetchJson), DEFAULT_BACKEND_URL);
+const profiles = new ProfileService(storage, PROFILES_KEY, storageKeys, new AccountApi(fetchJson), DEFAULT_BACKEND_URL, log);
+log.context.person = profiles.active || null;
 const STORAGE_KEYS = storageKeys(profiles.slot);
 OLD_KEYS.forEach((key) => storage.remove(key)); // Reste früherer Fassungen
 useImageMemory(storage, STORAGE_KEYS.images, IMAGE_MEMORY_MS);
@@ -49,16 +54,23 @@ const collection = new CollectionService(store);
 const lists = new ListService(store);
 const history = new HistoryService(storage, STORAGE_KEYS.history, collection, prices);
 const catalog = new CatalogService(tcgdex, sets);
-const sync = new SyncService(store, syncApi, storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH);
-sync.addEventListener("status", () => profiles.remember(sync.config.userId, sync.config.user)); // wer angemeldet ist, sagt das Backend
-const trade = new TradeService(new TradeApi(fetchJson), sync, collection, lists);
+// Gilt die Anmeldung nicht mehr, meldet der Sync das Gerät selbst neu an – für die Person, der die Daten gehören
+const sync = new SyncService(store, syncApi, storage, STORAGE_KEYS.sync, DEFAULT_BACKEND_URL, SYNC_BATCH, { log, relogin: (owner) => profiles.relogin(owner) });
+sync.addEventListener("status", () => {
+  profiles.remember(sync.config.userId, sync.config.user); // wer angemeldet ist, sagt das Backend
+  log.context.person = profiles.active || sync.config.userId || null;
+});
+const trade = new TradeService(new TradeApi(fetchJson), sync, collection, lists, log);
 const tradeDraft = new TradeDraftService(storage, STORAGE_KEYS.trade, collection);
-const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto);
+const scanner = new ScanService(new ScanApi(fetchJson), sync, catalog, sets, shrinkPhoto, log);
 const legacyImport = new LegacyImportService({ store, collection, lists, fetchJson, oldAppUrl: OLD_APP_URL });
 const backup = new BackupService(store, legacyImport);
 const sorters = createSorters({ valueOf: (id) => prices.value(id), setOrder: (id) => sets.order(id), dexOf: (id) => prices.get(id)?.dexId });
 const setSorters = createSetSorters((id) => prices.value(id));
-const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v")); // Version aus main.js?v=…
+const updates = new UpdateService(new URL(import.meta.url).searchParams.get("v"), sessionStorage, log); // Version aus main.js?v=…
+// Protokoll ans Backend: Warnungen und Fehler von selbst (höchstens einmal pro Minute), alles über „Mehr“ → „Protokoll“
+const logApi = new LogApi(fetchJson);
+const shipLog = (options) => log.ship((entries) => logApi.send(sync.config, { device: log.device, person: log.context.person, version: APP_VERSION, entries }), options);
 const prefs = createPrefs(storage, STORAGE_KEYS.prefs, {
   collectionSort: "newest",
   collectionGroup: "none",
@@ -71,7 +83,28 @@ const prefs = createPrefs(storage, STORAGE_KEYS.prefs, {
   setSort: "numUp",
 });
 
-const app = new App({ store, sets, prices, collection, lists, history, trade, tradeDraft, catalog, sync, scanner, profiles, backup, sorters, setSorters, updates }, prefs);
+const app = new App({ store, sets, prices, collection, lists, history, trade, tradeDraft, catalog, sync, scanner, profiles, backup, sorters, setSorters, updates, log, shipLog }, prefs);
+
+// Start ins Protokoll: wer, welcher Speicher-Platz, wie viel liegt hier, was wartet
+log.info("app", "Gestartet", {
+  version: APP_VERSION,
+  stage: IS_DEV ? "dev" : "live",
+  person: profiles.active || null,
+  slot: profiles.slot || "(erste)",
+  sync: sync.enabled ? (sync.config.key.length > 12 ? "session" : "sync_key") : "aus",
+  syncUser: sync.config.userId || null,
+  lastSync: sync.config.at ? new Date(sync.config.at).toISOString() : null,
+  lastError: sync.config.error || null,
+  entries: store.snapshot().filter((e) => !e.deleted).length,
+  pending: store.pendingCount,
+  rev: store.rev,
+  online: navigator.onLine,
+  homescreen: matchMedia("(display-mode: standalone)").matches || navigator.standalone === true,
+});
+if (profiles.active && sync.config.userId && profiles.active !== sync.config.userId) {
+  log.error("app", "Aktive Person und Daten auf dem Gerät passen nicht zusammen", { active: profiles.active, syncUser: sync.config.userId });
+}
+store.addEventListener("storage-error", () => log.error("store", "Gerät kann nicht speichern (Speicher voll oder privater Modus)"));
 app.start();
 
 // Wertverlauf: Tageswert merken, sobald alle Preise der Sammlung frisch sind (beim Start oft schon, sonst nach dem Laden)
@@ -111,9 +144,16 @@ document.addEventListener("visibilitychange", async () => {
 });
 window.addEventListener("pagehide", () => sync.flush()); // Tab zu oder App beendet (ältere Safari melden nur das)
 window.addEventListener("online", () => {
+  log.info("app", "Wieder online", { pending: store.pendingCount });
   sync.run();
   prices.resume();
 });
+window.addEventListener("offline", () => log.info("app", "Offline", { pending: store.pendingCount }));
+// Nach jedem Abgleich (und dann höchstens einmal pro Minute) Warnungen und Fehler ans Backend
+sync.addEventListener("status", () => sync.state !== "busy" && navigator.onLine && shipLog().catch(() => 0));
+// Unerwartete Fehler ins Protokoll (den Hinweis dazu zeigt ui/app.js)
+window.addEventListener("error", (e) => log.error("app", "Unerwarteter Fehler", { message: e.message, source: e.filename ? `${e.filename.split("/").pop()}:${e.lineno}` : null, error: e.error }));
+window.addEventListener("unhandledrejection", (e) => log.error("app", "Unbehandelter Fehler (Promise)", { error: e.reason }));
 if (IS_DEV) document.documentElement.dataset.stage = "dev"; // grauer Kopf statt rot
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-navigator.storage?.persist?.().catch(() => {});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch((e) => log.warn("app", "Service Worker nicht registriert – kein Offline-Betrieb", { error: e }));
+navigator.storage?.persist?.().then((granted) => !granted && log.info("app", "Browser kann gespeicherte Daten bei Platzmangel löschen (persist abgelehnt)"), () => {});

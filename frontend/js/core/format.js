@@ -12,6 +12,7 @@ export const fmtSigned = (x) => `${x >= 0 ? "+" : "−"}${fmtEur(Math.abs(x))}`;
 export const fmtPriceInput = (x) => (positive(x) == null ? "" : x.toFixed(2).replace(".", ","));
 export const fmtDateTime = (ms) => new Date(ms).toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
 export const fmtDate = (ms) => new Date(ms).toLocaleDateString("de-DE");
+export const fmtTime = (ms) => new Date(ms).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // klein, ohne Akzente: „Pokémon“ findet man auch mit „pokemon“
