@@ -19,6 +19,7 @@ export class SyncService extends EventTarget {
   #busy = false;
   #attempt = 0; // wievielter Fehlversuch in Folge
   #lastProblem = ""; // damit dasselbe Problem nicht bei jedem Versuch gemeldet wird
+  #lastContact = 0; // wann zuletzt eine Anfrage rausging – jeder Abgleich holt auch ab, was andere Geräte geändert haben
 
   constructor(store, api, storage, storageKey, defaultUrl, batchSize) {
     super();
@@ -82,23 +83,40 @@ export class SyncService extends EventTarget {
     this.#timer = setTimeout(() => this.run(), ms);
   }
 
-  async run() {
+  // Abholen, was andere Geräte geändert haben – außer die letzte Anfrage ist kürzer als minGap her
+  // (Fokus und Sichtbarkeit melden sich oft kurz nacheinander).
+  pull(minGap = 0) {
+    if (this.#busy || Date.now() - this.#lastContact < minGap) return;
+    return this.run();
+  }
+
+  // App geht in den Hintergrund (Handy gesperrt, Tab gewechselt): Wartendes sofort hochladen statt nach der kurzen
+  // Pause von schedule() – im Hintergrund hält das Handy Zeitgeber an, die Änderung käme sonst erst beim nächsten
+  // Öffnen an und die anderen Geräte sähen sie so lange nicht.
+  flush() {
+    if (!this.store.pendingCount) return;
+    return this.run({ background: true });
+  }
+
+  // background: läuft beim Verlassen der App – Anfragen mit keepalive, Probleme erst beim nächsten Mal melden
+  async run({ background = false } = {}) {
     if (!this.enabled || this.#busy || !navigator.onLine) return this.#notify();
     clearTimeout(this.#timer);
     this.#busy = true;
     this.#notify();
     let rejected = 0;
+    const request = (changes) => this.#request(changes, { keepalive: background });
     try {
       // Wartet etwas? Dann erst abholen: Was andere Geräte an denselben Einträgen geändert haben, führt der Speicher
       // Feld für Feld mit den eigenen Änderungen zusammen – sonst überschriebe der ganze Eintrag von hier deren Felder.
       // ponytail: ändert ein anderes Gerät genau zwischen Abholen und Hochladen, gewinnt wieder der ganze Eintrag
-      if (this.store.pendingCount) this.store.applySyncResult([], await this.#request([]));
+      if (this.store.pendingCount) this.store.applySyncResult([], await request([]));
       // in Päckchen hochladen, bis nichts mehr wartet
       for (let round = 0; round < 50; round++) {
         const sent = this.store.pendingChanges(this.batchSize);
         let result;
         try {
-          result = await this.#request(sent);
+          result = await request(sent);
         } catch (e) {
           // Einzelner Eintrag abgelehnt? Diesen zurückhalten und weitermachen, statt alles zu blockieren
           const bad = e.status === 400 && Number.isInteger(e.body?.index) ? sent[e.body.index] : null;
@@ -120,8 +138,11 @@ export class SyncService extends EventTarget {
       const problem = describeError(e);
       if (problem.retry) problem.message += " Neuer Versuch läuft automatisch.";
       this.config.error = problem.message;
-      if (problem.message !== this.#lastProblem) this.#report(problem);
-      this.#lastProblem = problem.message;
+      // im Hintergrund nicht melden (z. B. Netz beim Sperren schon weg) – der nächste Versuch meldet es, falls es bleibt
+      if (!background && problem.message !== this.#lastProblem) {
+        this.#report(problem);
+        this.#lastProblem = problem.message;
+      }
       // vorübergehend? Dann später von selbst nochmal (immer längere Pausen)
       if (problem.retry) this.schedule(RETRY_DELAYS_MS[Math.min(this.#attempt++, RETRY_DELAYS_MS.length - 1)]);
     }
@@ -135,9 +156,9 @@ export class SyncService extends EventTarget {
   }
 
   // Ein Abgleich; nebenbei die Uhr des Geräts an der des Servers messen (Mitte zwischen Senden und Antwort)
-  async #request(changes) {
-    const sentAt = Date.now();
-    const result = await this.api.sync(this.config, this.store.rev, changes);
+  async #request(changes, opts) {
+    const sentAt = (this.#lastContact = Date.now());
+    const result = await this.api.sync(this.config, this.store.rev, changes, opts);
     if (Number.isSafeInteger(result?.now)) this.store.clockOffset = this.config.offset = Math.round(result.now - (sentAt + Date.now()) / 2);
     return result;
   }

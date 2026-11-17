@@ -94,6 +94,7 @@ Web-App ohne Build-Schritt auf GitHub Pages, dazu ein kleines Cloudflare-Backend
 
 - iPhone: Safari → Teilen → „Zum Home-Bildschirm“.
 - Offline gehen App, gesehene Kartenbilder, Abhaken, Listen und Ordner; synchronisiert wird später.
+- **Abgleich zwischen Geräten:** beim Öffnen, bei jeder Rückkehr (auch nur ein Klick ins Browserfenster), alle 30 s, solange die App sichtbar ist, und sofort beim Verlassen, wenn noch etwas hochzuladen ist (Handy sperren direkt nach dem Abhaken reicht).
 - Updates kommen von selbst beim Öffnen und bei jeder Rückkehr in die App (höchstens einmal pro Minute).
 - Fehler erscheinen als Hinweise unten; der Sync versucht es selbst erneut (10 s → 5 min).
 - **Sicherung:** „Mehr“ → Export/Import (JSON). Import nimmt auch die Export-Datei der alten Checkliste.

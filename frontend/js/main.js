@@ -84,20 +84,32 @@ sets.ready.then(() => store.fixCards((card) => withEnglishImage(card, sets.info(
 
 profiles.refreshIfOlder(24 * 60 * 60 * 1000); // Namen und Schlösser: einmal am Tag reicht, die Personenauswahl lädt beim Öffnen frisch
 
-// Lebenszyklus: Sync beim Start, beim Zurückkehren und wenn wieder online.
-// Beim Start und bei jeder Rückkehr in die App nach einer neuen Version schauen – so kommen Updates
-// auch in der iPhone-App vom Home-Bildschirm sofort an.
+// Lebenszyklus: Sync beim Start, beim Zurückkehren, solange die App offen ist und wenn wieder online.
+// Was ein anderes Gerät geändert hat, kommt nur mit einem Abgleich hier an – ohne die Abfragen unten sah ein
+// offener Tab am PC Abgehaktes vom Handy erst nach dem Neuladen.
 sync.run();
 updates.reloadIfUpdated();
-// Höchstens einmal pro Minute – kurz zu Cardmarket und zurück soll nicht jedes Mal zwei Anfragen kosten.
-// Eigene Änderungen lädt der Sync ohnehin sofort hoch (store „change“).
+// Abholen beim Zurückkommen (Tab, App, auch nur Klick ins Browserfenster) und alle 30 s, solange die App sichtbar ist.
+// Ein Abgleich ohne Neues liest im Backend kaum Zeilen (Index auf Person + Stand).
+const PULL_GAP_MS = 5_000;
+const PULL_EVERY_MS = 30_000;
+window.addEventListener("focus", () => sync.pull(PULL_GAP_MS));
+// Bei einem Fehler wartet der Sync selbst immer länger bis zum nächsten Versuch – das Intervall drängelt nicht dazwischen.
+setInterval(() => !document.hidden && !sync.config.error && sync.pull(PULL_GAP_MS), PULL_EVERY_MS);
+// Nach einer neuen Version höchstens einmal pro Minute schauen – kurz zu Cardmarket und zurück soll nicht jedes Mal
+// index.html laden. So kommen Updates auch in der iPhone-App vom Home-Bildschirm an.
 const RETURN_CHECK_MS = 60_000;
 let lastCheck = Date.now();
 document.addEventListener("visibilitychange", async () => {
-  if (document.hidden || Date.now() - lastCheck < RETURN_CHECK_MS) return;
-  lastCheck = Date.now();
-  if (!(await updates.reloadIfUpdated())) sync.run();
+  // Weg von der App: Wartendes jetzt hochladen, im Hintergrund hält das Handy Zeitgeber an
+  if (document.hidden) return sync.flush();
+  if (Date.now() - lastCheck >= RETURN_CHECK_MS) {
+    lastCheck = Date.now();
+    if (await updates.reloadIfUpdated()) return;
+  }
+  sync.pull(PULL_GAP_MS);
 });
+window.addEventListener("pagehide", () => sync.flush()); // Tab zu oder App beendet (ältere Safari melden nur das)
 window.addEventListener("online", () => {
   sync.run();
   prices.resume();

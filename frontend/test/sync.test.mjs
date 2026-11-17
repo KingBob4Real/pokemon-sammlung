@@ -18,7 +18,7 @@ globalThis.setTimeout = (fn, ms) => timers.push(ms);
 globalThis.clearTimeout = () => {};
 
 // Server wie im Backend: neuere Änderung gewinnt, zurück kommt alles seit „since“ plus die gesendeten Einträge
-const server = { rows: new Map(), rev: 0, calls: [], fail: [] };
+const server = { rows: new Map(), rev: 0, calls: [], fail: [], keepalive: [] };
 server.sync = async (since, changes) => {
   server.calls.push(changes.length);
   const status = server.fail.shift();
@@ -40,7 +40,7 @@ const serverData = (id) => server.rows.get(`collection:${id}`).data;
 function device(clockSkew = 0, batchSize = 500) {
   const mem = new Map();
   const storage = { get: (k, f) => (mem.has(k) ? structuredClone(mem.get(k)) : f), set: (k, v) => (mem.set(k, structuredClone(v)), true), remove: (k) => mem.delete(k) };
-  const api = { sync: (config, since, changes) => server.sync(since, changes) };
+  const api = { sync: (config, since, changes, opts) => (server.keepalive.push(Boolean(opts?.keepalive)), server.sync(since, changes)) };
   const dev = {
     start() {
       dev.store = new EntityStore(storage, storageKeys());
@@ -156,5 +156,68 @@ await c.act((store, sync) => sync.configure("ANDERER"));
 assert.ok(c.store.get("collection", "neu-im-browser"), "bleibt auf dem Gerät");
 assert.ok(server.rows.has("collection:neu-im-browser"), "und ist oben");
 assert.equal(c.store.pendingCount, 0);
+
+// --- Offener Tab am PC: Abholen holt, was das Handy abgehakt hat – aber nicht bei jedem Fokus sofort nochmal
+const handy = device();
+const pc = device();
+await handy.run();
+await pc.run();
+t += 1000;
+await handy.put("ok-2", { qty: 7 });
+await handy.run();
+server.calls.length = 0;
+await pc.act((store, sync) => sync.pull(5_000)); // letzte Anfrage erst 1 s her
+assert.deepEqual(server.calls, [], "kurz nach dem letzten Abgleich nicht nochmal");
+assert.notEqual(pc.store.get("collection", "ok-2").qty, 7);
+t += 5_000;
+await pc.act((store, sync) => sync.pull(5_000));
+assert.deepEqual(server.calls, [0], "nur abholen, nichts hochladen");
+assert.equal(pc.store.get("collection", "ok-2").qty, 7, "PC sieht die Anzahl vom Handy");
+
+// --- Handy gesperrt direkt nach dem Abhaken: flush lädt sofort hoch (keepalive), ohne Wartendes passiert nichts
+server.calls.length = 0;
+server.keepalive.length = 0;
+await handy.act((store, sync) => sync.flush());
+assert.deepEqual(server.calls, [], "nichts wartet → keine Anfrage");
+t += 1000;
+await handy.put("ok-3", { qty: 5 });
+await handy.act((store, sync) => sync.flush());
+assert.deepEqual(server.calls, [0, 1], "erst abholen, dann hochladen");
+assert.deepEqual(server.keepalive, [true, true], "beide mit keepalive");
+assert.equal(serverData("ok-3").qty, 5);
+assert.equal(handy.store.pendingCount, 0);
+
+// --- Klappt das Hochladen im Hintergrund nicht, kommt keine Meldung – erst wenn es beim nächsten Mal noch hakt
+const handyProblems = [];
+handy.sync.addEventListener("problem", (e) => handyProblems.push(e.detail.kind));
+server.fail.push(503, 503);
+t += 1000;
+await handy.put("ok-4", { qty: 6 });
+await handy.act((store, sync) => sync.flush());
+assert.equal(handy.sync.state, "error");
+assert.deepEqual(handyProblems, [], "im Hintergrund still");
+await handy.run();
+assert.deepEqual(handyProblems, ["server"], "zurück in der App: jetzt melden");
+await handy.run();
+assert.equal(serverData("ok-4").qty, 6, "und danach geht es hoch");
+
+// --- keepalive nur für kleine Anfragen (Browser erlauben 64 KiB), sonst normal
+const { SyncApi } = await import("../js/data/syncApi.js");
+const seen = [];
+const syncApi = new SyncApi(async (url, opts) => (seen.push(opts.keepalive), { rev: 0, changes: [] }));
+const cfg = { url: "https://backend/", key: "K" };
+await syncApi.sync(cfg, 0, []);
+await syncApi.sync(cfg, 0, [entry], { keepalive: true });
+await syncApi.sync(cfg, 0, Array.from({ length: 400 }, (_, i) => ({ ...entry, id: `karte-${i}`, name: "Glurak ex äöü" })), { keepalive: true });
+assert.deepEqual(seen, [false, true, false]);
+// Browser lehnt keepalive ab (TypeError) → derselbe Abgleich nochmal ohne
+seen.length = 0;
+const picky = new SyncApi(async (url, opts) => {
+  seen.push(opts.keepalive);
+  if (opts.keepalive) throw new TypeError("keepalive mit Vorabanfrage nicht unterstützt");
+  return { rev: 1, changes: [] };
+});
+assert.equal((await picky.sync(cfg, 0, [entry], { keepalive: true })).rev, 1);
+assert.deepEqual(seen, [true, false]);
 
 console.log("Abgleich ok");
